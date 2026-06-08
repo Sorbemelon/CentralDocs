@@ -1,0 +1,7 @@
+issue_code	issue_category	recommended_answer	related_document	escalation_owner
+SUP-101	Document naming	Use the naming format Team-Purpose-Date-Version and store final versions in the approved folder.	Document Management Policy.pdf	Document Operations
+SUP-102	Vendor checklist	Use the Vendor Onboarding Checklist and confirm tax, bank, security, and approval fields are complete.	Vendor Onboarding Checklist.docx	Finance & Vendors
+SUP-103	Invoice status	Check Invoice Tracking Sample for owner, due date, current status, and risk flag.	Invoice Tracking Sample.xlsx	Finance
+SUP-104	Remote approval	Follow the Remote Approval SOP and record approval evidence in CentralDocs.	Remote Approval SOP.docx	Operations
+SUP-105	Generated briefing	Use Generate Document from Chat after validating references used in the answer.	Example Chat Summary.md	Project Lead
+SUP-106	Media evidence	Use cached media embeddings and transcript notes for audio/video demo evidence.	Rollout Risk Discussion.mp3	Digital Workspace Team

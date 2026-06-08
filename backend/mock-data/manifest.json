@@ -1,0 +1,429 @@
+{
+  "workspaceTitle": "Orchid Retail Digital Transformation",
+  "version": "2026-06-05",
+  "description": "Connected fictional mock corpus for CentralDocs demo. All files relate to one digital transformation scenario.",
+  "mockDataRules": {
+    "readOnly": true,
+    "publicUploadSeparateFromMock": true,
+    "mockMediaIndexing": "direct Gemini multimodal embedding once during seeding, then cached vector use at runtime",
+    "runtimeMediaReembedding": false
+  },
+  "folders": [
+    {
+      "slug": "01-strategy-rollout",
+      "title": "Strategy & Rollout"
+    },
+    {
+      "slug": "02-document-operations",
+      "title": "Document Operations"
+    },
+    {
+      "slug": "03-finance-vendors",
+      "title": "Finance & Vendors"
+    },
+    {
+      "slug": "04-customer-support-signals",
+      "title": "Customer & Support Signals"
+    },
+    {
+      "slug": "05-meeting-evidence",
+      "title": "Meeting Evidence"
+    },
+    {
+      "slug": "06-generated-examples",
+      "title": "Generated Examples"
+    }
+  ],
+  "sampleQuestions": [
+    "What is Orchid Retail trying to improve with CentralDocs?",
+    "Which documents mention vendor onboarding and invoice tracking?",
+    "Compare the rollout risks from the slides and meeting audio.",
+    "What customer pain points relate to document search?",
+    "Which policy or SOP explains how documents should be stored and approved?",
+    "Create a concise internal briefing from this chat and the references used."
+  ],
+  "documents": [
+    {
+      "folderSlug": "01-strategy-rollout",
+      "folderTitle": "Strategy & Rollout",
+      "filename": "centraldocs-transformation-brief.md",
+      "title": "CentralDocs Transformation Brief",
+      "fileKind": "markdown",
+      "mimeType": "text/markdown",
+      "sourceType": "mock",
+      "scope": "mock",
+      "readOnly": true,
+      "downloadable": true,
+      "indexingMode": "text_chunk_embedding",
+      "expectedTopics": [
+        "transformation goal",
+        "pilot scope",
+        "risks"
+      ],
+      "demoQuestions": [
+        "What is the main transformation goal?"
+      ],
+      "relativePath": "documents/01-strategy-rollout/centraldocs-transformation-brief.md",
+      "sizeBytes": 1704,
+      "sha256": "690d48c4e4696edb1b7cbdcfa9089b61eeec66b2dc75bdc8bcf5f6e17a1843a7"
+    },
+    {
+      "folderSlug": "01-strategy-rollout",
+      "folderTitle": "Strategy & Rollout",
+      "filename": "digital-workspace-rollout-plan.pptx",
+      "title": "Digital Workspace Rollout Plan",
+      "fileKind": "pptx",
+      "mimeType": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+      "sourceType": "mock",
+      "scope": "mock",
+      "readOnly": true,
+      "downloadable": true,
+      "indexingMode": "text_extraction_plus_slide_locators",
+      "expectedTopics": [
+        "rollout phases",
+        "training",
+        "risks"
+      ],
+      "demoQuestions": [
+        "What risks are listed in the rollout plan?"
+      ],
+      "relativePath": "documents/01-strategy-rollout/digital-workspace-rollout-plan.pptx",
+      "sizeBytes": 34880,
+      "sha256": "a90b5667f0cfada5b70c50d4b034bfd96a1ad1dc6ace6ce97f95d2386e4240ab"
+    },
+    {
+      "folderSlug": "01-strategy-rollout",
+      "folderTitle": "Strategy & Rollout",
+      "filename": "intake-to-ai-search-workflow.png",
+      "title": "Intake to AI Search Workflow",
+      "fileKind": "image",
+      "mimeType": "image/png",
+      "sourceType": "mock",
+      "scope": "mock",
+      "readOnly": true,
+      "downloadable": true,
+      "indexingMode": "direct_multimodal_seed_cached",
+      "expectedTopics": [
+        "workflow",
+        "document intake",
+        "AI search"
+      ],
+      "demoQuestions": [
+        "Explain the workflow diagram."
+      ],
+      "relativePath": "documents/01-strategy-rollout/intake-to-ai-search-workflow.png",
+      "sizeBytes": 123476,
+      "sha256": "cad418e78a53b761d185fabecd77972ab31fd4c302e670b1b92b2bd4ec3ee42d"
+    },
+    {
+      "folderSlug": "02-document-operations",
+      "folderTitle": "Document Operations",
+      "filename": "document-management-policy.pdf",
+      "title": "Document Management Policy",
+      "fileKind": "pdf",
+      "mimeType": "application/pdf",
+      "sourceType": "mock",
+      "scope": "mock",
+      "readOnly": true,
+      "downloadable": true,
+      "indexingMode": "page_text_extraction",
+      "expectedTopics": [
+        "naming",
+        "storage",
+        "approval",
+        "archive"
+      ],
+      "demoQuestions": [
+        "What is the naming convention?"
+      ],
+      "relativePath": "documents/02-document-operations/document-management-policy.pdf",
+      "sizeBytes": 3469,
+      "sha256": "5019b26d894e08159057862b41a00e65ee2400c417ba7cad290175ed640b6977"
+    },
+    {
+      "folderSlug": "02-document-operations",
+      "folderTitle": "Document Operations",
+      "filename": "remote-approval-sop.docx",
+      "title": "Remote Approval SOP",
+      "fileKind": "docx",
+      "mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "sourceType": "mock",
+      "scope": "mock",
+      "readOnly": true,
+      "downloadable": true,
+      "indexingMode": "docx_text_extraction",
+      "expectedTopics": [
+        "remote approval",
+        "evidence",
+        "SOP"
+      ],
+      "demoQuestions": [
+        "How should remote approvals be recorded?"
+      ],
+      "relativePath": "documents/02-document-operations/remote-approval-sop.docx",
+      "sizeBytes": 37699,
+      "sha256": "5c6b550567eb9f52a067532faf50eebeb2da1afe9236607ead8bd5998110fd13"
+    },
+    {
+      "folderSlug": "02-document-operations",
+      "folderTitle": "Document Operations",
+      "filename": "support-knowledge-playbook.tsv",
+      "title": "Support Knowledge Playbook",
+      "fileKind": "tsv",
+      "mimeType": "text/tab-separated-values",
+      "sourceType": "mock",
+      "scope": "mock",
+      "readOnly": true,
+      "downloadable": true,
+      "indexingMode": "table_aware_text_chunks",
+      "expectedTopics": [
+        "support",
+        "recommended answers",
+        "escalation"
+      ],
+      "demoQuestions": [
+        "What should support answer about invoice status?"
+      ],
+      "relativePath": "documents/02-document-operations/support-knowledge-playbook.tsv",
+      "sizeBytes": 1006,
+      "sha256": "b7d4e752b27e3cedbdedb479630014836e265039a2d91122de7396987bfb2884"
+    },
+    {
+      "folderSlug": "03-finance-vendors",
+      "folderTitle": "Finance & Vendors",
+      "filename": "vendor-onboarding-checklist.docx",
+      "title": "Vendor Onboarding Checklist",
+      "fileKind": "docx",
+      "mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "sourceType": "mock",
+      "scope": "mock",
+      "readOnly": true,
+      "downloadable": true,
+      "indexingMode": "docx_text_extraction",
+      "expectedTopics": [
+        "vendor onboarding",
+        "compliance",
+        "approval"
+      ],
+      "demoQuestions": [
+        "What fields are required for vendor approval?"
+      ],
+      "relativePath": "documents/03-finance-vendors/vendor-onboarding-checklist.docx",
+      "sizeBytes": 37546,
+      "sha256": "91607e58197823716f145a2dc5706006042d271e2a2281f087921f77a3cb0fe0"
+    },
+    {
+      "folderSlug": "03-finance-vendors",
+      "folderTitle": "Finance & Vendors",
+      "filename": "invoice-tracking-sample.xlsx",
+      "title": "Invoice Tracking Sample",
+      "fileKind": "xlsx",
+      "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "sourceType": "mock",
+      "scope": "mock",
+      "readOnly": true,
+      "downloadable": true,
+      "indexingMode": "mock_only_table_aware_extraction",
+      "expectedTopics": [
+        "invoice status",
+        "due dates",
+        "risk flags"
+      ],
+      "demoQuestions": [
+        "Which invoices are high risk?"
+      ],
+      "relativePath": "documents/03-finance-vendors/invoice-tracking-sample.xlsx",
+      "sizeBytes": 8977,
+      "sha256": "b461d37fe1376cd46a508e39fccbbf5877b4114fd982af992beb4b4036fbaf47"
+    },
+    {
+      "folderSlug": "03-finance-vendors",
+      "folderTitle": "Finance & Vendors",
+      "filename": "expense-reimbursement-guide.pdf",
+      "title": "Expense Reimbursement Guide",
+      "fileKind": "pdf",
+      "mimeType": "application/pdf",
+      "sourceType": "mock",
+      "scope": "mock",
+      "readOnly": true,
+      "downloadable": true,
+      "indexingMode": "page_text_extraction",
+      "expectedTopics": [
+        "reimbursement",
+        "approval",
+        "receipts"
+      ],
+      "demoQuestions": [
+        "What expenses are reimbursable?"
+      ],
+      "relativePath": "documents/03-finance-vendors/expense-reimbursement-guide.pdf",
+      "sizeBytes": 3043,
+      "sha256": "affceddf7b5e299b0c74d751244ba58d9160969762ad98aded4b0debb700b33a"
+    },
+    {
+      "folderSlug": "04-customer-support-signals",
+      "folderTitle": "Customer & Support Signals",
+      "filename": "customer-feedback-export.csv",
+      "title": "Customer Feedback Export",
+      "fileKind": "csv",
+      "mimeType": "text/csv",
+      "sourceType": "mock",
+      "scope": "mock",
+      "readOnly": true,
+      "downloadable": true,
+      "indexingMode": "table_aware_text_chunks",
+      "expectedTopics": [
+        "feedback",
+        "pain points",
+        "document search"
+      ],
+      "demoQuestions": [
+        "What customer pain points relate to document search?"
+      ],
+      "relativePath": "documents/04-customer-support-signals/customer-feedback-export.csv",
+      "sizeBytes": 1290,
+      "sha256": "9805cdc6606797d76c844303c9322af77e2d548d63fcf9d37eab71c1002b4e22"
+    },
+    {
+      "folderSlug": "04-customer-support-signals",
+      "folderTitle": "Customer & Support Signals",
+      "filename": "support-ticket-summary.md",
+      "title": "Support Ticket Summary",
+      "fileKind": "markdown",
+      "mimeType": "text/markdown",
+      "sourceType": "mock",
+      "scope": "mock",
+      "readOnly": true,
+      "downloadable": true,
+      "indexingMode": "text_chunk_embedding",
+      "expectedTopics": [
+        "support tickets",
+        "recommended actions"
+      ],
+      "demoQuestions": [
+        "What are the common support issue themes?"
+      ],
+      "relativePath": "documents/04-customer-support-signals/support-ticket-summary.md",
+      "sizeBytes": 1162,
+      "sha256": "02102662eb14195e8ef8a2bc97697be96a8bc2e204c11a6a5962ca5c013e287b"
+    },
+    {
+      "folderSlug": "05-meeting-evidence",
+      "folderTitle": "Meeting Evidence",
+      "filename": "rollout-risk-discussion.mp3",
+      "title": "Rollout Risk Discussion",
+      "fileKind": "audio",
+      "mimeType": "audio/mpeg",
+      "sourceType": "mock",
+      "scope": "mock",
+      "readOnly": true,
+      "downloadable": true,
+      "indexingMode": "direct_multimodal_seed_cached",
+      "expectedTopics": [
+        "meeting audio",
+        "rollout risks",
+        "training"
+      ],
+      "demoQuestions": [
+        "What risks were discussed in the meeting audio?"
+      ],
+      "relativePath": "documents/05-meeting-evidence/rollout-risk-discussion.mp3",
+      "sizeBytes": 498360,
+      "sha256": "6ace3744923cedfc35a07656f8f7fcf744d88fea7ecb279900b0c4c11ec86008"
+    },
+    {
+      "folderSlug": "05-meeting-evidence",
+      "folderTitle": "Meeting Evidence",
+      "filename": "rollout-risk-discussion-transcript.md",
+      "title": "Rollout Risk Discussion Transcript",
+      "fileKind": "markdown",
+      "mimeType": "text/markdown",
+      "sourceType": "mock",
+      "scope": "mock",
+      "readOnly": true,
+      "downloadable": true,
+      "indexingMode": "fallback_transcript_preview",
+      "expectedTopics": [
+        "meeting transcript",
+        "rollout risks"
+      ],
+      "demoQuestions": [
+        "What does the transcript say about risks?"
+      ],
+      "relativePath": "documents/05-meeting-evidence/rollout-risk-discussion-transcript.md",
+      "sizeBytes": 1411,
+      "sha256": "d55e8fe0dd8b2c565892e8d315636b415d9e366df3839001694eed95b65c09e1"
+    },
+    {
+      "folderSlug": "05-meeting-evidence",
+      "folderTitle": "Meeting Evidence",
+      "filename": "staff-training-demo.mp4",
+      "title": "Staff Training Demo",
+      "fileKind": "video",
+      "mimeType": "video/mp4",
+      "sourceType": "mock",
+      "scope": "mock",
+      "readOnly": true,
+      "downloadable": true,
+      "indexingMode": "direct_multimodal_seed_cached",
+      "expectedTopics": [
+        "training video",
+        "staff workflow"
+      ],
+      "demoQuestions": [
+        "What does the training video demonstrate?"
+      ],
+      "relativePath": "documents/05-meeting-evidence/staff-training-demo.mp4",
+      "sizeBytes": 776398,
+      "sha256": "f6a6ec4a6bb15db397e987d14803a6ec921bf89fd5852b3861f3d1a6591e35be"
+    },
+    {
+      "folderSlug": "05-meeting-evidence",
+      "folderTitle": "Meeting Evidence",
+      "filename": "staff-training-demo-notes.md",
+      "title": "Staff Training Demo Notes",
+      "fileKind": "markdown",
+      "mimeType": "text/markdown",
+      "sourceType": "mock",
+      "scope": "mock",
+      "readOnly": true,
+      "downloadable": true,
+      "indexingMode": "fallback_video_notes_preview",
+      "expectedTopics": [
+        "training notes",
+        "demo steps"
+      ],
+      "demoQuestions": [
+        "What steps are shown in the training notes?"
+      ],
+      "relativePath": "documents/05-meeting-evidence/staff-training-demo-notes.md",
+      "sizeBytes": 959,
+      "sha256": "dc115f0749b6bba36a7dd61e1243ef0b8aac2b911d951e37bda887dec5184d49"
+    },
+    {
+      "folderSlug": "06-generated-examples",
+      "folderTitle": "Generated Examples",
+      "filename": "example-chat-summary.md",
+      "title": "Example Chat Summary",
+      "fileKind": "markdown",
+      "mimeType": "text/markdown",
+      "sourceType": "mock",
+      "scope": "mock",
+      "readOnly": true,
+      "downloadable": true,
+      "indexingMode": "text_chunk_embedding",
+      "expectedTopics": [
+        "generated summary",
+        "references",
+        "next steps"
+      ],
+      "demoQuestions": [
+        "What does a generated briefing look like?"
+      ],
+      "relativePath": "documents/06-generated-examples/example-chat-summary.md",
+      "sizeBytes": 1347,
+      "sha256": "a3ae82d688d3fda59d88ffd017bfe688ae77312f5e1fc6cf6cfe794d558b5078"
+    }
+  ],
+  "generatedAt": "2026-06-05"
+}

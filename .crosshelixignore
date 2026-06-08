@@ -1,0 +1,11 @@
+_reference/
+docs/scopian/private/
+docs/prompts/
+docs/build-progress/
+.agent-work/
+backend/tmp/
+backend/uploads/
+backend/.cache/
+frontend/dist/
+backend/dist/
+node_modules/

@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+frontend/node_modules/
+backend/node_modules/
+
+# Environment / secrets
+.env
+.env.*
+frontend/.env
+frontend/.env.*
+backend/.env
+backend/.env.*
+!.env.example
+!frontend/.env.example
+!backend/.env.example
+
+# Build outputs
+dist/
+build/
+frontend/dist/
+backend/dist/
+coverage/
+
+# Agent/build private material
+_reference/
+docs/scopian/private/
+docs/prompts/
+docs/build-progress/
+.agent-work/
+
+# Local runtime/cache
+.crosshelix/
+.scopian/cache/
+*.log
+.DS_Store
+Thumbs.db
+
+# Temporary uploads
+backend/tmp/
+backend/uploads/
+backend/.cache/

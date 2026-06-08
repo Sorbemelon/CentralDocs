@@ -1,0 +1,9 @@
+feedback_id,source,date,team,theme,severity,comment,related_document
+FB-001,Store Manager,2026-05-02,Operations,Document search,High,"I can never tell which vendor checklist is the latest version.",Vendor Onboarding Checklist.docx
+FB-002,Support Agent,2026-05-04,Support,Repeated questions,Medium,"We answer the same document naming questions every week.",Document Management Policy.pdf
+FB-003,Finance Coordinator,2026-05-06,Finance,Invoice tracking,High,"Invoice status is split between email and spreadsheets.",Invoice Tracking Sample.xlsx
+FB-004,Regional Manager,2026-05-07,Operations,Approval delays,Medium,"Remote approval steps are not obvious for new managers.",Remote Approval SOP.docx
+FB-005,Support Agent,2026-05-09,Support,Knowledge access,High,"The support playbook exists, but agents do not search it first.",Support Knowledge Playbook.tsv
+FB-006,Store Associate,2026-05-10,Retail,Training,Low,"A short training video is easier than reading the full policy.",Staff Training Demo.mp4
+FB-007,Finance Lead,2026-05-12,Finance,References,High,"AI summaries are useful only if they cite the exact source.",Expense Reimbursement Guide.pdf
+FB-008,Project Lead,2026-05-14,Rollout,Adoption,Medium,"The demo guide should tell users what to ask first.",CentralDocs Transformation Brief.md
