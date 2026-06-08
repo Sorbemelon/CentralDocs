@@ -1,5 +1,11 @@
 import mongoose from "mongoose";
 import { DEMO_LIMITS, EMPTY_DEMO_USAGE } from "../config/limits.js";
+import {
+  CLEANUP_STATUS,
+  CLEANUP_STATUSES,
+  DEMO_SESSION_STATUS,
+  DEMO_SESSION_STATUSES,
+} from "../constants/lifecycle.constants.js";
 
 const demoSessionSchema = new mongoose.Schema(
   {
@@ -11,8 +17,8 @@ const demoSessionSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["active", "expired"],
-      default: "active",
+      enum: DEMO_SESSION_STATUSES,
+      default: DEMO_SESSION_STATUS.ACTIVE,
       index: true,
     },
     createdAt: {
@@ -42,8 +48,8 @@ const demoSessionSchema = new mongoose.Schema(
     },
     cleanupStatus: {
       type: String,
-      enum: ["not_started", "accepted", "pending", "completed", "failed"],
-      default: "not_started",
+      enum: CLEANUP_STATUSES,
+      default: CLEANUP_STATUS.NOT_STARTED,
     },
   },
   {

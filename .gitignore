@@ -52,5 +52,6 @@ __pycache__/
 *.local.json
 .scopian/
 
-# Scopian local/generated evidence
+# Scopian local/generated files
 docs/scopian/views/**/checks/
+docs/scopian/views/**/attempts/
