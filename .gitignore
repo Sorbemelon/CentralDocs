@@ -39,3 +39,15 @@ Thumbs.db
 backend/tmp/
 backend/uploads/
 backend/.cache/
+__pycache__/
+*.py[cod]
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+.audit_final/
+.audit_*/
+.claude/settings.local.json
+*.local.json
+.scopian/
