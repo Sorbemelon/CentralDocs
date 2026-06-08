@@ -6,15 +6,22 @@ const manifestPath = fileURLToPath(new URL("../../../mock-data/manifest.json", i
 
 let manifestCache = null;
 
-export async function loadMockManifest({ forceReload = false } = {}) {
-  if (manifestCache && !forceReload) {
+export async function loadMockManifest({ forceReload = false, manifestFilePath = manifestPath } = {}) {
+  const usesDefaultManifest = manifestFilePath === manifestPath;
+
+  if (usesDefaultManifest && manifestCache && !forceReload) {
     return manifestCache;
   }
 
   try {
-    const fileContents = await readFile(manifestPath, "utf8");
-    manifestCache = JSON.parse(fileContents);
-    return manifestCache;
+    const fileContents = await readFile(manifestFilePath, "utf8");
+    const manifest = JSON.parse(fileContents);
+
+    if (usesDefaultManifest) {
+      manifestCache = manifest;
+    }
+
+    return manifest;
   } catch (error) {
     throw createHttpError(
       500,

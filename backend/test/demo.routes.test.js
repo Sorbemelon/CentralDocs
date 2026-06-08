@@ -1,0 +1,69 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import request from "supertest";
+
+process.env.NODE_ENV = "test";
+delete process.env.MONGODB_URI;
+delete process.env.AWS_REGION;
+delete process.env.AWS_S3_BUCKET;
+delete process.env.AWS_ACCESS_KEY_ID;
+delete process.env.AWS_SECRET_ACCESS_KEY;
+delete process.env.GEMINI_API_KEY_1;
+delete process.env.GEMINI_API_KEY_2;
+delete process.env.GEMINI_API_KEY_3;
+delete process.env.GEMINI_API_KEYS;
+
+const { app } = await import("../src/app.js");
+
+test("POST /api/demo/session creates a foundation-memory demo session", async () => {
+  const response = await request(app).post("/api/demo/session").expect(201);
+
+  assert.equal(response.body.status, "ready");
+  assert.equal(response.body.mode, "foundation_memory");
+  assert.match(response.body.session.sessionId, /^demo_/);
+  assert.equal(response.body.session.persistence, "memory");
+  assert.equal(response.body.session.limits.sessionLifetimeDays, 3);
+  assert.equal(response.body.session.usage.uploadedFiles, 0);
+  assert.ok(response.headers["set-cookie"]?.some((cookie) => cookie.includes("centraldocs_demo_session")));
+});
+
+test("GET /api/demo/session returns current session with header", async () => {
+  const created = await request(app).post("/api/demo/session").expect(201);
+  const sessionId = created.body.session.sessionId;
+
+  const current = await request(app)
+    .get("/api/demo/session")
+    .set("x-demo-session-id", sessionId)
+    .expect(200);
+
+  assert.equal(current.body.status, "ready");
+  assert.equal(current.body.mode, "foundation_memory");
+  assert.equal(current.body.session.sessionId, sessionId);
+  assert.equal(current.body.session.persistence, "memory");
+});
+
+test("POST /api/demo/clear returns clear accepted foundation response", async () => {
+  const created = await request(app).post("/api/demo/session").expect(201);
+  const sessionId = created.body.session.sessionId;
+
+  const response = await request(app)
+    .post("/api/demo/clear")
+    .set("x-demo-session-id", sessionId)
+    .expect(202);
+
+  assert.equal(response.body.status, "clear_accepted");
+  assert.equal(response.body.result.accepted, true);
+  assert.equal(response.body.result.sessionId, sessionId);
+  assert.match(response.body.phaseLimit, /Phase 1A/);
+});
+
+test("GET /api/demo/guide returns guide counts from manifest", async () => {
+  const response = await request(app).get("/api/demo/guide").expect(200);
+
+  assert.equal(response.body.status, "ready");
+  assert.equal(response.body.guide.workspaceTitle, "Orchid Retail Digital Transformation");
+  assert.ok(response.body.guide.sampleQuestions.length > 0);
+  assert.equal(response.body.guide.folders.length, 6);
+  assert.equal(response.body.guide.documentCount, 16);
+  assert.equal(response.body.limits.maxChatSessions, 5);
+});
