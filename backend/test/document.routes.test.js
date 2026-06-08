@@ -1,0 +1,75 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import request from "supertest";
+
+process.env.NODE_ENV = "test";
+delete process.env.MONGODB_URI;
+
+const { app } = await import("../src/app.js");
+const { toMockDocumentId } = await import("../src/utils/ids.js");
+
+const briefDocumentId = toMockDocumentId(
+  "01-strategy-rollout/centraldocs-transformation-brief.md",
+);
+
+test("GET /api/documents returns mock documents without MongoDB", async () => {
+  const response = await request(app).get("/api/documents").expect(200);
+
+  assert.equal(response.body.status, "ready");
+  assert.equal(response.body.persistenceStatus, "not_configured");
+  assert.equal(response.body.documents.length, 16);
+  assert.ok(response.body.documents.every((document) => document.scope === "mock"));
+  assert.ok(response.body.documents.every((document) => document.readOnly === true));
+  assert.ok(response.body.documents.every((document) => document.attachable === true));
+  assert.ok(response.body.documents.every((document) => !("objectKey" in document)));
+});
+
+test("GET /api/documents supports fileKind and sourceType filters", async () => {
+  const imageResponse = await request(app).get("/api/documents?fileKind=image").expect(200);
+  const sourceResponse = await request(app).get("/api/documents?sourceType=mock").expect(200);
+
+  assert.equal(imageResponse.body.documents.length, 1);
+  assert.equal(imageResponse.body.documents[0].fileKind, "image");
+  assert.equal(sourceResponse.body.documents.length, 16);
+  assert.ok(sourceResponse.body.documents.every((document) => document.sourceType === "mock"));
+});
+
+test("GET /api/documents/:mockDocumentId returns mock document detail", async () => {
+  const response = await request(app).get(`/api/documents/${briefDocumentId}`).expect(200);
+
+  assert.equal(response.body.document.id, briefDocumentId);
+  assert.equal(response.body.document.title, "CentralDocs Transformation Brief");
+  assert.equal(response.body.document.status, "ready");
+  assert.equal(response.body.document.downloadAvailable, "pending_s3_phase");
+  assert.ok(response.body.document.demoQuestions.length > 0);
+  assert.ok(!("objectKey" in response.body.document));
+});
+
+test("GET /api/documents/:mockDocumentId/preview returns manifest-derived preview", async () => {
+  const response = await request(app)
+    .get(`/api/documents/${briefDocumentId}/preview`)
+    .expect(200);
+
+  assert.equal(response.body.preview.title, "CentralDocs Transformation Brief");
+  assert.equal(response.body.preview.fileKind, "markdown");
+  assert.equal(response.body.preview.folderName, "Strategy & Rollout");
+  assert.equal(response.body.preview.previewUnavailable, false);
+  assert.ok(response.body.preview.demoQuestions.length > 0);
+});
+
+test("PATCH and DELETE mock document return read-only error", async () => {
+  const patchResponse = await request(app)
+    .patch(`/api/documents/${briefDocumentId}/move`)
+    .send({ folderId: null })
+    .expect(403);
+  const deleteResponse = await request(app).delete(`/api/documents/${briefDocumentId}`).expect(403);
+
+  assert.equal(patchResponse.body.error.code, "READ_ONLY_RESOURCE");
+  assert.equal(deleteResponse.body.error.code, "READ_ONLY_RESOURCE");
+});
+
+test("upload/download/retry document routes are not implemented in Phase 2B", async () => {
+  await request(app).post("/api/documents/upload").expect(404);
+  await request(app).post(`/api/documents/${briefDocumentId}/download-url`).expect(404);
+  await request(app).post(`/api/documents/${briefDocumentId}/retry`).expect(404);
+});

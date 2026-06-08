@@ -9,7 +9,10 @@ import { errorHandler } from "./middleware/errorHandler.js";
 import { notFound } from "./middleware/notFound.js";
 import { requestLogger } from "./middleware/requestLogger.js";
 import { demoRouter } from "./routes/demo.routes.js";
+import { documentRouter } from "./routes/document.routes.js";
+import { folderRouter } from "./routes/folder.routes.js";
 import { healthRouter } from "./routes/health.routes.js";
+import { trashRouter } from "./routes/trash.routes.js";
 
 export const app = express();
 
@@ -44,6 +47,9 @@ app.use(demoSessionMiddleware);
 
 app.use("/api/health", healthRouter);
 app.use("/api/demo", demoRouter);
+app.use("/api/folders", folderRouter);
+app.use("/api/documents", documentRouter);
+app.use("/api/trash", trashRouter);
 
 app.use(notFound);
 app.use(errorHandler);

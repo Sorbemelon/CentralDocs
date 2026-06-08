@@ -6,6 +6,7 @@ import {
   createOrResumeDemoSession,
   getDemoSession,
 } from "../services/demo/demoSession.service.js";
+import { buildDemoWorkspace } from "../services/demo/demoWorkspace.service.js";
 import { getDemoGuideFromManifest } from "../services/mockData/mockManifest.service.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { createHttpError } from "../utils/httpError.js";
@@ -22,6 +23,35 @@ function setDemoSessionCookie(res, sessionId) {
     maxAge: COOKIE_MAX_AGE_MS,
   });
 }
+
+demoRouter.post(
+  "/bootstrap",
+  asyncHandler(async (req, res) => {
+    const workspace = await buildDemoWorkspace();
+    const session = await getDemoSession(req.demoSessionId);
+
+    res.json({
+      status: "ready",
+      workspaceTitle: workspace.workspaceTitle,
+      description: workspace.description,
+      sampleQuestions: workspace.sampleQuestions,
+      folders: workspace.folders,
+      documents: workspace.documents,
+      counts: workspace.counts,
+      mockDataRules: workspace.mockDataRules,
+      session: session
+        ? {
+            usage: session.usage,
+            limits: session.limits,
+            persistence: session.persistence,
+            expiresAt: session.expiresAt,
+          }
+        : null,
+      phaseLimit:
+        "Phase 2B derives read-only mock workspace metadata from manifest only.",
+    });
+  }),
+);
 
 demoRouter.post(
   "/session",
