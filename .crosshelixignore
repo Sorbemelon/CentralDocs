@@ -9,3 +9,6 @@ backend/.cache/
 frontend/dist/
 backend/dist/
 node_modules/
+
+# Scopian local/generated evidence
+docs/scopian/views/**/checks/

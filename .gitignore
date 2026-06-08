@@ -51,3 +51,6 @@ __pycache__/
 .claude/settings.local.json
 *.local.json
 .scopian/
+
+# Scopian local/generated evidence
+docs/scopian/views/**/checks/
