@@ -67,7 +67,7 @@ function assertNotBinaryText(buffer, fileKind) {
 }
 
 function assertPdfSignature(buffer) {
-  if (!buffer.subarray(0, 5).equals(Buffer.from("%PDF-"))) {
+  if (!buffer.slice(0, 5).equals(Buffer.from("%PDF-"))) {
     throw createUnsupportedTypeError({ fileKind: "pdf", reason: "pdf_signature" });
   }
 }

@@ -201,7 +201,7 @@ export async function getObjectBuffer({ objectKey } = {}, overrides = {}) {
 export async function getObjectText({ objectKey, maxBytes } = {}, overrides = {}) {
   const buffer = await getObjectBuffer({ objectKey }, overrides);
   const limit = Number(maxBytes);
-  const readable = Number.isFinite(limit) && limit > 0 ? buffer.subarray(0, limit) : buffer;
+  const readable = Number.isFinite(limit) && limit > 0 ? buffer.slice(0, limit) : buffer;
 
   return readable.toString("utf8");
 }

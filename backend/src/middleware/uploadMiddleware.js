@@ -38,13 +38,14 @@ function mapMulterError(error) {
 }
 
 export function uploadSingleDocumentMiddleware(req, res, next) {
-  multipartUpload.array("file", 2)(req, res, (error) => {
+  multipartUpload.single("file")(req, res, (error) => {
     const mappedError = mapMulterError(error);
     if (mappedError) {
       next(mappedError);
       return;
     }
 
+    req.files = req.file ? [req.file] : [];
     next();
   });
 }
