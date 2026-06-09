@@ -68,8 +68,7 @@ test("PATCH and DELETE mock document return read-only error", async () => {
   assert.equal(deleteResponse.body.error.code, "READ_ONLY_RESOURCE");
 });
 
-test("upload/download/retry document routes are not implemented in Phase 2B", async () => {
+test("upload and retry document routes remain unimplemented in Phase 2C", async () => {
   await request(app).post("/api/documents/upload").expect(404);
-  await request(app).post(`/api/documents/${briefDocumentId}/download-url`).expect(404);
   await request(app).post(`/api/documents/${briefDocumentId}/retry`).expect(404);
 });

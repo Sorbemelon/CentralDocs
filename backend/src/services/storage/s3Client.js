@@ -8,7 +8,12 @@ export function getS3ConfigStatus() {
 }
 
 export function getS3Presence() {
-  return env.s3Presence;
+  return {
+    configured: env.s3Presence.configured,
+    bucketConfigured: env.s3Presence.bucketConfigured,
+    regionConfigured: env.s3Presence.regionConfigured,
+    credentialsConfigured: env.s3Presence.credentialsConfigured,
+  };
 }
 
 export function getS3Client() {

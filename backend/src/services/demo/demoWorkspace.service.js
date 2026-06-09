@@ -10,6 +10,18 @@ import { loadMockManifest } from "../mockData/mockManifest.service.js";
 const MOCK_DOWNLOAD_STATUS = "pending_s3_phase";
 const DIRECT_MULTIMODAL_INDEXING_MODE = "direct_multimodal_seed_cached";
 
+function getManifestStorageObjectKey(document) {
+  return (
+    document.objectKey ||
+    document.storageKey ||
+    document.s3ObjectKey ||
+    document.downloadObjectKey ||
+    document.storage?.objectKey ||
+    document.storage?.key ||
+    null
+  );
+}
+
 function toIsoDate(value) {
   if (!value) {
     return null;
@@ -63,6 +75,7 @@ function buildMockFolder(folder, documentCount, timestamp) {
 function buildMockDocument(document, folder, timestamp) {
   const slug = `${document.folderSlug}/${document.filename}`;
   const isDirectMultimodalSeeded = document.indexingMode === DIRECT_MULTIMODAL_INDEXING_MODE;
+  const storageObjectKey = getManifestStorageObjectKey(document);
 
   return {
     id: toMockDocumentId(slug),
@@ -103,7 +116,8 @@ function buildMockDocument(document, folder, timestamp) {
     demoQuestions: document.demoQuestions || [],
     expectedTopics: document.expectedTopics || [],
     indexingMode: document.indexingMode || null,
-    downloadAvailable: MOCK_DOWNLOAD_STATUS,
+    storageObjectKey,
+    downloadAvailable: storageObjectKey ? true : MOCK_DOWNLOAD_STATUS,
     attachable: true,
     previewText: describeMockDocument(document),
   };

@@ -39,10 +39,20 @@ test("GET /api/health/dependencies returns safe dependency statuses", async () =
 
   assert.equal(response.body.status, "ok");
   assert.match(response.body.dependencies.mongodb, /configured|connected|not_configured|disconnected/);
-  assert.match(response.body.dependencies.s3, /configured|not_configured/);
+  assert.deepEqual(response.body.dependencies.s3, {
+    configured: true,
+    regionConfigured: true,
+    bucketConfigured: true,
+    credentialsConfigured: true,
+  });
   assert.match(response.body.dependencies.gemini, /configured|not_configured/);
   assert.equal(response.body.config.geminiKeyCount, 1);
-  assert.equal(response.body.config.s3Presence.secretAccessKey, true);
+  assert.deepEqual(response.body.config.s3, {
+    configured: true,
+    regionConfigured: true,
+    bucketConfigured: true,
+    credentialsConfigured: true,
+  });
 
   const body = responseText(response);
   assert.equal(body.includes("health-test-access-token"), false);

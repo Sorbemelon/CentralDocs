@@ -34,7 +34,7 @@ healthRouter.get("/dependencies", (req, res) => {
     timestamp: nowIso(),
     dependencies: {
       mongodb: getMongoStatus(),
-      s3: getStorageStatus().status,
+      s3: getStorageStatus(),
       gemini: getGeminiStatus(),
     },
     config: getSafeConfigSummary(),

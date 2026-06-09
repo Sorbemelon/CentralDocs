@@ -68,6 +68,7 @@ test("document DTO hides storage internals", () => {
   });
 
   assert.equal(dto.id, "document_1");
+  assert.equal(dto.downloadAvailable, true);
   assert.ok(!("objectKey" in dto));
   assert.ok(!("_id" in dto));
 });

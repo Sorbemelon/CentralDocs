@@ -92,6 +92,8 @@ export function toDocumentDto(document, { includePreview = false } = {}) {
   }
   if (raw.downloadAvailable !== undefined) {
     dto.downloadAvailable = raw.downloadAvailable;
+  } else if (raw.objectKey && raw.lifecycleStatus === "active") {
+    dto.downloadAvailable = true;
   }
   if (raw.attachable !== undefined) {
     dto.attachable = Boolean(raw.attachable);

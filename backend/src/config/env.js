@@ -77,10 +77,15 @@ export const env = Object.freeze({
       rawEnv.AWS_SECRET_ACCESS_KEY,
   ),
   s3Presence: Object.freeze({
-    region: Boolean(rawEnv.AWS_REGION),
-    bucket: Boolean(rawEnv.AWS_S3_BUCKET),
-    accessKeyId: Boolean(rawEnv.AWS_ACCESS_KEY_ID),
-    secretAccessKey: Boolean(rawEnv.AWS_SECRET_ACCESS_KEY),
+    configured: Boolean(
+      rawEnv.AWS_REGION &&
+        rawEnv.AWS_S3_BUCKET &&
+        rawEnv.AWS_ACCESS_KEY_ID &&
+        rawEnv.AWS_SECRET_ACCESS_KEY,
+    ),
+    regionConfigured: Boolean(rawEnv.AWS_REGION),
+    bucketConfigured: Boolean(rawEnv.AWS_S3_BUCKET),
+    credentialsConfigured: Boolean(rawEnv.AWS_ACCESS_KEY_ID && rawEnv.AWS_SECRET_ACCESS_KEY),
   }),
   geminiKeyCount: geminiApiKeys.length,
   generationModelLane: GENERATION_MODEL_LANE,
@@ -116,9 +121,8 @@ export function getSafeConfigSummary() {
     nodeEnv: env.NODE_ENV,
     port: env.PORT,
     clientOrigins: env.CLIENT_ORIGINS,
-    mongodb: env.isMongoConfigured ? "configured" : "not_configured",
-    s3: env.isS3Configured ? "configured" : "not_configured",
-    s3Presence: env.s3Presence,
+  mongodb: env.isMongoConfigured ? "configured" : "not_configured",
+    s3: env.s3Presence,
     geminiKeyCount: env.geminiKeyCount,
     generationModelLane: env.generationModelLane,
     embeddingModel: env.embeddingModel,

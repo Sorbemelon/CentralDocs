@@ -35,7 +35,12 @@ test("safe config summary does not expose sensitive values", () => {
 
   assert.equal(env.NODE_ENV, "test");
   assert.equal(summary.mongodb, "configured");
-  assert.equal(summary.s3, "configured");
+  assert.deepEqual(summary.s3, {
+    configured: true,
+    regionConfigured: true,
+    bucketConfigured: true,
+    credentialsConfigured: true,
+  });
   assert.equal(summary.geminiKeyCount, 1);
   assert.equal(serialized.includes("hidden-host.example"), false);
   assert.equal(serialized.includes("safe-summary-access-token"), false);

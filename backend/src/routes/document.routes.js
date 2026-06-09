@@ -1,5 +1,8 @@
 import { Router } from "express";
 import {
+  createDocumentDownloadUrl,
+} from "../services/documents/documentDownload.service.js";
+import {
   getDocumentById,
   getDocumentPreviewById,
   listDocuments,
@@ -54,6 +57,19 @@ documentRouter.patch(
       status: "moved",
       document,
     });
+  }),
+);
+
+documentRouter.post(
+  "/:documentId/download-url",
+  asyncHandler(async (req, res) => {
+    const download = await createDocumentDownloadUrl({
+      documentId: req.params.documentId,
+      demoSessionId: req.demoSessionId,
+      requestedFilename: req.body?.filename || null,
+    });
+
+    res.json(download);
   }),
 );
 
