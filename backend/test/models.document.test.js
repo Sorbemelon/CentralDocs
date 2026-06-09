@@ -104,6 +104,22 @@ test("Document generated and media metadata fields exist", () => {
   assert.equal(generatedDocument.validateSync(), undefined);
 });
 
+test("Document contentStats can represent indexed chunk count", () => {
+  const indexedDocument = baseDocument({
+    status: DOCUMENT_STATUS.READY,
+    contentStats: {
+      extractedCharCount: 1200,
+      optimizedCharCount: 900,
+      estimatedTokenCount: 225,
+      chunkCount: 3,
+    },
+  });
+
+  assert.equal(indexedDocument.validateSync(), undefined);
+  assert.equal(indexedDocument.contentStats.chunkCount, 3);
+  assert.equal(indexedDocument.contentStats.estimatedTokenCount, 225);
+});
+
 test("Document enforces session-owned records and mock read-only convention", async () => {
   const uploadedWithoutSession = baseDocument({ demoSessionId: null });
   const uploadError = uploadedWithoutSession.validateSync();

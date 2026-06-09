@@ -8,7 +8,8 @@
     "start": "node src/server.js",
     "lint": "echo \"lint not configured yet\"",
     "test": "node --test",
-    "seed:mock": "node src/scripts/seedMockWorkspace.js"
+    "seed:mock": "node src/scripts/seedMockWorkspace.js",
+    "index:mock": "node src/scripts/indexMockWorkspace.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1064.0",

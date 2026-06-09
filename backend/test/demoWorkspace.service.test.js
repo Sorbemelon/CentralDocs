@@ -26,6 +26,9 @@ test("demo workspace service builds stable mock IDs and counts", async () => {
   assert.equal(first.mockWorkspace.source, "manifest");
   assert.equal(first.mockWorkspace.seeded, false);
   assert.equal(first.mockWorkspace.documentsDownloadable, false);
+  assert.equal(first.mockWorkspace.indexed, false);
+  assert.equal(first.mockWorkspace.documentsSearchable, false);
+  assert.equal(first.mockWorkspace.indexedDocumentCount, 0);
   assert.equal(first.workspaceTitle, "Orchid Retail Digital Transformation");
   assert.equal(first.counts.folders, 6);
   assert.equal(first.counts.documents, 16);
@@ -88,6 +91,12 @@ test("demo workspace can report persistent seeded mock records", async () => {
             status: "ready",
             lifecycleStatus: "active",
             sizeBytes: 1704,
+            contentStats: {
+              extractedCharCount: 100,
+              optimizedCharCount: 90,
+              estimatedTokenCount: 25,
+              chunkCount: 2,
+            },
             objectKey:
               "mock/orchid-retail/original/mock_document_01_strategy_rollout_centraldocs_transformation_brief_md/centraldocs-transformation-brief.md",
           },
@@ -101,6 +110,9 @@ test("demo workspace can report persistent seeded mock records", async () => {
   assert.equal(workspace.mockWorkspace.source, "persistent");
   assert.equal(workspace.mockWorkspace.seeded, true);
   assert.equal(workspace.mockWorkspace.documentsDownloadable, true);
+  assert.equal(workspace.mockWorkspace.indexed, true);
+  assert.equal(workspace.mockWorkspace.indexedDocumentCount, 1);
+  assert.equal(workspace.mockWorkspace.documentsSearchable, true);
   assert.equal(workspace.documents[0].downloadAvailable, true);
   assert.equal("objectKey" in workspace.documents[0], false);
 });

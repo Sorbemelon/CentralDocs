@@ -38,6 +38,33 @@ test("DocumentChunk schema stores vector field and external Atlas metadata", () 
   });
 });
 
+test("DocumentChunk model accepts a realistic embedded chunk payload", () => {
+  const documentId = new mongoose.Types.ObjectId();
+  const chunk = new DocumentChunk({
+    documentId,
+    demoSessionId: null,
+    folderId: new mongoose.Types.ObjectId(),
+    scope: DOCUMENT_SCOPE.MOCK,
+    chunkIndex: 4,
+    content: "Row 4: Vendor = Northstar Logistics; Status = Pending.",
+    embedding: Array.from({ length: 768 }, () => 0.125),
+    embeddingModel: "gemini-embedding-2",
+    embeddingDimensions: 768,
+    tokenEstimate: 14,
+    sourceLocator: {
+      sheetName: "Vendors",
+      rowStart: 4,
+      rowEnd: 4,
+    },
+    lifecycleStatus: LIFECYCLE_STATUS.ACTIVE,
+  });
+
+  assert.equal(chunk.validateSync(), undefined);
+  assert.equal(chunk.embedding.length, 768);
+  assert.equal(chunk.sourceLocator.sheetName, "Vendors");
+  assert.equal(chunk.sourceLocator.rowStart, 4);
+});
+
 test("DocumentChunk indexes include later retrieval filters", () => {
   assert.equal(hasIndex(DocumentChunk.schema, { documentId: 1 }), true);
   assert.equal(hasIndex(DocumentChunk.schema, { demoSessionId: 1, lifecycleStatus: 1 }), true);
