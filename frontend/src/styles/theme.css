@@ -1,0 +1,133 @@
+/*
+ * CentralDocs theme tokens.
+ *
+ * Professionalized AutumData-spirit palette:
+ *   - deep document blue (primary)
+ *   - professional teal (accent surfaces / informational)
+ *   - emerald success
+ *   - soft slate neutrals
+ * No orange/autumn, no purple-blue AI gradient, no cartoon AI styling.
+ *
+ * Light is the default. Dark is applied via the `.dark` class on <html>.
+ * Values are OKLCH; body text/border pairs are tuned for >=4.5:1 contrast.
+ */
+
+:root {
+  /* Surfaces */
+  --background: oklch(0.992 0.003 247);
+  --foreground: oklch(0.24 0.024 257);
+
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.24 0.024 257);
+
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.24 0.024 257);
+
+  /* Brand: deep document blue */
+  --primary: oklch(0.47 0.123 258);
+  --primary-foreground: oklch(0.99 0.004 247);
+
+  /* Soft slate secondary */
+  --secondary: oklch(0.965 0.006 247);
+  --secondary-foreground: oklch(0.32 0.02 257);
+
+  --muted: oklch(0.965 0.006 247);
+  --muted-foreground: oklch(0.476 0.02 257);
+
+  /* Subtle hover/active surface (NOT the brand teal) */
+  --accent: oklch(0.955 0.012 245);
+  --accent-foreground: oklch(0.4 0.07 258);
+
+  /* Professional teal — informational chips/links */
+  --teal: oklch(0.58 0.082 207);
+  --teal-foreground: oklch(0.99 0.004 247);
+  --teal-subtle: oklch(0.95 0.024 207);
+  --teal-subtle-foreground: oklch(0.38 0.06 215);
+
+  /* Emerald success */
+  --success: oklch(0.6 0.13 157);
+  --success-foreground: oklch(0.99 0.004 247);
+  --success-subtle: oklch(0.95 0.04 157);
+  --success-subtle-foreground: oklch(0.4 0.09 158);
+
+  /* Amber warning */
+  --warning: oklch(0.74 0.14 76);
+  --warning-foreground: oklch(0.27 0.05 75);
+  --warning-subtle: oklch(0.95 0.05 82);
+  --warning-subtle-foreground: oklch(0.45 0.08 70);
+
+  /* Destructive */
+  --destructive: oklch(0.577 0.21 27);
+  --destructive-foreground: oklch(0.99 0.004 247);
+  --destructive-subtle: oklch(0.95 0.03 25);
+  --destructive-subtle-foreground: oklch(0.48 0.16 27);
+
+  /* Lines & controls */
+  --border: oklch(0.91 0.006 247);
+  --input: oklch(0.9 0.006 247);
+  --ring: oklch(0.47 0.123 258);
+
+  /* Secondary neutral layer for sidebar/toolbars (cooler than content) */
+  --sidebar: oklch(0.975 0.005 247);
+  --sidebar-foreground: oklch(0.24 0.024 257);
+  --sidebar-border: oklch(0.91 0.006 247);
+  --sidebar-accent: oklch(0.95 0.012 245);
+  --sidebar-accent-foreground: oklch(0.4 0.07 258);
+  --sidebar-ring: oklch(0.47 0.123 258);
+
+  --radius: 0.625rem;
+}
+
+.dark {
+  --background: oklch(0.205 0.018 257);
+  --foreground: oklch(0.95 0.005 247);
+
+  --card: oklch(0.245 0.02 257);
+  --card-foreground: oklch(0.95 0.005 247);
+
+  --popover: oklch(0.245 0.02 257);
+  --popover-foreground: oklch(0.95 0.005 247);
+
+  --primary: oklch(0.7 0.12 256);
+  --primary-foreground: oklch(0.18 0.02 257);
+
+  --secondary: oklch(0.285 0.02 257);
+  --secondary-foreground: oklch(0.95 0.005 247);
+
+  --muted: oklch(0.285 0.02 257);
+  --muted-foreground: oklch(0.72 0.02 257);
+
+  --accent: oklch(0.31 0.022 257);
+  --accent-foreground: oklch(0.92 0.01 247);
+
+  --teal: oklch(0.68 0.09 205);
+  --teal-foreground: oklch(0.18 0.02 257);
+  --teal-subtle: oklch(0.32 0.045 207);
+  --teal-subtle-foreground: oklch(0.85 0.06 205);
+
+  --success: oklch(0.68 0.13 158);
+  --success-foreground: oklch(0.18 0.02 257);
+  --success-subtle: oklch(0.33 0.06 158);
+  --success-subtle-foreground: oklch(0.85 0.09 158);
+
+  --warning: oklch(0.78 0.13 78);
+  --warning-foreground: oklch(0.2 0.03 75);
+  --warning-subtle: oklch(0.36 0.06 78);
+  --warning-subtle-foreground: oklch(0.86 0.08 82);
+
+  --destructive: oklch(0.68 0.18 25);
+  --destructive-foreground: oklch(0.18 0.02 257);
+  --destructive-subtle: oklch(0.33 0.08 25);
+  --destructive-subtle-foreground: oklch(0.85 0.1 25);
+
+  --border: oklch(0.32 0.02 257);
+  --input: oklch(0.34 0.02 257);
+  --ring: oklch(0.7 0.12 256);
+
+  --sidebar: oklch(0.18 0.018 257);
+  --sidebar-foreground: oklch(0.95 0.005 247);
+  --sidebar-border: oklch(0.3 0.02 257);
+  --sidebar-accent: oklch(0.3 0.022 257);
+  --sidebar-accent-foreground: oklch(0.92 0.01 247);
+  --sidebar-ring: oklch(0.7 0.12 256);
+}
