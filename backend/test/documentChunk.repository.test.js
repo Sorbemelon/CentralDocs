@@ -5,6 +5,7 @@ import mongoose from "mongoose";
 const {
   buildDocumentChunkPayload,
   createMemoryDocumentChunkRepository,
+  getDocumentChunkVectorSearchMetadata,
 } = await import("../src/services/indexing/documentChunk.repository.js");
 const { EMBEDDING_DIMENSIONS, EMBEDDING_MODEL } = await import("../src/constants/embedding.constants.js");
 
@@ -124,4 +125,14 @@ test("memory document chunk repository lists direct media chunks separately", as
 
   assert.equal(directChunk.chunkKind, "media_direct");
   assert.equal(await repository.countDirectMediaChunksForDocument({ documentId }), 1);
+});
+
+test("document chunk repository exposes external vector search metadata", () => {
+  assert.deepEqual(getDocumentChunkVectorSearchMetadata(), {
+    managedByMongoose: false,
+    indexName: "document_chunks_vector_index",
+    vectorField: "embedding",
+    dimensions: 768,
+    model: "gemini-embedding-2",
+  });
 });

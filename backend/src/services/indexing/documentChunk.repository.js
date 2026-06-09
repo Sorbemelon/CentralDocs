@@ -2,6 +2,7 @@ import { EMBEDDING_DIMENSIONS, EMBEDDING_MODEL } from "../../constants/embedding
 import { DOCUMENT_SCOPE } from "../../constants/document.constants.js";
 import { LIFECYCLE_STATUS } from "../../constants/lifecycle.constants.js";
 import { CHUNK_KIND, EMBEDDING_INPUT_TYPE } from "../../constants/mediaEmbedding.constants.js";
+import { SEARCH_EMBEDDING, VECTOR_SEARCH } from "../../constants/search.constants.js";
 import { isMongoConnected } from "../../db/connectMongo.js";
 import { DocumentChunk } from "../../models/DocumentChunk.model.js";
 import { createHttpError } from "../../utils/httpError.js";
@@ -49,6 +50,16 @@ function sanitizeMediaMeta(mediaMeta = null) {
 
 export function isDocumentChunkPersistenceAvailable() {
   return isMongoConnected();
+}
+
+export function getDocumentChunkVectorSearchMetadata() {
+  return {
+    managedByMongoose: false,
+    indexName: VECTOR_SEARCH.indexName,
+    vectorField: VECTOR_SEARCH.path,
+    dimensions: SEARCH_EMBEDDING.dimensions,
+    model: SEARCH_EMBEDDING.model,
+  };
 }
 
 export function buildDocumentChunkPayload({ document = {}, embeddedChunk = {} } = {}) {

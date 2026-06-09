@@ -12,6 +12,7 @@ import { demoRouter } from "./routes/demo.routes.js";
 import { documentRouter } from "./routes/document.routes.js";
 import { folderRouter } from "./routes/folder.routes.js";
 import { healthRouter } from "./routes/health.routes.js";
+import { searchRouter } from "./routes/search.routes.js";
 import { trashRouter } from "./routes/trash.routes.js";
 
 export const app = express();
@@ -49,6 +50,7 @@ app.use("/api/health", healthRouter);
 app.use("/api/demo", demoRouter);
 app.use("/api/folders", folderRouter);
 app.use("/api/documents", documentRouter);
+app.use("/api/search", searchRouter);
 app.use("/api/trash", trashRouter);
 
 app.use(notFound);

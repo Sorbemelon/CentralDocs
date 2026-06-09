@@ -320,3 +320,74 @@ export async function listTrashedDocuments({ demoSessionId = null } = {}) {
 
   return toDocumentDtos(await Document.find(filter).sort({ deletedAt: -1 }).lean());
 }
+
+export async function listSearchableDocumentsForSemanticSearch({
+  demoSessionId = null,
+  scopes = [],
+  selectedDocumentIds = [],
+  selectedFolderIds = [],
+  fileKinds = [],
+} = {}) {
+  if (!isMongoConnected()) {
+    return [];
+  }
+
+  const requestedScopes = scopes.length > 0 ? scopes : DOCUMENT_SCOPES;
+  const scopeFilters = [];
+
+  if (requestedScopes.includes(DOCUMENT_SCOPE.MOCK)) {
+    scopeFilters.push({
+      scope: DOCUMENT_SCOPE.MOCK,
+      demoSessionId: null,
+    });
+  }
+  const sessionOwnedScopes = requestedScopes.filter((scope) => scope !== DOCUMENT_SCOPE.MOCK);
+  if (sessionOwnedScopes.length > 0 && demoSessionId) {
+    scopeFilters.push({
+      scope: { $in: sessionOwnedScopes },
+      demoSessionId,
+    });
+  }
+
+  if (scopeFilters.length === 0) {
+    return [];
+  }
+
+  const filter = {
+    lifecycleStatus: LIFECYCLE_STATUS.ACTIVE,
+    status: DOCUMENT_STATUS.READY,
+    $or: scopeFilters,
+  };
+
+  const selectionFilters = [];
+  const objectIds = selectedDocumentIds.filter((id) => mongoose.Types.ObjectId.isValid(id));
+  if (objectIds.length > 0) {
+    selectionFilters.push({ _id: { $in: objectIds } });
+  }
+  if (selectedDocumentIds.length > 0) {
+    selectionFilters.push({ mockId: { $in: selectedDocumentIds } });
+  }
+  if (selectedFolderIds.length > 0) {
+    const folderObjectIds = selectedFolderIds.filter((id) => mongoose.Types.ObjectId.isValid(id));
+    const folderIds = [...folderObjectIds];
+    const folderMockIds = selectedFolderIds.filter((id) => !mongoose.Types.ObjectId.isValid(id));
+    if (folderMockIds.length > 0) {
+      const mockFolders = await Folder.find({
+        mockId: { $in: folderMockIds },
+        lifecycleStatus: LIFECYCLE_STATUS.ACTIVE,
+      }).select({ _id: 1 }).lean();
+      folderIds.push(...mockFolders.map((folder) => String(folder._id)));
+    }
+    if (folderIds.length > 0) {
+      selectionFilters.push({ folderId: { $in: folderIds } });
+    }
+  }
+  if (selectionFilters.length > 0) {
+    filter.$and = [{ $or: selectionFilters }];
+  }
+  if (fileKinds.length > 0) {
+    filter.fileKind = { $in: fileKinds };
+  }
+
+  return Document.find(filter).lean();
+}
