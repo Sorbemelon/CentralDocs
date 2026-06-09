@@ -9,6 +9,7 @@ import {
   FileVideo,
   Plus,
   Presentation,
+  RefreshCw,
   Trash2,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -87,13 +88,27 @@ export function DocumentRow({ ws, doc }) {
       <div className="flex shrink-0 items-center opacity-70 transition-opacity group-hover:opacity-100">
         <IconButton
           icon={Plus}
-          label={selected ? "In context" : "Attach to context"}
+          label={
+            selected
+              ? "In context"
+              : doc.attachable === false
+                ? "Not ready to attach"
+                : "Attach to context"
+          }
           onClick={() => ws.attach("document", doc.id)}
-          disabled={selected}
+          disabled={selected || doc.attachable === false}
           className={cn(selected && "text-primary")}
         />
         <IconButton icon={Eye} label="Preview" onClick={() => ws.openPreview(doc.id)} />
-        <IconButton icon={Download} label="Download" onClick={() => ws.downloadDocument(doc)} />
+        {doc.retryAvailable && (
+          <IconButton icon={RefreshCw} label="Retry processing" onClick={() => ws.retryDocument(doc)} />
+        )}
+        <IconButton
+          icon={Download}
+          label="Download"
+          onClick={() => ws.downloadDocument(doc)}
+          disabled={doc.downloadAvailable === false}
+        />
         {doc.readOnly ? (
           <IconButton
             icon={Trash2}

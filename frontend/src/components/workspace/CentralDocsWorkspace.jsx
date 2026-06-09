@@ -2,16 +2,24 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { cn } from "@/lib/cn";
 import { SOURCE_FILTER, SOURCE_KIND } from "@/lib/constants";
-import { isLocalChatId } from "@/lib/workspaceData";
+import {
+  isLocalChatId,
+  normalizeDocument,
+  normalizeUsage,
+  normalizeUsageFromSnapshot,
+} from "@/lib/workspaceData";
 import { useDemoSession } from "@/lib/useDemoSession";
 import { useWorkspaceData } from "@/lib/useWorkspaceData";
 import { useChatSessions } from "@/lib/useChatSessions";
 import { useSelectedContext } from "@/lib/useSelectedContext";
 import { updateChatSelection } from "@/services/chatApi";
+import { getDemoSession } from "@/services/demoApi";
 import {
   createDownloadUrl,
   deleteDocument as apiDeleteDocument,
   restoreDocument as apiRestoreDocument,
+  retryDocument as apiRetryDocument,
+  uploadDocument as apiUploadDocument,
 } from "@/services/documentApi";
 import {
   createFolder as apiCreateFolder,
@@ -40,6 +48,8 @@ export default function CentralDocsWorkspace() {
   const [generateOpen, setGenerateOpen] = useState(false);
   const [sourcesDrawer, setSourcesDrawer] = useState(false);
   const [contextDrawer, setContextDrawer] = useState(false);
+  const [operation, setOperation] = useState(null); // { kind, status, label }
+  const [usageOverride, setUsageOverride] = useState(null);
 
   const wsData = useWorkspaceData({ online, bootstrap: demo.bootstrap, filter: sourceFilter });
   const chats = useChatSessions({ online });
@@ -72,13 +82,33 @@ export default function CentralDocsWorkspace() {
   // --- selection wrappers (toast + local/remote handled by the hook) ---
   const attach = useCallback(
     (kind, id) => {
-      selection.attach(kind, id);
+      if (kind === "document") {
+        const doc = documents.find((d) => d.id === id);
+        if (doc && doc.attachable === false) {
+          toast.error("This document isn't ready to attach yet.");
+          return;
+        }
+        selection.attach(kind, id, { attachable: doc ? doc.attachable : undefined });
+      } else {
+        selection.attach(kind, id);
+      }
       toast.success(kind === "folder" ? "Folder attached to context" : "Document attached to context");
     },
-    [selection],
+    [selection, documents],
   );
   const detach = selection.detach;
   const clearSelection = selection.clear;
+
+  // Refresh demo usage after actions that change counts (delete/restore have no usage in their response).
+  const refreshUsage = useCallback(async () => {
+    if (!online) return;
+    try {
+      const res = await getDemoSession();
+      if (res?.session) setUsageOverride(normalizeUsage(res.session));
+    } catch {
+      /* keep previous usage values */
+    }
+  }, [online]);
 
   const notifyDeferred = useCallback((action = "This action") => {
     toast(`${action} is not wired yet`, {
@@ -110,11 +140,12 @@ export default function CentralDocsWorkspace() {
         toast.success("Document moved to Trash");
         wsData.reloadActive();
         if (sourceFilter === SOURCE_FILTER.trash) wsData.reloadTrash();
+        refreshUsage();
       } catch {
         toast.error("Couldn't delete the document");
       }
     },
-    [online, notifyDeferred, selection, wsData, sourceFilter],
+    [online, notifyDeferred, selection, wsData, sourceFilter, refreshUsage],
   );
 
   const deleteFolder = useCallback(
@@ -126,26 +157,90 @@ export default function CentralDocsWorkspace() {
         selection.detach("folder", folder.id);
         toast.success("Folder moved to Trash");
         wsData.reloadActive();
+        refreshUsage();
       } catch {
         toast.error("Couldn't delete the folder");
       }
     },
-    [online, notifyDeferred, selection, wsData],
+    [online, notifyDeferred, selection, wsData, refreshUsage],
   );
 
   const downloadDocument = useCallback(
     async (doc) => {
-      if (!online || doc.source === SOURCE_KIND.mock) return notifyDeferred("Download");
+      if (!online) return notifyDeferred("Download");
+      if (doc.downloadAvailable === false) {
+        toast.error("This document isn't available to download.");
+        return;
+      }
       try {
         const res = await createDownloadUrl(doc.id);
-        const url = res?.url || res?.downloadUrl || res?.download?.url;
+        const url = res?.downloadUrl || res?.url || res?.download?.url;
         if (url) window.open(url, "_blank", "noopener,noreferrer");
-        else toast.success("Download link created");
+        else toast.error("No download link was returned.");
       } catch {
         toast.error("Couldn't create a download link");
       }
     },
     [online, notifyDeferred],
+  );
+
+  // --- upload + retry ---
+  const uploadDocument = useCallback(
+    async (file) => {
+      if (!online) {
+        notifyDeferred("Upload");
+        return { ok: false };
+      }
+      setOperation({ kind: "upload", status: "uploading", label: `Uploading ${file.name}` });
+      try {
+        const res = await apiUploadDocument({ file });
+        const doc = normalizeDocument(res.document);
+        wsData.applyDocument(doc);
+        wsData.reloadActive();
+        if (res.usage) setUsageOverride(normalizeUsageFromSnapshot(res.usage));
+        const failed = doc.status === "failed";
+        setOperation({
+          kind: "upload",
+          status: failed ? "failed" : "complete",
+          label: failed ? `Upload failed: ${doc.title}` : `Upload complete: ${doc.title}`,
+        });
+        if (failed) toast.error(`Processing failed for ${doc.title}`);
+        else toast.success(`Uploaded ${doc.title}`);
+        setPreviewDocId(doc.id);
+        setActiveTab("preview");
+        return { ok: true, doc };
+      } catch (err) {
+        setOperation({ kind: "upload", status: "failed", label: "Upload failed" });
+        toast.error(err?.message || "Upload failed");
+        return { ok: false, error: err };
+      }
+    },
+    [online, notifyDeferred, wsData],
+  );
+
+  const retryDocument = useCallback(
+    async (doc) => {
+      if (!online) return notifyDeferred("Retry");
+      setOperation({ kind: "retry", status: "processing", label: `Retrying ${doc.title}` });
+      try {
+        const res = await apiRetryDocument(doc.id);
+        const next = normalizeDocument(res.document);
+        wsData.applyDocument(next);
+        wsData.reloadActive();
+        const failed = next.status === "failed";
+        setOperation({
+          kind: "retry",
+          status: failed ? "failed" : "complete",
+          label: failed ? `Retry failed: ${next.title}` : `Retry complete: ${next.title}`,
+        });
+        if (failed) toast.error(`Retry failed for ${next.title}`);
+        else toast.success(`Reprocessed ${next.title}`);
+      } catch (err) {
+        setOperation({ kind: "retry", status: "failed", label: "Retry failed" });
+        toast.error(err?.message || "Couldn't retry processing");
+      }
+    },
+    [online, notifyDeferred, wsData],
   );
 
   const createFolder = useCallback(async () => {
@@ -168,11 +263,12 @@ export default function CentralDocsWorkspace() {
         toast.success("Restored from Trash");
         wsData.reloadTrash();
         wsData.reloadActive();
+        refreshUsage();
       } catch {
         toast.error("Couldn't restore the item");
       }
     },
-    [online, notifyDeferred, wsData],
+    [online, notifyDeferred, wsData, refreshUsage],
   );
 
   const removeChat = useCallback(
@@ -221,10 +317,11 @@ export default function CentralDocsWorkspace() {
       documents,
       generated: wsData.generated,
       trash: wsData.trash,
-      usage: demo.usage,
+      usage: usageOverride ?? demo.usage,
     },
     online,
     backendStatus: demo.backendStatus,
+    operation,
     loading: { sources: wsData.loading, chats: chats.loading },
     error: { sources: wsData.error, chats: chats.error },
     reloadSources: wsData.reloadActive,
@@ -265,6 +362,8 @@ export default function CentralDocsWorkspace() {
     deleteFolder,
     downloadDocument,
     restoreTrashItem,
+    uploadDocument,
+    retryDocument,
 
     openGenerateModal: () => setGenerateOpen(true),
     notifyDeferred,

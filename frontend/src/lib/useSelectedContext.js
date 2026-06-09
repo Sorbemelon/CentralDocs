@@ -28,7 +28,10 @@ export function useSelectedContext({ onPersist } = {}) {
     onPersistRef.current?.(nextDocs, nextFolders);
   };
 
-  const attach = useCallback((kind, id) => {
+  const attach = useCallback((kind, id, options = {}) => {
+    // Guard: a document that the backend reports as not attachable (processing/failed)
+    // can never enter the context, even via a stray caller.
+    if (options.attachable === false) return;
     if (kind === "folder") {
       setFolderIds((prev) => {
         if (prev.includes(id)) return prev;

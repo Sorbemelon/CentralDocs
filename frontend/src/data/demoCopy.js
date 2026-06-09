@@ -59,6 +59,13 @@ export const PROCESSING_STATES = Object.freeze([
   "Failed",
 ]);
 
+/** Upload card copy. Allowed public types and per-type size caps. */
+export const UPLOAD_COPY = Object.freeze({
+  allowed: "txt, md, csv, tsv, pdf, docx",
+  sizeCaps: "txt/md/csv/tsv ≤ 500 KB · docx ≤ 1 MB · pdf ≤ 2 MB",
+  unsupported: "That file type isn't supported. Allowed: txt, md, csv, tsv, pdf, docx.",
+});
+
 /** Demo limits summary (label + value) for the landing page and usage card. */
 export const DEMO_LIMITS_SUMMARY = Object.freeze([
   { label: "Session lifetime", value: "3 days" },

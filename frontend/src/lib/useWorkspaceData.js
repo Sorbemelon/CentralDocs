@@ -86,6 +86,18 @@ export function useWorkspaceData({ online, bootstrap, filter }) {
     else loadActive();
   }, [filter, loadActive, loadTrash]);
 
+  // Upsert a single normalized document (immediate reflect after upload/retry).
+  const applyDocument = useCallback((doc) => {
+    if (!doc?.id) return;
+    setDocuments((prev) => {
+      const idx = prev.findIndex((d) => d.id === doc.id);
+      if (idx === -1) return [doc, ...prev];
+      const next = prev.slice();
+      next[idx] = { ...next[idx], ...doc };
+      return next;
+    });
+  }, []);
+
   const generated = useMemo(() => {
     if (!online) return FALLBACK_GENERATED;
     const fromDocs = documents.filter((d) => d.source === SOURCE_KIND.generated);
@@ -99,6 +111,7 @@ export function useWorkspaceData({ online, bootstrap, filter }) {
     generated,
     loading,
     error,
+    applyDocument,
     reloadActive: () => loadActive({ force: true }),
     reloadTrash: loadTrash,
   };
