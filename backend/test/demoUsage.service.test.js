@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
+const { DEMO_LIMITS } = await import("../src/config/limits.js");
 const {
   applyUsageDelta,
   assertCanCreateChat,
@@ -69,6 +70,8 @@ test("usage service rejects chat, prompt, generated document, and folder limits"
 });
 
 test("usage service validates text length limits", () => {
+  assert.equal(DEMO_LIMITS.maxChatSessions, 5);
+  assert.equal(DEMO_LIMITS.maxPromptLengthChars, 1500);
   assert.throws(() => assertPromptLength("x".repeat(1501)), {
     code: "DEMO_LIMIT_REACHED",
   });

@@ -100,6 +100,5 @@ test("POST /api/search/semantic returns safe not-configured response without fak
 test("search route exists only as semantic POST and other future routes remain unimplemented", async () => {
   await request(app).get("/api/search/semantic").expect(404);
   await request(app).post("/api/documents/upload").expect(404);
-  await request(app).post("/api/chats").expect(404);
   await request(app).post(["/api/chats/chat_1/generated", "documents"].join("-")).expect(404);
 });

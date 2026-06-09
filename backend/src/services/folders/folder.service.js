@@ -308,3 +308,28 @@ export async function listTrashedFolders({ demoSessionId = null } = {}) {
 
   return toFolderDtos(await Folder.find(filter).sort({ deletedAt: -1 }).lean());
 }
+
+export async function listAttachableFoldersForChatSelection({
+  demoSessionId = null,
+  selectedFolderIds = [],
+} = {}) {
+  const mockFolders = (await listMockFolders({})).filter((folder) =>
+    selectedFolderIds.includes(folder.id) || selectedFolderIds.includes(folder.mockId),
+  );
+
+  if (!isMongoConnected() || selectedFolderIds.length === 0) {
+    return mockFolders;
+  }
+
+  const objectIds = selectedFolderIds.filter((id) => mongoose.Types.ObjectId.isValid(id));
+  const filter = {
+    lifecycleStatus: LIFECYCLE_STATUS.ACTIVE,
+    $or: [
+      { scope: FOLDER_SCOPE.MOCK, mockId: { $in: selectedFolderIds } },
+      { scope: FOLDER_SCOPE.USER, demoSessionId, _id: { $in: objectIds } },
+    ],
+  };
+
+  const dbFolders = await Folder.find(filter).lean();
+  return [...mockFolders, ...dbFolders];
+}

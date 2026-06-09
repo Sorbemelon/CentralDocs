@@ -1,8 +1,6 @@
 import mongoose from "mongoose";
 import { LIFECYCLE_STATUS, LIFECYCLE_STATUSES } from "../constants/lifecycle.constants.js";
 
-const { ObjectId } = mongoose.Schema.Types;
-
 const chatSessionSchema = new mongoose.Schema(
   {
     demoSessionId: {
@@ -15,8 +13,8 @@ const chatSessionSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
-    currentSelectedDocumentIds: [{ type: ObjectId, ref: "Document" }],
-    currentSelectedFolderIds: [{ type: ObjectId, ref: "Folder" }],
+    currentSelectedDocumentIds: [{ type: String }],
+    currentSelectedFolderIds: [{ type: String }],
     rollingSummary: {
       type: String,
       default: null,

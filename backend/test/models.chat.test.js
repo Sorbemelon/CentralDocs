@@ -18,13 +18,15 @@ test("ChatSession schema has defaults and indexes", () => {
   const session = new ChatSession({
     demoSessionId: "demo_123",
     title: "Rollout questions",
+    currentSelectedDocumentIds: ["mock_document_rollout_plan"],
+    currentSelectedFolderIds: ["mock_folder_strategy"],
   });
 
   assert.equal(session.messageCount, 0);
   assert.equal(session.aiPromptCount, 0);
   assert.equal(session.lifecycleStatus, LIFECYCLE_STATUS.ACTIVE);
-  assert.deepEqual(session.currentSelectedDocumentIds, []);
-  assert.deepEqual(session.currentSelectedFolderIds, []);
+  assert.deepEqual(session.currentSelectedDocumentIds, ["mock_document_rollout_plan"]);
+  assert.deepEqual(session.currentSelectedFolderIds, ["mock_folder_strategy"]);
   assert.equal(session.validateSync(), undefined);
 
   assert.equal(hasIndex(ChatSession.schema, { demoSessionId: 1, lifecycleStatus: 1 }), true);
@@ -81,6 +83,61 @@ test("ChatMessage reference snapshots accept expected source reference object", 
   for (const field of REFERENCE_USED_FIELDS) {
     assert.ok(field in message.referencesUsed[0].toObject());
   }
+});
+
+test("ChatMessage user snapshots accept saved selected context shape", () => {
+  const message = new ChatMessage({
+    chatSessionId: new mongoose.Types.ObjectId(),
+    demoSessionId: "demo_123",
+    role: CHAT_ROLE.USER,
+    content: "What are the rollout risks?",
+    status: CHAT_MESSAGE_STATUS.COMPLETE,
+    attachedDocumentSnapshot: [
+      {
+        id: "mock_document_rollout_plan",
+        title: "Rollout Plan",
+        fileKind: "pptx",
+        sourceType: "mock",
+        scope: "mock",
+        folderId: "mock_folder_strategy",
+        folderName: "Strategy",
+        status: "ready",
+        lifecycleStatus: "active",
+      },
+    ],
+    attachedFolderSnapshot: [
+      {
+        id: "mock_folder_strategy",
+        name: "Strategy",
+        scope: "mock",
+        path: "/Strategy",
+        readOnly: true,
+        lifecycleStatus: "active",
+      },
+    ],
+    resolvedDocumentSnapshot: [
+      {
+        id: "mock_document_rollout_plan",
+        title: "Rollout Plan",
+        fileKind: "pptx",
+        sourceType: "mock",
+        scope: "mock",
+        folderId: "mock_folder_strategy",
+        folderName: "Strategy",
+        resolvedFromFolderIds: ["mock_folder_strategy"],
+        status: "ready",
+        lifecycleStatus: "active",
+      },
+    ],
+    referencesUsed: [],
+    aiMeta: null,
+  });
+
+  assert.equal(message.validateSync(), undefined);
+  assert.equal(message.attachedDocumentSnapshot[0].id, "mock_document_rollout_plan");
+  assert.deepEqual(message.resolvedDocumentSnapshot[0].resolvedFromFolderIds, [
+    "mock_folder_strategy",
+  ]);
 });
 
 test("ChatMessage indexes support session and role lookups", () => {

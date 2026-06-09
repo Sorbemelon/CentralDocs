@@ -6,10 +6,14 @@ const { ObjectId } = mongoose.Schema.Types;
 
 const attachedDocumentSnapshotSchema = new mongoose.Schema(
   {
-    documentId: { type: ObjectId, ref: "Document", required: true },
-    documentTitle: { type: String, required: true },
-    fileType: { type: String, default: null },
+    id: { type: String, required: true },
+    title: { type: String, required: true },
+    fileKind: { type: String, default: null },
+    sourceType: { type: String, default: null },
+    scope: { type: String, default: null },
+    folderId: { type: String, default: null },
     folderName: { type: String, default: null },
+    status: { type: String, default: null },
     lifecycleStatus: { type: String, default: null },
   },
   { _id: false },
@@ -17,9 +21,11 @@ const attachedDocumentSnapshotSchema = new mongoose.Schema(
 
 const attachedFolderSnapshotSchema = new mongoose.Schema(
   {
-    folderId: { type: ObjectId, ref: "Folder", required: true },
-    folderName: { type: String, required: true },
-    resolvedDocumentCount: { type: Number, default: 0, min: 0 },
+    id: { type: String, required: true },
+    name: { type: String, required: true },
+    scope: { type: String, default: null },
+    path: { type: String, default: null },
+    readOnly: { type: Boolean, default: false },
     lifecycleStatus: { type: String, default: null },
   },
   { _id: false },
@@ -27,12 +33,16 @@ const attachedFolderSnapshotSchema = new mongoose.Schema(
 
 const resolvedDocumentSnapshotSchema = new mongoose.Schema(
   {
-    documentId: { type: ObjectId, ref: "Document", required: true },
-    documentTitle: { type: String, required: true },
-    folderId: { type: ObjectId, ref: "Folder", default: null },
-    folderName: { type: String, default: null },
-    sourceType: { type: String, default: null },
+    id: { type: String, required: true },
+    title: { type: String, required: true },
     fileKind: { type: String, default: null },
+    sourceType: { type: String, default: null },
+    scope: { type: String, default: null },
+    folderId: { type: String, default: null },
+    folderName: { type: String, default: null },
+    resolvedFromFolderIds: [{ type: String }],
+    status: { type: String, default: null },
+    lifecycleStatus: { type: String, default: null },
   },
   { _id: false },
 );

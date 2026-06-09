@@ -391,3 +391,59 @@ export async function listSearchableDocumentsForSemanticSearch({
 
   return Document.find(filter).lean();
 }
+
+export async function listAttachableDocumentsForChatSelection({
+  demoSessionId = null,
+  selectedDocumentIds = [],
+  selectedFolderIds = [],
+} = {}) {
+  const mockDocuments = (await listMockDocuments({})).filter((document) => {
+    return (
+      selectedDocumentIds.includes(document.id) ||
+      selectedDocumentIds.includes(document.mockId) ||
+      selectedFolderIds.includes(document.folderId)
+    );
+  });
+
+  if (!isMongoConnected()) {
+    return mockDocuments;
+  }
+
+  const selectionFilters = [];
+  const objectIds = selectedDocumentIds.filter((id) => mongoose.Types.ObjectId.isValid(id));
+  if (objectIds.length > 0) {
+    selectionFilters.push({ _id: { $in: objectIds } });
+  }
+  if (selectedDocumentIds.length > 0) {
+    selectionFilters.push({ mockId: { $in: selectedDocumentIds } });
+  }
+
+  const folderIds = selectedFolderIds.filter((id) => mongoose.Types.ObjectId.isValid(id));
+  const folderMockIds = selectedFolderIds.filter((id) => !mongoose.Types.ObjectId.isValid(id));
+  if (folderMockIds.length > 0) {
+    const mockFolders = await Folder.find({
+      mockId: { $in: folderMockIds },
+      lifecycleStatus: LIFECYCLE_STATUS.ACTIVE,
+    }).select({ _id: 1 }).lean();
+    folderIds.push(...mockFolders.map((folder) => String(folder._id)));
+  }
+  if (folderIds.length > 0) {
+    selectionFilters.push({ folderId: { $in: folderIds } });
+  }
+
+  if (selectionFilters.length === 0) {
+    return mockDocuments;
+  }
+
+  const dbDocuments = await Document.find({
+    lifecycleStatus: LIFECYCLE_STATUS.ACTIVE,
+    status: DOCUMENT_STATUS.READY,
+    $and: [{ $or: selectionFilters }],
+    $or: [
+      { scope: DOCUMENT_SCOPE.MOCK, demoSessionId: null },
+      { scope: { $in: [DOCUMENT_SCOPE.USER, DOCUMENT_SCOPE.GENERATED] }, demoSessionId },
+    ],
+  }).lean();
+
+  return [...mockDocuments, ...dbDocuments];
+}
