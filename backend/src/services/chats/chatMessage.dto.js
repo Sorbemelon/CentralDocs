@@ -95,6 +95,24 @@ function toReferencesUsed(values = []) {
   });
 }
 
+function toSafeAiMeta(aiMeta) {
+  if (!aiMeta) {
+    return null;
+  }
+  const raw = rawObject(aiMeta);
+
+  return {
+    actionType: raw.actionType || null,
+    generationModel: raw.generationModel || null,
+    fallbackUsed: Boolean(raw.fallbackUsed),
+    fallbackLevel: raw.fallbackLevel || 0,
+    keySlotUsed: Number.isInteger(raw.keySlotUsed) ? raw.keySlotUsed : null,
+    estimatedInputTokens: raw.estimatedInputTokens || 0,
+    estimatedOutputTokens: raw.estimatedOutputTokens || 0,
+    latencyMs: raw.latencyMs ?? null,
+  };
+}
+
 export function toChatMessageDto(message = {}) {
   const raw = message?.toObject ? message.toObject() : message;
 
@@ -108,7 +126,7 @@ export function toChatMessageDto(message = {}) {
     attachedFolderSnapshot: toAttachedFolderSnapshots(raw.attachedFolderSnapshot),
     resolvedDocumentSnapshot: toResolvedDocumentSnapshots(raw.resolvedDocumentSnapshot),
     referencesUsed: toReferencesUsed(raw.referencesUsed),
-    aiMeta: raw.aiMeta || null,
+    aiMeta: toSafeAiMeta(raw.aiMeta),
     createdAt: serializeDate(raw.createdAt),
   };
 }

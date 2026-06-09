@@ -1,7 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-const { createUserChatMessage } = await import("../src/services/chats/chatMessage.service.js");
+const { createChatMessageWithRagAnswer, createUserChatMessage } = await import(
+  "../src/services/chats/chatMessage.service.js"
+);
 const { createMemoryChatMessageRepository } = await import(
   "../src/services/chats/chatMessage.repository.js"
 );
@@ -92,6 +94,32 @@ function dependencies() {
     chatSessionRepository,
     chatMessageRepository,
     selectionRepositories: selectionRepositories(),
+    semanticSearcher: async () => ({
+      references: [
+        {
+          citationNumber: 1,
+          documentId: "doc_1",
+          documentTitle: "Rollout Plan",
+          fileType: "pptx",
+          folderName: "Strategy",
+          chunkId: "chunk_1",
+          excerptPreview: "Training adoption is a risk.",
+          similarityScore: 0.9,
+        },
+      ],
+      results: [],
+      scope: {},
+    }),
+    generator: async () => ({
+      text: "Training adoption is the key rollout risk [1].",
+      model: "gemini-3.5-flash",
+      fallbackUsed: false,
+      fallbackLevel: 0,
+      keySlot: 0,
+      latencyMs: 10,
+      usage: { estimatedInputTokens: 100, estimatedOutputTokens: 20 },
+      aiRouting: [],
+    }),
     now: () => new Date("2026-01-03T00:00:00.000Z"),
   };
 }
@@ -167,4 +195,46 @@ test("user message creation enforces empty and max prompt length validation", as
       }),
     { code: "CHAT_MESSAGE_TOO_LONG" },
   );
+});
+
+test("RAG chat message creation stores user and assistant messages with citations", async () => {
+  const deps = dependencies();
+  const result = await createChatMessageWithRagAnswer({
+    chatId: "chat_1",
+    demoSessionId: "demo_123",
+    body: { content: "What are the rollout risks?" },
+    dependencies: deps,
+  });
+
+  assert.equal(result.userMessage.role, "user");
+  assert.equal(result.assistantMessage.role, "assistant");
+  assert.equal(result.assistantMessage.content, "Training adoption is the key rollout risk [1].");
+  assert.equal(result.assistantMessage.referencesUsed[0].citationNumber, 1);
+  assert.equal(result.assistantMessage.aiMeta.actionType, "chat_answer");
+  assert.equal(result.chat.messageCount, 2);
+  assert.equal(result.chat.aiPromptCount, 1);
+});
+
+test("RAG chat message creation rejects no context before provider call", async () => {
+  const deps = dependencies();
+  let generatorCalled = false;
+  deps.generator = async () => {
+    generatorCalled = true;
+  };
+
+  await assert.rejects(
+    () =>
+      createChatMessageWithRagAnswer({
+        chatId: "chat_1",
+        demoSessionId: "demo_123",
+        body: {
+          content: "What are the rollout risks?",
+          selectedDocumentIds: [],
+          selectedFolderIds: [],
+        },
+        dependencies: deps,
+      }),
+    { code: "CHAT_CONTEXT_REQUIRED" },
+  );
+  assert.equal(generatorCalled, false);
 });

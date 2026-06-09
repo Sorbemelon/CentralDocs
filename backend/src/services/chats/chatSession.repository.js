@@ -131,7 +131,12 @@ export async function updateSelection({
   );
 }
 
-export async function incrementMessageCount({ chatId, demoSessionId, at = new Date() } = {}) {
+export async function incrementMessageCount({
+  chatId,
+  demoSessionId,
+  at = new Date(),
+  delta = 1,
+} = {}) {
   requirePersistence();
   if (!isValidMongoId(chatId)) {
     return null;
@@ -140,8 +145,29 @@ export async function incrementMessageCount({ chatId, demoSessionId, at = new Da
   return ChatSession.findOneAndUpdate(
     { _id: chatId, demoSessionId, lifecycleStatus: LIFECYCLE_STATUS.ACTIVE },
     {
-      $inc: { messageCount: 1 },
+      $inc: { messageCount: delta },
       $set: { lastMessageAt: at },
+    },
+    { new: true, lean: true },
+  );
+}
+
+export async function incrementAiPromptCount({
+  chatId,
+  demoSessionId,
+  at = new Date(),
+  delta = 1,
+} = {}) {
+  requirePersistence();
+  if (!isValidMongoId(chatId)) {
+    return null;
+  }
+
+  return ChatSession.findOneAndUpdate(
+    { _id: chatId, demoSessionId, lifecycleStatus: LIFECYCLE_STATUS.ACTIVE },
+    {
+      $inc: { aiPromptCount: delta },
+      $set: { updatedAt: at },
     },
     { new: true, lean: true },
   );
@@ -243,13 +269,22 @@ export function createMemoryChatSessionRepository({ seed = [], now = () => new D
         },
       });
     },
-    async incrementMessageCount({ chatId, demoSessionId, at = now() }) {
+    async incrementMessageCount({ chatId, demoSessionId, at = now(), delta = 1 }) {
       const chat = chats.get(String(chatId));
       if (!chat || chat.demoSessionId !== demoSessionId || chat.lifecycleStatus !== LIFECYCLE_STATUS.ACTIVE) {
         return null;
       }
-      chat.messageCount += 1;
+      chat.messageCount += delta;
       chat.lastMessageAt = at;
+      chat.updatedAt = at;
+      return clone(chat);
+    },
+    async incrementAiPromptCount({ chatId, demoSessionId, at = now(), delta = 1 }) {
+      const chat = chats.get(String(chatId));
+      if (!chat || chat.demoSessionId !== demoSessionId || chat.lifecycleStatus !== LIFECYCLE_STATUS.ACTIVE) {
+        return null;
+      }
+      chat.aiPromptCount += delta;
       chat.updatedAt = at;
       return clone(chat);
     },

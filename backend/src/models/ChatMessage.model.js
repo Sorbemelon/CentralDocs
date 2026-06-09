@@ -50,11 +50,11 @@ const resolvedDocumentSnapshotSchema = new mongoose.Schema(
 export const referenceUsedSchema = new mongoose.Schema(
   {
     citationNumber: { type: Number, required: true, min: 1 },
-    documentId: { type: ObjectId, ref: "Document", required: true },
+    documentId: { type: String, required: true },
     documentTitle: { type: String, required: true },
     fileType: { type: String, default: null },
     folderName: { type: String, default: null },
-    chunkId: { type: ObjectId, ref: "DocumentChunk", default: null },
+    chunkId: { type: String, default: null },
     sectionTitle: { type: String, default: null },
     pageNumber: { type: Number, default: null, min: 1 },
     slideNumber: { type: Number, default: null, min: 1 },

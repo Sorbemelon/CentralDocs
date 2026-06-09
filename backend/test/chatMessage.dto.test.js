@@ -69,3 +69,52 @@ test("chat message DTO hides object keys, embeddings, local paths, and internals
   assert.equal(serialized.includes("demo_secret"), false);
   assert.equal("__v" in dto, false);
 });
+
+test("assistant chat message DTO exposes safe aiMeta and references only", () => {
+  const dto = toChatMessageDto({
+    _id: "message_assistant",
+    chatSessionId: "chat_1",
+    role: "assistant",
+    content: "Training adoption is the risk [1].",
+    status: "complete",
+    attachedDocumentSnapshot: [],
+    attachedFolderSnapshot: [],
+    resolvedDocumentSnapshot: [],
+    referencesUsed: [
+      {
+        citationNumber: 1,
+        documentId: "doc_1",
+        documentTitle: "Rollout Plan",
+        fileType: "pptx",
+        folderName: "Strategy",
+        chunkId: "chunk_1",
+        excerptPreview: "Training adoption risk.",
+        similarityScore: 0.91,
+        usedFor: "chat answer evidence",
+        objectKey: "mock/secret",
+        embedding: [0.1],
+      },
+    ],
+    aiMeta: {
+      actionType: "chat_answer",
+      generationModel: "gemini-3.5-flash",
+      fallbackUsed: false,
+      fallbackLevel: 0,
+      keySlotUsed: 1,
+      estimatedInputTokens: 120,
+      estimatedOutputTokens: 24,
+      latencyMs: 50,
+      prompt: "hidden prompt",
+      apiKey: "SECRET",
+    },
+  });
+  const serialized = JSON.stringify(dto);
+
+  assert.equal(dto.aiMeta.actionType, "chat_answer");
+  assert.equal(dto.aiMeta.generationModel, "gemini-3.5-flash");
+  assert.equal(dto.referencesUsed[0].usedFor, "chat answer evidence");
+  assert.equal(serialized.includes("hidden prompt"), false);
+  assert.equal(serialized.includes("SECRET"), false);
+  assert.equal(serialized.includes("objectKey"), false);
+  assert.equal(serialized.includes("embedding"), false);
+});

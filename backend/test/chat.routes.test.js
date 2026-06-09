@@ -89,6 +89,32 @@ function installFakeDependencies({ sessions = [], messages = [] } = {}) {
     chatSessionRepository,
     chatMessageRepository,
     selectionRepositories: selectionRepositories(),
+    semanticSearcher: async () => ({
+      references: [
+        {
+          citationNumber: 1,
+          documentId: "doc_2",
+          documentTitle: "Risk Register",
+          fileType: "csv",
+          folderName: "Operations",
+          chunkId: "chunk_1",
+          excerptPreview: "Approval ownership is the risk.",
+          similarityScore: 0.91,
+        },
+      ],
+      results: [],
+      scope: {},
+    }),
+    generator: async () => ({
+      text: "Approval ownership is the main change risk [1].",
+      model: "gemini-3.5-flash",
+      fallbackUsed: false,
+      fallbackLevel: 0,
+      keySlot: 0,
+      latencyMs: 15,
+      usage: { estimatedInputTokens: 100, estimatedOutputTokens: 20 },
+      aiRouting: [],
+    }),
   };
 
   setChatSessionDependenciesForTests(dependencies);
@@ -155,17 +181,18 @@ test("chat routes create, list, update selection, store user message, detail, an
     .set("x-demo-session-id", "demo_123")
     .send({ content: "What changed?" })
     .expect(201);
-  assert.equal(message.body.message.role, "user");
-  assert.equal(message.body.message.attachedDocumentSnapshot[0].id, "doc_2");
-  assert.equal(message.body.message.referencesUsed.length, 0);
-  assert.equal(message.body.message.aiMeta, null);
-  assert.equal(message.body.chat.aiPromptCount, 0);
+  assert.equal(message.body.userMessage.role, "user");
+  assert.equal(message.body.userMessage.attachedDocumentSnapshot[0].id, "doc_2");
+  assert.equal(message.body.assistantMessage.role, "assistant");
+  assert.equal(message.body.assistantMessage.referencesUsed[0].citationNumber, 1);
+  assert.equal(message.body.assistantMessage.aiMeta.generationModel, "gemini-3.5-flash");
+  assert.equal(message.body.chat.aiPromptCount, 1);
 
   const detail = await request(app)
     .get(`/api/chats/${chatId}`)
     .set("x-demo-session-id", "demo_123")
     .expect(200);
-  assert.equal(detail.body.messages.length, 1);
+  assert.equal(detail.body.messages.length, 2);
   assert.equal(detail.body.messages[0].role, "user");
 
   const deleted = await request(app)
@@ -209,6 +236,36 @@ test("chat routes validate titles, session limit, and message body as JSON error
     .send({ content: "x".repeat(1501) })
     .expect(400);
   assert.equal(messageResponse.body.error.code, "CHAT_MESSAGE_TOO_LONG");
+});
+
+test("chat message route handles no selected context and AI prompt limit safely", async () => {
+  installFakeDependencies({
+    sessions: [{ id: "chat_empty", demoSessionId: "demo_123", title: "Empty" }],
+  });
+  const noContext = await request(app)
+    .post("/api/chats/chat_empty/messages")
+    .set("x-demo-session-id", "demo_123")
+    .send({ content: "What are the risks?" })
+    .expect(400);
+  assert.equal(noContext.body.error.code, "CHAT_CONTEXT_REQUIRED");
+
+  installFakeDependencies({
+    sessions: [
+      {
+        id: "chat_limited",
+        demoSessionId: "demo_123",
+        title: "Limited",
+        currentSelectedDocumentIds: ["doc_2"],
+        aiPromptCount: 10,
+      },
+    ],
+  });
+  const limited = await request(app)
+    .post("/api/chats/chat_limited/messages")
+    .set("x-demo-session-id", "demo_123")
+    .send({ content: "What are the risks?" })
+    .expect(409);
+  assert.equal(limited.body.error.code, "AI_PROMPT_LIMIT_REACHED");
 });
 
 test("chat routes require a demo session and generated-document route remains absent", async () => {

@@ -7,7 +7,7 @@ import {
   updateChatSelection,
   updateSavedChatSession,
 } from "../services/chats/chatSession.service.js";
-import { createUserChatMessage } from "../services/chats/chatMessage.service.js";
+import { createChatMessageWithRagAnswer } from "../services/chats/chatMessage.service.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 
 export const chatRouter = Router();
@@ -103,7 +103,7 @@ chatRouter.patch(
 chatRouter.post(
   "/:chatId/messages",
   asyncHandler(async (req, res) => {
-    const result = await createUserChatMessage({
+    const result = await createChatMessageWithRagAnswer({
       chatId: req.params.chatId,
       demoSessionId: req.demoSessionId,
       body: req.body,

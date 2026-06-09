@@ -12,11 +12,15 @@ import {
   toSelectionDto,
 } from "./chatSession.service.js";
 import { resolveChatSelection } from "./chatSelection.service.js";
+import { buildRagContext } from "../rag/ragContext.service.js";
+import { answerChatMessageWithRag } from "../rag/ragAnswer.service.js";
 
 const defaultDependencies = Object.freeze({
   chatSessionRepository: defaultChatSessionRepository,
   chatMessageRepository: defaultChatMessageRepository,
   selectionResolver: resolveChatSelection,
+  contextBuilder: buildRagContext,
+  ragAnswerer: answerChatMessageWithRag,
   now: () => new Date(),
 });
 
@@ -151,4 +155,71 @@ export async function createUserChatMessage({
     }),
     selection: toSelectionDto(selection),
   };
+}
+
+export async function createChatMessageWithRagAnswer({
+  chatId,
+  demoSessionId,
+  body = {},
+  dependencies = {},
+} = {}) {
+  requireDemoSessionId(demoSessionId);
+  const deps = getDependencies(dependencies);
+  const content = validateMessageContent(body.content);
+  const chat = assertChatFound(
+    await deps.chatSessionRepository.getChatSessionById({ chatId, demoSessionId }),
+  );
+  const ragContext = await deps.contextBuilder({
+    chatSession: chat,
+    body,
+    userPrompt: content,
+    demoSessionId,
+    selectionResolver: deps.selectionResolver,
+    semanticSearcher: deps.semanticSearcher,
+    selectionRepositories: deps.selectionRepositories || {},
+    searchDependencies: deps.searchDependencies || {},
+  });
+
+  let selectedChat = chat;
+  if (ragContext.hasOverride) {
+    selectedChat = assertChatFound(
+      await deps.chatSessionRepository.updateSelection({
+        chatId,
+        demoSessionId,
+        selectedDocumentIds: ragContext.selection.selectedDocumentIds,
+        selectedFolderIds: ragContext.selection.selectedFolderIds,
+      }),
+    );
+  }
+
+  const userMessage = await deps.chatMessageRepository.createMessage({
+    chatSessionId: selectedChat._id || selectedChat.id,
+    demoSessionId,
+    role: CHAT_ROLE.USER,
+    content,
+    status: CHAT_MESSAGE_STATUS.COMPLETE,
+    attachedDocumentSnapshot: ragContext.selection.snapshots.attachedDocumentSnapshot,
+    attachedFolderSnapshot: ragContext.selection.snapshots.attachedFolderSnapshot,
+    resolvedDocumentSnapshot: ragContext.selection.snapshots.resolvedDocumentSnapshot,
+    referencesUsed: [],
+    aiMeta: null,
+  });
+  const chatAfterUser = assertChatFound(
+    await deps.chatSessionRepository.incrementMessageCount({
+      chatId,
+      demoSessionId,
+      at: deps.now(),
+    }),
+  );
+
+  return deps.ragAnswerer({
+    chatId,
+    demoSessionId,
+    content,
+    body,
+    userMessage,
+    chatSession: chatAfterUser,
+    ragContext,
+    dependencies: deps,
+  });
 }
