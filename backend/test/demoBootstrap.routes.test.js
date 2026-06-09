@@ -32,6 +32,8 @@ test("POST /api/demo/bootstrap includes session limits when session exists", asy
     .expect(200);
 
   assert.equal(response.body.session.persistence, "memory");
+  assert.equal(response.body.session.mode, "foundation_memory");
   assert.equal(response.body.session.limits.maxUserFolders, 10);
   assert.equal(response.body.session.usage.uploadedFiles, 0);
+  assert.equal(response.body.session.remaining.userFolders, 10);
 });

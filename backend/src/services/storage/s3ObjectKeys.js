@@ -130,3 +130,8 @@ export function buildGeneratedDocumentObjectKey({ demoSessionId, documentId, fil
 
   return assertSafeObjectKey(key);
 }
+
+export function buildDemoSessionPrefix({ demoSessionId } = {}) {
+  const sessionSegment = sanitizeKeySegment(demoSessionId, "Demo session ID");
+  return `${STORAGE_KEY_PREFIX.DEMO_SESSIONS}/${sessionSegment}/`;
+}

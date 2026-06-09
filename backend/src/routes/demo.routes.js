@@ -6,6 +6,7 @@ import {
   createOrResumeDemoSession,
   getDemoSession,
 } from "../services/demo/demoSession.service.js";
+import { cleanupExpiredDemoSessions } from "../services/demo/demoExpiry.service.js";
 import { buildDemoWorkspace } from "../services/demo/demoWorkspace.service.js";
 import { getDemoGuideFromManifest } from "../services/mockData/mockManifest.service.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
@@ -27,6 +28,7 @@ function setDemoSessionCookie(res, sessionId) {
 demoRouter.post(
   "/bootstrap",
   asyncHandler(async (req, res) => {
+    await cleanupExpiredDemoSessions();
     const workspace = await buildDemoWorkspace();
     const session = await getDemoSession(req.demoSessionId);
 
@@ -42,8 +44,11 @@ demoRouter.post(
       session: session
         ? {
             usage: session.usage,
+            remaining: session.remaining,
             limits: session.limits,
             persistence: session.persistence,
+            mode: session.mode,
+            status: session.status,
             expiresAt: session.expiresAt,
           }
         : null,
@@ -61,7 +66,7 @@ demoRouter.post(
 
     res.status(201).json({
       status: "ready",
-      mode: session.persistence === "mongodb" ? "persistent" : "foundation_memory",
+      mode: session.mode,
       session,
     });
   }),
@@ -75,14 +80,21 @@ demoRouter.get(
       throw createHttpError(
         404,
         "No active demo session was found. Create one with POST /api/demo/session.",
-        "DEMO_SESSION_NOT_FOUND",
+        "SESSION_NOT_FOUND",
       );
     }
 
     res.json({
-      status: "ready",
-      mode: session.persistence === "mongodb" ? "persistent" : "foundation_memory",
+      status: session.status === "expired" ? "expired" : "ready",
+      mode: session.mode,
       session,
+      cleanup:
+        session.status === "expired"
+          ? {
+              status: "pending_expired_session_cleanup",
+              cleanupStatus: session.cleanupStatus,
+            }
+          : undefined,
     });
   }),
 );
@@ -91,13 +103,9 @@ demoRouter.post(
   "/clear",
   asyncHandler(async (req, res) => {
     const result = await acceptDemoClear(req.demoSessionId);
+    setDemoSessionCookie(res, result.session.sessionId);
 
-    res.status(202).json({
-      status: "clear_accepted",
-      result,
-      phaseLimit:
-        "Phase 1A records the clear request only. Full hard-delete cleanup is implemented later.",
-    });
+    res.json(result);
   }),
 );
 

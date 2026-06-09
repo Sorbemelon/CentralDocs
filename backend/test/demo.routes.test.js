@@ -22,8 +22,10 @@ test("POST /api/demo/session creates a foundation-memory demo session", async ()
   assert.equal(response.body.mode, "foundation_memory");
   assert.match(response.body.session.sessionId, /^demo_/);
   assert.equal(response.body.session.persistence, "memory");
+  assert.equal(response.body.session.mode, "foundation_memory");
   assert.equal(response.body.session.limits.sessionLifetimeDays, 3);
   assert.equal(response.body.session.usage.uploadedFiles, 0);
+  assert.equal(response.body.session.remaining.uploadedFiles, 5);
   assert.ok(response.headers["set-cookie"]?.some((cookie) => cookie.includes("centraldocs_demo_session")));
 });
 
@@ -40,21 +42,26 @@ test("GET /api/demo/session returns current session with header", async () => {
   assert.equal(current.body.mode, "foundation_memory");
   assert.equal(current.body.session.sessionId, sessionId);
   assert.equal(current.body.session.persistence, "memory");
+  assert.equal(current.body.session.remaining.chatSessions, 5);
 });
 
-test("POST /api/demo/clear returns clear accepted foundation response", async () => {
+test("POST /api/demo/clear returns cleared foundation response", async () => {
   const created = await request(app).post("/api/demo/session").expect(201);
   const sessionId = created.body.session.sessionId;
 
   const response = await request(app)
     .post("/api/demo/clear")
     .set("x-demo-session-id", sessionId)
-    .expect(202);
+    .expect(200);
 
-  assert.equal(response.body.status, "clear_accepted");
-  assert.equal(response.body.result.accepted, true);
-  assert.equal(response.body.result.sessionId, sessionId);
-  assert.match(response.body.phaseLimit, /Phase 1A/);
+  assert.equal(response.body.status, "cleared");
+  assert.equal(response.body.previousSessionId, sessionId);
+  assert.match(response.body.session.sessionId, /^demo_/);
+  assert.notEqual(response.body.session.sessionId, sessionId);
+  assert.equal(response.body.session.usage.uploadedFiles, 0);
+  assert.equal(response.body.session.remaining.storageBytes, 20 * 1024 * 1024);
+  assert.equal(response.body.cleanup.mongo, "skipped_not_configured");
+  assert.equal(response.body.cleanup.s3, "skipped_not_configured");
 });
 
 test("GET /api/demo/guide returns guide counts from manifest", async () => {

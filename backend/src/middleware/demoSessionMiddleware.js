@@ -2,6 +2,14 @@ export const DEMO_SESSION_COOKIE = "centraldocs_demo_session";
 export const DEMO_SESSION_HEADER = "x-demo-session-id";
 
 export function demoSessionMiddleware(req, res, next) {
-  req.demoSessionId = req.get(DEMO_SESSION_HEADER) || req.cookies?.[DEMO_SESSION_COOKIE] || null;
+  const headerSessionId = req.get(DEMO_SESSION_HEADER);
+  const cookieSessionId = req.cookies?.[DEMO_SESSION_COOKIE] || null;
+  const sessionId = headerSessionId || cookieSessionId || null;
+
+  req.demoSessionId = sessionId;
+  req.demoSessionContext = {
+    sessionId,
+    source: headerSessionId ? "header" : cookieSessionId ? "cookie" : "none",
+  };
   next();
 }

@@ -9,6 +9,7 @@ delete process.env.AWS_SECRET_ACCESS_KEY;
 
 const {
   deleteObject,
+  deleteObjectsByPrefix,
   getPresignedDownloadUrl,
   getStorageStatus,
   putObject,
@@ -108,4 +109,26 @@ test("reserved S3 upload/delete methods fail safely without AWS calls", async ()
   }
 
   resetS3StorageDependenciesForTests();
+});
+
+test("S3 storage delete-by-prefix foundation only allows demo-session prefixes", async () => {
+  await assert.rejects(() => deleteObjectsByPrefix({ prefix: "mock/orchid-retail/" }), {
+    code: "INVALID_STORAGE_KEY",
+  });
+
+  const skipped = await deleteObjectsByPrefix({ prefix: "demo-sessions/demo_abc/" });
+  assert.equal(skipped.status, "skipped_not_configured");
+
+  const completed = await deleteObjectsByPrefix(
+    { prefix: "demo-sessions/demo_abc/" },
+    {
+      configured: true,
+      bucket: "centraldocs-test",
+      client: {},
+      prefixDeleter: async ({ prefix }) => ({ deletedCount: prefix.endsWith("/") ? 3 : 0 }),
+    },
+  );
+
+  assert.equal(completed.status, "completed");
+  assert.equal(completed.deletedCount, 3);
 });

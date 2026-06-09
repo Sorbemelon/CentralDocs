@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 const {
   assertSafeObjectKey,
   buildDemoUploadObjectKey,
+  buildDemoSessionPrefix,
   buildGeneratedDocumentObjectKey,
   buildMockObjectKey,
   isSafeObjectKey,
@@ -73,4 +74,12 @@ test("buildGeneratedDocumentObjectKey uses expected key pattern", () => {
     }),
     "demo-sessions/demo_abc/generated/generated_doc_1/summary.md",
   );
+});
+
+test("buildDemoSessionPrefix returns safe cleanup prefix and rejects unsafe IDs", () => {
+  assert.equal(buildDemoSessionPrefix({ demoSessionId: "demo_abc" }), "demo-sessions/demo_abc/");
+  assert.throws(() => buildDemoSessionPrefix({ demoSessionId: "../mock" }), {
+    code: "INVALID_STORAGE_KEY",
+  });
+  assert.notEqual(buildDemoSessionPrefix({ demoSessionId: "demo_safe" }).startsWith("mock/"), true);
 });

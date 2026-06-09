@@ -1,8 +1,18 @@
 import { nanoid } from "nanoid";
 import { DEMO_LIMITS, EMPTY_DEMO_USAGE } from "../../config/limits.js";
-import { isMongoConnected } from "../../db/connectMongo.js";
-import { DemoSession } from "../../models/DemoSession.model.js";
-import { addDays, isPast, now } from "../../utils/time.js";
+import { CLEANUP_STATUS, DEMO_SESSION_STATUS } from "../../constants/lifecycle.constants.js";
+import { addDays, now } from "../../utils/time.js";
+import { cleanupDemoSessionData } from "./demoCleanup.service.js";
+import { cleanupExpiredDemoSessions, expireSessionIfNeeded } from "./demoExpiry.service.js";
+import {
+  createSession as createPersistentSession,
+  findBySessionId,
+  isDemoSessionPersistenceAvailable,
+  markExpired,
+  updateLastActive,
+  updateUsage,
+} from "./demoSession.repository.js";
+import { getRemainingLimits, getUsageSnapshot } from "./demoUsage.service.js";
 
 const inMemorySessions = new Map();
 
@@ -10,70 +20,111 @@ function createSessionId() {
   return `demo_${nanoid(18)}`;
 }
 
-function createSessionRecord(sessionId = createSessionId()) {
-  const createdAt = now();
-
+export function createSessionRecord(sessionId = createSessionId(), createdAt = now()) {
   return {
     sessionId,
-    status: "active",
+    status: DEMO_SESSION_STATUS.ACTIVE,
     createdAt,
     lastActiveAt: createdAt,
     expiresAt: addDays(createdAt, DEMO_LIMITS.sessionLifetimeDays),
     limits: { ...DEMO_LIMITS },
     usage: { ...EMPTY_DEMO_USAGE },
-    cleanupStatus: "not_started",
+    cleanupStatus: CLEANUP_STATUS.NOT_STARTED,
   };
 }
 
-function toPublicSession(record, persistence) {
+function serializeDate(value) {
+  if (!value) {
+    return null;
+  }
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+
+  return value;
+}
+
+function getMode(persistence) {
+  return persistence === "mongodb" ? "persistent" : "foundation_memory";
+}
+
+export function toPublicSession(record, persistence = "memory") {
+  const normalized = {
+    ...record,
+    usage: getUsageSnapshot(record),
+    limits: record.limits || { ...DEMO_LIMITS },
+  };
+
   return {
-    sessionId: record.sessionId,
-    status: record.status,
-    createdAt: record.createdAt,
-    lastActiveAt: record.lastActiveAt,
-    expiresAt: record.expiresAt,
-    limits: record.limits,
-    usage: record.usage,
-    cleanupStatus: record.cleanupStatus,
+    sessionId: normalized.sessionId,
+    status: normalized.status,
+    createdAt: serializeDate(normalized.createdAt),
+    lastActiveAt: serializeDate(normalized.lastActiveAt),
+    expiresAt: serializeDate(normalized.expiresAt),
+    limits: normalized.limits,
+    usage: normalized.usage,
+    remaining: getRemainingLimits(normalized),
+    cleanupStatus: normalized.cleanupStatus || CLEANUP_STATUS.NOT_STARTED,
     persistence,
+    mode: getMode(persistence),
   };
 }
 
-async function upsertMongoSession(requestedSessionId) {
+function updateMemorySession(session) {
+  inMemorySessions.set(session.sessionId, session);
+  return session;
+}
+
+async function createPersistentOrMemorySession(persistenceAvailable) {
+  const record = createSessionRecord();
+
+  if (persistenceAvailable) {
+    return toPublicSession(await createPersistentSession(record), "mongodb");
+  }
+
+  return toPublicSession(updateMemorySession(record), "memory");
+}
+
+async function createOrResumePersistentSession(requestedSessionId) {
   if (requestedSessionId) {
-    const existing = await DemoSession.findOne({ sessionId: requestedSessionId });
-    if (existing && existing.status === "active" && !isPast(existing.expiresAt)) {
-      existing.lastActiveAt = now();
-      await existing.save();
-      return toPublicSession(existing.toObject(), "mongodb");
+    const existing = await findBySessionId(requestedSessionId);
+    if (existing) {
+      const maybeExpired = expireSessionIfNeeded(existing);
+      if (maybeExpired.status === DEMO_SESSION_STATUS.ACTIVE) {
+        return toPublicSession(await updateLastActive(existing.sessionId, now()), "mongodb");
+      }
+
+      await markExpired(existing.sessionId, now());
     }
   }
 
-  const created = await DemoSession.create(createSessionRecord());
-  return toPublicSession(created.toObject(), "mongodb");
+  return createPersistentOrMemorySession(true);
 }
 
-function upsertMemorySession(requestedSessionId) {
+function createOrResumeMemorySession(requestedSessionId) {
   if (requestedSessionId) {
     const existing = inMemorySessions.get(requestedSessionId);
-    if (existing && existing.status === "active" && !isPast(existing.expiresAt)) {
-      existing.lastActiveAt = now();
-      inMemorySessions.set(existing.sessionId, existing);
-      return toPublicSession(existing, "memory");
+    if (existing) {
+      const maybeExpired = expireSessionIfNeeded(existing);
+      if (maybeExpired.status === DEMO_SESSION_STATUS.ACTIVE) {
+        existing.lastActiveAt = now();
+        return toPublicSession(updateMemorySession(existing), "memory");
+      }
+
+      updateMemorySession(maybeExpired);
     }
   }
 
-  const created = createSessionRecord();
-  inMemorySessions.set(created.sessionId, created);
-  return toPublicSession(created, "memory");
+  return createPersistentOrMemorySession(false);
 }
 
 export async function createOrResumeDemoSession(requestedSessionId) {
-  if (isMongoConnected()) {
-    return upsertMongoSession(requestedSessionId);
+  if (isDemoSessionPersistenceAvailable()) {
+    await cleanupExpiredDemoSessions();
+    return createOrResumePersistentSession(requestedSessionId);
   }
 
-  return upsertMemorySession(requestedSessionId);
+  return createOrResumeMemorySession(requestedSessionId);
 }
 
 export async function getDemoSession(requestedSessionId) {
@@ -81,45 +132,88 @@ export async function getDemoSession(requestedSessionId) {
     return null;
   }
 
-  if (isMongoConnected()) {
-    const existing = await DemoSession.findOne({ sessionId: requestedSessionId });
+  if (isDemoSessionPersistenceAvailable()) {
+    const existing = await findBySessionId(requestedSessionId);
     if (!existing) {
       return null;
     }
 
-    return toPublicSession(existing.toObject(), "mongodb");
+    const maybeExpired = expireSessionIfNeeded(existing);
+    if (maybeExpired.status === DEMO_SESSION_STATUS.EXPIRED && existing.status !== DEMO_SESSION_STATUS.EXPIRED) {
+      await markExpired(existing.sessionId, now());
+    }
+
+    return toPublicSession(maybeExpired, "mongodb");
   }
 
   const existing = inMemorySessions.get(requestedSessionId);
-  return existing ? toPublicSession(existing, "memory") : null;
+  if (!existing) {
+    return null;
+  }
+
+  const maybeExpired = expireSessionIfNeeded(existing);
+  if (maybeExpired.status === DEMO_SESSION_STATUS.EXPIRED) {
+    updateMemorySession(maybeExpired);
+  }
+
+  return toPublicSession(maybeExpired, "memory");
+}
+
+export async function applyDemoSessionUsageDelta(sessionId, delta) {
+  const current = await getDemoSession(sessionId);
+  if (!current) {
+    return null;
+  }
+
+  const nextUsage = getUsageSnapshot({
+    usage: Object.fromEntries(
+      Object.entries(current.usage).map(([key, value]) => [key, value + Number(delta[key] || 0)]),
+    ),
+  });
+
+  if (current.persistence === "mongodb") {
+    return toPublicSession(await updateUsage(sessionId, nextUsage), "mongodb");
+  }
+
+  const existing = inMemorySessions.get(sessionId);
+  existing.usage = nextUsage;
+  existing.lastActiveAt = now();
+  updateMemorySession(existing);
+  return toPublicSession(existing, "memory");
+}
+
+export async function clearDemoSession(requestedSessionId) {
+  const persistenceAvailable = isDemoSessionPersistenceAvailable();
+  const previousSessionId = requestedSessionId || null;
+  const cleanup = previousSessionId
+    ? await cleanupDemoSessionData(previousSessionId, { persistenceAvailable })
+    : {
+        mongo: { status: "skipped_not_configured", deleted: {} },
+        s3: { status: "skipped_not_configured", prefix: null, deletedCount: 0 },
+      };
+
+  if (!persistenceAvailable && previousSessionId) {
+    inMemorySessions.delete(previousSessionId);
+  }
+
+  const session = await createPersistentOrMemorySession(persistenceAvailable);
+
+  return {
+    status: "cleared",
+    previousSessionId,
+    session,
+    cleanup: {
+      mongo: cleanup.mongo?.status || "skipped_not_configured",
+      s3: cleanup.s3?.status || "skipped_not_configured",
+      details: cleanup,
+    },
+  };
 }
 
 export async function acceptDemoClear(requestedSessionId) {
-  if (!requestedSessionId) {
-    return {
-      accepted: true,
-      sessionId: null,
-      cleanupStatus: "accepted",
-      message: "Clear accepted. No Phase 1A data deletion was performed.",
-    };
-  }
+  return clearDemoSession(requestedSessionId);
+}
 
-  if (isMongoConnected()) {
-    await DemoSession.updateOne(
-      { sessionId: requestedSessionId },
-      { $set: { cleanupStatus: "accepted", lastActiveAt: now() } },
-    );
-  } else if (inMemorySessions.has(requestedSessionId)) {
-    const existing = inMemorySessions.get(requestedSessionId);
-    existing.cleanupStatus = "accepted";
-    existing.lastActiveAt = now();
-    inMemorySessions.set(requestedSessionId, existing);
-  }
-
-  return {
-    accepted: true,
-    sessionId: requestedSessionId,
-    cleanupStatus: "accepted",
-    message: "Clear accepted. Full hard-delete cleanup is reserved for a later phase.",
-  };
+export function resetDemoSessionMemoryForTests() {
+  inMemorySessions.clear();
 }
