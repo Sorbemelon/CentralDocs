@@ -43,7 +43,7 @@ test("mock asset service rejects path traversal", async () => {
         relativePath: "documents/../evil.md",
       }),
     {
-      code: "MOCK_ASSET_PATH_UNSAFE",
+      code: "INVALID_MOCK_ASSET_PATH",
     },
   );
 });

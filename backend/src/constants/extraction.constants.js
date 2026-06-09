@@ -1,0 +1,59 @@
+export const EXTRACTION_FILE_KIND = Object.freeze({
+  TEXT: "text",
+  MARKDOWN: "markdown",
+  CSV: "csv",
+  TSV: "tsv",
+  PDF: "pdf",
+  DOCX: "docx",
+  XLSX: "xlsx",
+  PPTX: "pptx",
+  IMAGE: "image",
+  AUDIO: "audio",
+  VIDEO: "video",
+});
+
+export const PUBLIC_UPLOAD_EXTRACTION_FILE_KINDS = Object.freeze([
+  EXTRACTION_FILE_KIND.TEXT,
+  EXTRACTION_FILE_KIND.MARKDOWN,
+  EXTRACTION_FILE_KIND.CSV,
+  EXTRACTION_FILE_KIND.TSV,
+  EXTRACTION_FILE_KIND.PDF,
+  EXTRACTION_FILE_KIND.DOCX,
+]);
+
+export const MOCK_ONLY_EXTRACTION_FILE_KINDS = Object.freeze([
+  EXTRACTION_FILE_KIND.XLSX,
+  EXTRACTION_FILE_KIND.PPTX,
+  EXTRACTION_FILE_KIND.IMAGE,
+  EXTRACTION_FILE_KIND.AUDIO,
+  EXTRACTION_FILE_KIND.VIDEO,
+]);
+
+export const SUPPORTED_EXTRACTION_FILE_KINDS = Object.freeze([
+  ...PUBLIC_UPLOAD_EXTRACTION_FILE_KINDS,
+  ...MOCK_ONLY_EXTRACTION_FILE_KINDS,
+]);
+
+export const EXTRACTION_SOURCE = Object.freeze({
+  PUBLIC_UPLOAD: "public_upload",
+  MOCK: "mock",
+});
+
+export const EXTRACTION_LIMITS = Object.freeze({
+  maxOptimizedTextChars: 24000,
+  maxPreviewChars: 2000,
+  maxTableRowsPerSheet: 100,
+  maxXlsxSheets: 5,
+  maxPptxSlides: 30,
+  maxPublicPdfPages: 10,
+  maxSourceBlocksPerFile: 120,
+});
+
+export const EXTRACTION_ERROR_CODE = Object.freeze({
+  UNSUPPORTED_FILE_TYPE: "UNSUPPORTED_FILE_TYPE",
+  EXTRACTION_FAILED: "EXTRACTION_FAILED",
+  INVALID_MOCK_ASSET_PATH: "INVALID_MOCK_ASSET_PATH",
+  FILE_NOT_FOUND: "FILE_NOT_FOUND",
+  FILE_TOO_LARGE_FOR_DEMO: "FILE_TOO_LARGE_FOR_DEMO",
+  MEDIA_SIDECAR_NOT_FOUND: "MEDIA_SIDECAR_NOT_FOUND",
+});

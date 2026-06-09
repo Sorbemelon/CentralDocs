@@ -2,6 +2,7 @@ import { stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { lookup as lookupMimeType } from "mime-types";
+import { EXTRACTION_ERROR_CODE } from "../../constants/extraction.constants.js";
 import { toMockDocumentId, toMockFolderId } from "../../utils/ids.js";
 import { buildMockObjectKey } from "../storage/s3ObjectKeys.js";
 import { MOCK_WORKSPACE_ID } from "./mockStorageMetadata.service.js";
@@ -15,7 +16,7 @@ function ensureInsideMockDocumentsRoot(candidatePath) {
 
   if (relative.startsWith("..") || path.isAbsolute(relative)) {
     const error = new Error("Mock asset path must stay inside backend/mock-data/documents.");
-    error.code = "MOCK_ASSET_PATH_UNSAFE";
+    error.code = EXTRACTION_ERROR_CODE.INVALID_MOCK_ASSET_PATH;
     throw error;
   }
 
@@ -29,7 +30,7 @@ function normalizeManifestRelativePath(document = {}) {
 
   if (!normalized || normalized.includes("..") || normalized.startsWith("/")) {
     const error = new Error("Mock asset manifest path is unsafe.");
-    error.code = "MOCK_ASSET_PATH_UNSAFE";
+    error.code = EXTRACTION_ERROR_CODE.INVALID_MOCK_ASSET_PATH;
     throw error;
   }
 
@@ -93,7 +94,14 @@ export function buildMockAssetMetadata(document = {}, folder = {}) {
 
 export async function validateMockAsset(document = {}, folder = {}) {
   const metadata = buildMockAssetMetadata(document, folder);
-  const fileStats = await stat(metadata.localPath);
+  let fileStats;
+  try {
+    fileStats = await stat(metadata.localPath);
+  } catch (error) {
+    const safeError = new Error("Mock asset file was not found.");
+    safeError.code = EXTRACTION_ERROR_CODE.FILE_NOT_FOUND;
+    throw safeError;
+  }
 
   return {
     ...metadata,

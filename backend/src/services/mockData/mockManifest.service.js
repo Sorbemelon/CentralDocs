@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { createHttpError } from "../../utils/httpError.js";
+import { toMockDocumentId } from "../../utils/ids.js";
 
 const manifestPath = fileURLToPath(new URL("../../../mock-data/manifest.json", import.meta.url));
 
@@ -42,4 +43,16 @@ export async function getDemoGuideFromManifest() {
     documentCount: Array.isArray(manifest.documents) ? manifest.documents.length : 0,
     mockDataRules: manifest.mockDataRules || {},
   };
+}
+
+export function findMockManifestDocument(manifest = {}, documentIdOrSlug) {
+  return (manifest.documents || []).find((document) => {
+    const slug = `${document.folderSlug}/${document.filename}`;
+    return (
+      documentIdOrSlug === slug ||
+      documentIdOrSlug === document.filename ||
+      documentIdOrSlug === document.title ||
+      documentIdOrSlug === toMockDocumentId(slug)
+    );
+  }) || null;
 }
