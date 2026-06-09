@@ -1,15 +1,14 @@
-import { FolderPlus, RotateCcw } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { CloudOff, FolderPlus, RotateCcw } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { IconButton } from "@/components/common/IconButton";
 import { EmptyState } from "@/components/common/EmptyState";
+import { LoadingState } from "@/components/common/LoadingState";
 import { cn } from "@/lib/cn";
 import { SOURCE_FILTER } from "@/lib/constants";
 import { SourceUploadCard } from "./SourceUploadCard";
 import { FolderTree } from "./FolderTree";
-import { DocumentList } from "./DocumentList";
-import { getFileIcon, SourceBadge } from "./DocumentList";
+import { DocumentList, getFileIcon, SourceBadge } from "./DocumentList";
 
 function Segmented({ value, onChange }) {
   const items = [
@@ -64,7 +63,7 @@ function TrashView({ ws }) {
             <IconButton
               icon={RotateCcw}
               label="Restore"
-              onClick={() => ws.notifyDeferred("Restore")}
+              onClick={() => ws.restoreTrashItem(item)}
               className="opacity-70 group-hover:opacity-100"
             />
           </div>
@@ -78,24 +77,26 @@ function TrashView({ ws }) {
 function SourcePanel({ ws, className }) {
   const isTrash = ws.sourceFilter === SOURCE_FILTER.trash;
   const activeDocs = ws.data.documents;
+  const loading = ws.loading?.sources;
 
   return (
     <section className={cn("flex min-h-0 flex-col", className)}>
       <div className="flex items-center justify-between gap-2 px-3 pt-3">
         <h2 className="text-sm font-semibold tracking-tight">Sources</h2>
-        <IconButton
-          icon={FolderPlus}
-          label="Create folder"
-          onClick={() => ws.notifyDeferred("Create folder")}
-        />
+        <IconButton icon={FolderPlus} label="Create folder" onClick={ws.createFolder} />
       </div>
 
       <div className="flex items-center justify-between gap-2 px-3 pb-2 pt-2">
         <Segmented value={ws.sourceFilter} onChange={ws.setSourceFilter} />
-        {!isTrash && (
-          <Badge variant="muted">{activeDocs.length} docs</Badge>
-        )}
+        {!isTrash && <Badge variant="muted">{activeDocs.length} docs</Badge>}
       </div>
+
+      {!ws.online && (
+        <div className="mx-3 mb-2 flex items-center gap-1.5 rounded-md bg-warning-subtle px-2 py-1 text-[11px] text-warning-subtle-foreground">
+          <CloudOff className="size-3.5 shrink-0" />
+          Backend offline — showing demo data.
+        </div>
+      )}
 
       {!isTrash && (
         <div className="px-3 pb-2">
@@ -104,7 +105,9 @@ function SourcePanel({ ws, className }) {
       )}
 
       <ScrollArea className="flex-1 px-2 pb-3">
-        {isTrash ? (
+        {loading ? (
+          <LoadingState rows={5} />
+        ) : isTrash ? (
           <TrashView ws={ws} />
         ) : (
           <div className="flex flex-col gap-2">
@@ -113,7 +116,11 @@ function SourcePanel({ ws, className }) {
               <p className="px-2 pb-0.5 pt-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                 Documents
               </p>
-              <DocumentList ws={ws} documents={activeDocs} />
+              {activeDocs.length ? (
+                <DocumentList ws={ws} documents={activeDocs} />
+              ) : (
+                <EmptyState title="No documents" description="Uploaded and generated documents will appear here." className="py-4" />
+              )}
             </div>
           </div>
         )}

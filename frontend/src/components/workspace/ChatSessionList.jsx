@@ -3,10 +3,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { LoadingState } from "@/components/common/LoadingState";
+import { EmptyState } from "@/components/common/EmptyState";
 import { cn } from "@/lib/cn";
 
 function ChatRow({ ws, chat }) {
   const active = chat.id === ws.activeChatId;
+  const contextCount = chat.contextCount ?? 0;
   return (
     <div
       className={cn(
@@ -22,7 +25,10 @@ function ChatRow({ ws, chat }) {
         <MessageSquareText className={cn("size-4 shrink-0", active ? "text-primary" : "text-muted-foreground")} />
         <span className="min-w-0 flex-1">
           <span className="block truncate text-[13px] font-medium leading-tight text-foreground">{chat.title}</span>
-          <span className="text-[11px] text-muted-foreground">{chat.contextCount} docs</span>
+          <span className="text-[11px] text-muted-foreground">
+            {contextCount} {contextCount === 1 ? "doc" : "docs"}
+            {chat.messageCount ? ` · ${chat.messageCount} msg` : ""}
+          </span>
         </span>
       </button>
       <DropdownMenu
@@ -39,7 +45,7 @@ function ChatRow({ ws, chat }) {
           <Archive /> Archive
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem tone="destructive" onClick={() => ws.notifyDeferred("Delete chat")}>
+        <DropdownMenuItem tone="destructive" onClick={() => ws.removeChat(chat.id)}>
           <Trash2 /> Delete
         </DropdownMenuItem>
       </DropdownMenu>
@@ -61,11 +67,17 @@ function ChatSessionList({ ws, className }) {
         </Button>
       </div>
       <ScrollArea className="flex-1 px-2 pb-2">
-        <div className="flex flex-col gap-0.5">
-          {ws.chats.map((chat) => (
-            <ChatRow key={chat.id} ws={ws} chat={chat} />
-          ))}
-        </div>
+        {ws.loading?.chats ? (
+          <LoadingState rows={3} />
+        ) : ws.chats.length ? (
+          <div className="flex flex-col gap-0.5">
+            {ws.chats.map((chat) => (
+              <ChatRow key={chat.id} ws={ws} chat={chat} />
+            ))}
+          </div>
+        ) : (
+          <EmptyState title="No chats yet" description="Start a chat with New Chat." className="py-4" />
+        )}
       </ScrollArea>
     </section>
   );

@@ -93,7 +93,7 @@ export function DocumentRow({ ws, doc }) {
           className={cn(selected && "text-primary")}
         />
         <IconButton icon={Eye} label="Preview" onClick={() => ws.openPreview(doc.id)} />
-        <IconButton icon={Download} label="Download" onClick={() => ws.notifyDeferred("Download")} />
+        <IconButton icon={Download} label="Download" onClick={() => ws.downloadDocument(doc)} />
         {doc.readOnly ? (
           <IconButton
             icon={Trash2}
@@ -105,7 +105,7 @@ export function DocumentRow({ ws, doc }) {
           <IconButton
             icon={Trash2}
             label="Delete"
-            onClick={() => ws.notifyDeferred("Delete document")}
+            onClick={() => ws.deleteDocument(doc)}
             className="hover:text-destructive"
           />
         )}

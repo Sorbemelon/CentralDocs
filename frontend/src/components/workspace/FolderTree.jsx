@@ -41,7 +41,7 @@ function FolderRow({ ws, folder, docCount }) {
           <IconButton
             icon={Trash2}
             label="Delete folder"
-            onClick={() => ws.notifyDeferred("Delete folder")}
+            onClick={() => ws.deleteFolder(folder)}
             className="hover:text-destructive"
           />
         )}

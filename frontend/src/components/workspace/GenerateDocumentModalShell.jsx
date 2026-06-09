@@ -14,13 +14,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
-function CheckRow({ id, label, defaultChecked }) {
+function OptionToggle({ id, label, value, onChange }) {
   return (
     <label htmlFor={id} className="flex items-center gap-2 text-[13px] text-foreground">
       <input
         id={id}
         type="checkbox"
-        defaultChecked={defaultChecked}
+        checked={value}
+        onChange={(e) => onChange(e.target.checked)}
         className="size-4 rounded border-input accent-[var(--primary)]"
       />
       {label}
@@ -34,6 +35,8 @@ function CheckRow({ id, label, defaultChecked }) {
  */
 function GenerateDocumentModalShell({ ws, open, onOpenChange }) {
   const [submitting, setSubmitting] = useState(false);
+  const [includeReferences, setIncludeReferences] = useState(true);
+  const [includeContext, setIncludeContext] = useState(true);
 
   const handleGenerate = () => {
     setSubmitting(true);
@@ -76,8 +79,8 @@ function GenerateDocumentModalShell({ ws, open, onOpenChange }) {
           </div>
 
           <div className="flex flex-col gap-2">
-            <CheckRow id="gen-refs" label="Include references" defaultChecked />
-            <CheckRow id="gen-ctx" label="Include current selected context" defaultChecked />
+            <OptionToggle id="gen-refs" label="Include references" value={includeReferences} onChange={setIncludeReferences} />
+            <OptionToggle id="gen-ctx" label="Include current selected context" value={includeContext} onChange={setIncludeContext} />
           </div>
 
           <div className="rounded-md border border-border bg-muted/50 p-2 text-[12px] text-muted-foreground">

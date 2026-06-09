@@ -1,16 +1,23 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { cn } from "@/lib/cn";
-import { SOURCE_FILTER } from "@/lib/constants";
-import { useBackendStatus } from "@/lib/useBackendStatus";
+import { SOURCE_FILTER, SOURCE_KIND } from "@/lib/constants";
+import { isLocalChatId } from "@/lib/workspaceData";
+import { useDemoSession } from "@/lib/useDemoSession";
+import { useWorkspaceData } from "@/lib/useWorkspaceData";
+import { useChatSessions } from "@/lib/useChatSessions";
+import { useSelectedContext } from "@/lib/useSelectedContext";
+import { updateChatSelection } from "@/services/chatApi";
 import {
-  FALLBACK_CHATS,
-  FALLBACK_DOCUMENTS,
-  FALLBACK_FOLDERS,
-  FALLBACK_GENERATED,
-  FALLBACK_TRASH,
-  FALLBACK_USAGE,
-} from "@/data/mockWorkspaceFallback";
+  createDownloadUrl,
+  deleteDocument as apiDeleteDocument,
+  restoreDocument as apiRestoreDocument,
+} from "@/services/documentApi";
+import {
+  createFolder as apiCreateFolder,
+  deleteFolder as apiDeleteFolder,
+  restoreFolder as apiRestoreFolder,
+} from "@/services/folderApi";
 import { WorkspaceTopBar } from "./WorkspaceTopBar";
 import { SourceSidebar } from "./SourceSidebar";
 import { MainWorkspacePanel } from "./MainWorkspacePanel";
@@ -18,68 +25,65 @@ import { RightContextPanel } from "./RightContextPanel";
 import { GenerateDocumentModalShell } from "./GenerateDocumentModalShell";
 
 /**
- * One compact workspace route. Holds Phase 7A shell state (selected source
- * context, active chat/tab, filters) so the plus/minus/delete interactions are
- * visible immediately. Backend wiring is deferred; data comes from the offline
- * fallback and the workspace stays usable when the backend is cold.
+ * One compact workspace route. Phase 7B wires Sources + Chat Sessions to the
+ * backend (folders/documents/trash/chats + demo session/bootstrap) and persists
+ * the selected context onto the active chat, while degrading gracefully to the
+ * offline fallback. Upload/search/chat-send/generate remain deferred shells.
  */
 export default function CentralDocsWorkspace() {
-  const { status: backendStatus, check } = useBackendStatus({ auto: true });
+  const demo = useDemoSession();
+  const online = demo.online;
 
-  // Static fallback data for the foundation phase.
-  const folders = FALLBACK_FOLDERS;
-  const documents = FALLBACK_DOCUMENTS;
-  const generated = FALLBACK_GENERATED;
-  const trash = FALLBACK_TRASH;
-  const usage = FALLBACK_USAGE;
-
-  const [chats, setChats] = useState(FALLBACK_CHATS);
-  const [activeChatId, setActiveChatId] = useState(
-    () => (FALLBACK_CHATS.find((c) => c.active) || FALLBACK_CHATS[0])?.id,
-  );
   const [activeTab, setActiveTab] = useState("chat");
   const [sourceFilter, setSourceFilter] = useState(SOURCE_FILTER.active);
-
-  const [selectedFolderIds, setSelectedFolderIds] = useState([]);
-  const [selectedDocIds, setSelectedDocIds] = useState([]);
-
   const [previewDocId, setPreviewDocId] = useState(null);
   const [generateOpen, setGenerateOpen] = useState(false);
-
-  // Mobile/medium drawers
   const [sourcesDrawer, setSourcesDrawer] = useState(false);
   const [contextDrawer, setContextDrawer] = useState(false);
 
+  const wsData = useWorkspaceData({ online, bootstrap: demo.bootstrap, filter: sourceFilter });
+  const chats = useChatSessions({ online });
+
+  // Persist selection to the active backend chat (no-op offline / local chat).
+  const persistSelection = useCallback(
+    (docIds, folderIds) => {
+      const id = chats.activeChatId;
+      if (!online || !id || isLocalChatId(id)) return;
+      updateChatSelection(id, {
+        selectedDocumentIds: docIds,
+        selectedFolderIds: folderIds,
+      }).catch(() => toast.error("Couldn't sync selection to the chat"));
+    },
+    [online, chats.activeChatId],
+  );
+
+  const selection = useSelectedContext({ onPersist: persistSelection });
+  const { setFromChat } = selection;
+
+  // Hydrate selected context from the active chat's persisted selection.
+  useEffect(() => {
+    if (chats.activeSelection) setFromChat(chats.activeSelection);
+  }, [chats.activeSelection, setFromChat]);
+
+  const { folders, documents } = wsData;
   const getDocById = useCallback((id) => documents.find((d) => d.id === id) || null, [documents]);
   const getFolderById = useCallback((id) => folders.find((f) => f.id === id) || null, [folders]);
 
-  const isSelected = useCallback(
-    (kind, id) =>
-      kind === "folder" ? selectedFolderIds.includes(id) : selectedDocIds.includes(id),
-    [selectedFolderIds, selectedDocIds],
-  );
-
+  // --- selection wrappers (toast + local/remote handled by the hook) ---
   const attach = useCallback(
     (kind, id) => {
-      if (kind === "folder") {
-        setSelectedFolderIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
-        toast.success(`Attached folder to chat context`);
-      } else {
-        setSelectedDocIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
-        toast.success(`Attached document to chat context`);
-      }
+      selection.attach(kind, id);
+      toast.success(kind === "folder" ? "Folder attached to context" : "Document attached to context");
     },
-    [],
+    [selection],
   );
+  const detach = selection.detach;
+  const clearSelection = selection.clear;
 
-  const detach = useCallback((kind, id) => {
-    if (kind === "folder") setSelectedFolderIds((prev) => prev.filter((x) => x !== id));
-    else setSelectedDocIds((prev) => prev.filter((x) => x !== id));
-  }, []);
-
-  const clearSelection = useCallback(() => {
-    setSelectedFolderIds([]);
-    setSelectedDocIds([]);
+  const notifyDeferred = useCallback((action = "This action") => {
+    toast(`${action} is not wired yet`, {
+      description: "This comes in a later frontend phase.",
+    });
   }, []);
 
   const openPreview = useCallback((id) => {
@@ -87,61 +91,147 @@ export default function CentralDocsWorkspace() {
     setActiveTab("preview");
   }, []);
 
-  const setActiveChat = useCallback((id) => {
-    setActiveChatId(id);
-    setChats((prev) => prev.map((c) => ({ ...c, active: c.id === id })));
-    setActiveTab("chat");
-  }, []);
+  const setActiveChat = useCallback(
+    (id) => {
+      chats.setActiveChat(id);
+      setActiveTab("chat");
+    },
+    [chats],
+  );
 
-  const newChat = useCallback(() => {
-    const id = `chat-${Date.now()}`;
-    const chat = { id, title: "New chat", contextCount: 0, active: true };
-    setChats((prev) => [chat, ...prev.map((c) => ({ ...c, active: false }))]);
-    setActiveChatId(id);
-    setActiveTab("chat");
-  }, []);
+  // --- source actions (wired when online + reversible; toast otherwise) ---
+  const deleteDocument = useCallback(
+    async (doc) => {
+      if (doc.readOnly) return;
+      if (!online) return notifyDeferred("Delete document");
+      try {
+        await apiDeleteDocument(doc.id);
+        selection.detach("document", doc.id);
+        toast.success("Document moved to Trash");
+        wsData.reloadActive();
+        if (sourceFilter === SOURCE_FILTER.trash) wsData.reloadTrash();
+      } catch {
+        toast.error("Couldn't delete the document");
+      }
+    },
+    [online, notifyDeferred, selection, wsData, sourceFilter],
+  );
 
-  const notifyDeferred = useCallback((action = "This action") => {
-    toast(`${action} is not wired yet`, {
-      description: "Backend wiring comes in a later frontend phase.",
-    });
-  }, []);
+  const deleteFolder = useCallback(
+    async (folder) => {
+      if (folder.readOnly) return;
+      if (!online) return notifyDeferred("Delete folder");
+      try {
+        await apiDeleteFolder(folder.id);
+        selection.detach("folder", folder.id);
+        toast.success("Folder moved to Trash");
+        wsData.reloadActive();
+      } catch {
+        toast.error("Couldn't delete the folder");
+      }
+    },
+    [online, notifyDeferred, selection, wsData],
+  );
 
-  // Derived selection
+  const downloadDocument = useCallback(
+    async (doc) => {
+      if (!online || doc.source === SOURCE_KIND.mock) return notifyDeferred("Download");
+      try {
+        const res = await createDownloadUrl(doc.id);
+        const url = res?.url || res?.downloadUrl || res?.download?.url;
+        if (url) window.open(url, "_blank", "noopener,noreferrer");
+        else toast.success("Download link created");
+      } catch {
+        toast.error("Couldn't create a download link");
+      }
+    },
+    [online, notifyDeferred],
+  );
+
+  const createFolder = useCallback(async () => {
+    if (!online) return notifyDeferred("Create folder");
+    try {
+      await apiCreateFolder({ name: "New folder" });
+      toast.success("Folder created");
+      wsData.reloadActive();
+    } catch {
+      toast.error("Couldn't create the folder");
+    }
+  }, [online, notifyDeferred, wsData]);
+
+  const restoreTrashItem = useCallback(
+    async (item) => {
+      if (!online) return notifyDeferred("Restore");
+      try {
+        if (item.kind === "folder") await apiRestoreFolder(item.id);
+        else await apiRestoreDocument(item.id);
+        toast.success("Restored from Trash");
+        wsData.reloadTrash();
+        wsData.reloadActive();
+      } catch {
+        toast.error("Couldn't restore the item");
+      }
+    },
+    [online, notifyDeferred, wsData],
+  );
+
+  const removeChat = useCallback(
+    async (id) => {
+      try {
+        await chats.removeChat(id);
+        toast.success("Chat removed");
+      } catch {
+        toast.error("Couldn't remove the chat");
+      }
+    },
+    [chats],
+  );
+
+  // --- derived selection ---
   const selectedFolders = useMemo(
-    () => selectedFolderIds.map(getFolderById).filter(Boolean),
-    [selectedFolderIds, getFolderById],
+    () => selection.folderIds.map(getFolderById).filter(Boolean),
+    [selection.folderIds, getFolderById],
   );
   const selectedDocs = useMemo(
-    () => selectedDocIds.map(getDocById).filter(Boolean),
-    [selectedDocIds, getDocById],
+    () => selection.docIds.map(getDocById).filter(Boolean),
+    [selection.docIds, getDocById],
   );
   const resolvedDocIds = useMemo(() => {
-    const set = new Set(selectedDocIds);
+    const set = new Set(selection.docIds);
     documents.forEach((d) => {
-      if (selectedFolderIds.includes(d.folderId)) set.add(d.id);
+      if (selection.folderIds.includes(d.folderId)) set.add(d.id);
     });
     return Array.from(set);
-  }, [selectedDocIds, selectedFolderIds, documents]);
+  }, [selection.docIds, selection.folderIds, documents]);
 
   const counts = useMemo(
     () => ({
-      folders: selectedFolderIds.length,
-      documents: selectedDocIds.length,
+      folders: selection.folderIds.length,
+      documents: selection.docIds.length,
       resolved: resolvedDocIds.length,
     }),
-    [selectedFolderIds, selectedDocIds, resolvedDocIds],
+    [selection.folderIds, selection.docIds, resolvedDocIds],
   );
 
-  const activeChat = chats.find((c) => c.id === activeChatId) || null;
   const hasContext = counts.folders > 0 || counts.documents > 0;
 
   const ws = {
-    data: { folders, documents, generated, trash, usage },
-    backendStatus,
-    recheckBackend: check,
-    selection: { folderIds: selectedFolderIds, docIds: selectedDocIds },
-    isSelected,
+    data: {
+      folders,
+      documents,
+      generated: wsData.generated,
+      trash: wsData.trash,
+      usage: demo.usage,
+    },
+    online,
+    backendStatus: demo.backendStatus,
+    loading: { sources: wsData.loading, chats: chats.loading },
+    error: { sources: wsData.error, chats: chats.error },
+    reloadSources: wsData.reloadActive,
+    reloadTrash: wsData.reloadTrash,
+
+    selection: { folderIds: selection.folderIds, docIds: selection.docIds },
+    isSelected: selection.isSelected,
     attach,
     detach,
     clearSelection,
@@ -150,18 +240,32 @@ export default function CentralDocsWorkspace() {
     resolvedDocIds,
     counts,
     hasContext,
+
     activeTab,
     setActiveTab,
-    chats,
-    activeChat,
-    activeChatId,
+
+    chats: chats.chats,
+    activeChat: chats.activeChat,
+    activeChatId: chats.activeChatId,
     setActiveChat,
-    newChat,
+    newChat: chats.newChat,
+    removeChat,
+
     sourceFilter,
     setSourceFilter,
+
     previewDocId,
     openPreview,
     getDocById,
+    getFolderById,
+
+    // source actions
+    createFolder,
+    deleteDocument,
+    deleteFolder,
+    downloadDocument,
+    restoreTrashItem,
+
     openGenerateModal: () => setGenerateOpen(true),
     notifyDeferred,
   };
