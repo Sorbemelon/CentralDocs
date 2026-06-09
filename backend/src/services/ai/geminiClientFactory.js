@@ -22,3 +22,14 @@ export function createGeminiClientForKeyIndex(index = 0) {
 
   return new GoogleGenAI({ apiKey });
 }
+
+export function getGeminiKeySlots() {
+  return getGeminiApiKeys().map((_, index) => ({
+    keySlot: index,
+    configured: true,
+  }));
+}
+
+export function createGeminiClientForKeySlot(keySlot = 0) {
+  return createGeminiClientForKeyIndex(keySlot);
+}
