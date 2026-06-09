@@ -1,4 +1,5 @@
 import { EXTRACTION_LIMITS } from "../constants/extraction.constants.js";
+import { CHUNKING_LIMITS } from "../constants/chunking.constants.js";
 
 const MB = 1024 * 1024;
 const KB = 1024;
@@ -30,3 +31,4 @@ export const EMPTY_DEMO_USAGE = Object.freeze({
 });
 
 export const EXTRACTION_LIMIT_CONFIG = EXTRACTION_LIMITS;
+export const CHUNKING_LIMIT_CONFIG = CHUNKING_LIMITS;
