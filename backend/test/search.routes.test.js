@@ -99,7 +99,7 @@ test("POST /api/search/semantic returns safe not-configured response without fak
 
 test("search route exists only as semantic POST and unrelated routes stay constrained", async () => {
   await request(app).get("/api/search/semantic").expect(404);
-  await request(app).post("/api/documents/upload").expect(404);
+  await request(app).post("/api/documents/upload-batch").expect(404);
   await request(app)
     .get(["/api/chats/chat_1/generated", "documents"].join("-"))
     .set("x-demo-session-id", "demo_123")

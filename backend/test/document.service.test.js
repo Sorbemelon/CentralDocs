@@ -69,6 +69,34 @@ test("document DTO hides storage internals", () => {
 
   assert.equal(dto.id, "document_1");
   assert.equal(dto.downloadAvailable, true);
+  assert.equal(dto.attachable, true);
+  assert.equal(dto.searchable, false);
   assert.ok(!("objectKey" in dto));
   assert.ok(!("_id" in dto));
+});
+
+test("document DTO marks uploaded failed documents downloadable but not attachable", () => {
+  const dto = toDocumentDto({
+    _id: "upload_1",
+    title: "Failed Upload",
+    originalFilename: "failed.md",
+    downloadFilename: "failed.md",
+    fileExtension: "md",
+    mimeType: "text/markdown",
+    fileKind: "markdown",
+    scope: "user",
+    sourceType: "upload",
+    readOnly: false,
+    status: "failed",
+    statusMessage: "Extraction failed.",
+    lifecycleStatus: "active",
+    sizeBytes: 12,
+    objectKey: "demo-sessions/demo_123/uploads/upload_1/failed.md",
+    contentStats: { chunkCount: 0 },
+  });
+
+  assert.equal(dto.downloadAvailable, true);
+  assert.equal(dto.attachable, false);
+  assert.equal(dto.searchable, false);
+  assert.ok(!("objectKey" in dto));
 });

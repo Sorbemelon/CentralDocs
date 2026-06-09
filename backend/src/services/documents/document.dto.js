@@ -57,8 +57,14 @@ function toContentStats(contentStats = {}) {
   };
 }
 
+function isReadyActive(raw = {}) {
+  return raw.status === "ready" && raw.lifecycleStatus === "active";
+}
+
 export function toDocumentDto(document, { includePreview = false } = {}) {
   const raw = document?.toObject ? document.toObject() : document;
+  const contentStats = toContentStats(raw.contentStats);
+  const readyActive = isReadyActive(raw);
   const dto = {
     id: serializeId(raw.mockId || raw.id || raw._id),
     title: raw.title,
@@ -76,9 +82,14 @@ export function toDocumentDto(document, { includePreview = false } = {}) {
     statusMessage: raw.statusMessage || null,
     lifecycleStatus: raw.lifecycleStatus,
     sizeBytes: raw.sizeBytes || 0,
-    contentStats: toContentStats(raw.contentStats),
+    contentStats,
     generatedMeta: toGeneratedMetaSummary(raw.generatedMeta),
     mediaMeta: toMediaMetaSummary(raw.mediaMeta),
+    processing: {
+      status: raw.status,
+      statusMessage: raw.statusMessage || null,
+    },
+    searchable: Boolean(readyActive && contentStats.chunkCount > 0),
     createdAt: serializeDate(raw.createdAt),
     updatedAt: serializeDate(raw.updatedAt),
     expiresAt: serializeDate(raw.expiresAt),
@@ -100,6 +111,8 @@ export function toDocumentDto(document, { includePreview = false } = {}) {
   }
   if (raw.attachable !== undefined) {
     dto.attachable = Boolean(raw.attachable);
+  } else {
+    dto.attachable = Boolean(readyActive);
   }
   if (includePreview) {
     dto.extractedTextPreview = raw.extractedTextPreview || raw.previewText || null;

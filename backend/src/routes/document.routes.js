@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { uploadSingleDocumentMiddleware } from "../middleware/uploadMiddleware.js";
 import {
   createDocumentDownloadUrl,
 } from "../services/documents/documentDownload.service.js";
@@ -10,6 +11,11 @@ import {
   restoreDocument,
   softDeleteDocument,
 } from "../services/documents/document.service.js";
+import {
+  getUploadDocumentStatus,
+  retryDocumentProcessing,
+  uploadDocumentForDemo,
+} from "../services/uploads/uploadDocument.service.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 
 export const documentRouter = Router();
@@ -24,6 +30,23 @@ documentRouter.get(
 
     res.json({
       status: "ready",
+      ...result,
+    });
+  }),
+);
+
+documentRouter.post(
+  "/upload",
+  uploadSingleDocumentMiddleware,
+  asyncHandler(async (req, res) => {
+    const result = await uploadDocumentForDemo({
+      demoSessionId: req.demoSessionId,
+      files: req.files || [],
+      body: req.body || {},
+    });
+
+    res.status(201).json({
+      status: "created",
       ...result,
     });
   }),
@@ -44,6 +67,18 @@ documentRouter.get(
   }),
 );
 
+documentRouter.get(
+  "/:documentId/status",
+  asyncHandler(async (req, res) => {
+    const documentStatus = await getUploadDocumentStatus({
+      documentId: req.params.documentId,
+      demoSessionId: req.demoSessionId,
+    });
+
+    res.json(documentStatus);
+  }),
+);
+
 documentRouter.patch(
   "/:documentId/move",
   asyncHandler(async (req, res) => {
@@ -57,6 +92,18 @@ documentRouter.patch(
       status: "moved",
       document,
     });
+  }),
+);
+
+documentRouter.post(
+  "/:documentId/retry",
+  asyncHandler(async (req, res) => {
+    const result = await retryDocumentProcessing({
+      documentId: req.params.documentId,
+      demoSessionId: req.demoSessionId,
+    });
+
+    res.json(result);
   }),
 );
 

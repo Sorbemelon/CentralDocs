@@ -76,9 +76,8 @@ test("PATCH and DELETE mock document return read-only error", async () => {
   assert.equal(deleteResponse.body.error.code, "READ_ONLY_RESOURCE");
 });
 
-test("upload and retry document routes remain unimplemented", async () => {
-  await request(app).post("/api/documents/upload").expect(404);
-  await request(app).post(`/api/documents/${briefDocumentId}/retry`).expect(404);
+test("future document processing routes remain constrained", async () => {
+  await request(app).post(`/api/documents/${briefDocumentId}/extract`).expect(404);
 });
 
 test("POST /api/documents/:documentId/download-url works for generated documents through safe metadata", async () => {

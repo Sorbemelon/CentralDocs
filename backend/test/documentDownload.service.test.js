@@ -153,6 +153,45 @@ test("generated document with object key returns signed URL without exposing obj
   assert.equal("objectKey" in response, false);
 });
 
+test("uploaded document with object key returns signed URL without exposing object key", async () => {
+  const response = await createDocumentDownloadUrl(
+    {
+      documentId: "64b64b64b64b64b64b64b64c",
+      demoSessionId: "demo_test",
+    },
+    {
+      isMongoConnected: () => true,
+      findPersistentDocumentById: async () => ({
+        _id: "64b64b64b64b64b64b64b64c",
+        demoSessionId: "demo_test",
+        scope: "user",
+        sourceType: "upload",
+        storageProvider: "s3",
+        objectKey: "demo-sessions/demo_test/uploads/64b64b64b64b64b64b64b64c/brief.md",
+        downloadFilename: "brief.md",
+        mimeType: "text/markdown",
+        lifecycleStatus: "active",
+      }),
+      createPresignedDownloadUrl: async ({ objectKey, downloadFilename }) => {
+        assert.equal(
+          objectKey,
+          "demo-sessions/demo_test/uploads/64b64b64b64b64b64b64b64c/brief.md",
+        );
+        return {
+          downloadUrl: "https://signed.example/uploaded-brief.md",
+          expiresInSeconds: 300,
+          filename: downloadFilename,
+          storageProvider: "s3",
+        };
+      },
+    },
+  );
+
+  assert.equal(response.documentId, "64b64b64b64b64b64b64b64c");
+  assert.equal(response.filename, "brief.md");
+  assert.equal("objectKey" in response, false);
+});
+
 test("trashed persistent document is rejected", async () => {
   await assert.rejects(
     () =>

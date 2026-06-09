@@ -92,8 +92,7 @@ test("POST /api/documents/:missingMockDocumentId/download-url returns 404", asyn
   assert.equal(response.body.error.code, "DOCUMENT_NOT_FOUND");
 });
 
-test("download URL route is POST only and upload/retry remain unimplemented", async () => {
+test("download URL route is POST only and unrelated document actions stay constrained", async () => {
   await request(app).get(`/api/documents/${briefDocumentId}/download-url`).expect(404);
-  await request(app).post("/api/documents/upload").expect(404);
-  await request(app).post(`/api/documents/${briefDocumentId}/retry`).expect(404);
+  await request(app).post("/api/documents/upload-batch").expect(404);
 });
