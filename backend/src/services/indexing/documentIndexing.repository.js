@@ -66,3 +66,13 @@ export async function updateDocumentIndexingStatus({ documentId, patch = {} } = 
     { new: true, lean: true },
   );
 }
+
+export async function updateDocumentMediaMeta({ documentId, mediaMeta = {} } = {}) {
+  requirePersistence();
+  assertObjectId(documentId);
+  return Document.findByIdAndUpdate(
+    documentId,
+    { $set: { mediaMeta } },
+    { new: true, lean: true },
+  );
+}

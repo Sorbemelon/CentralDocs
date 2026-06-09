@@ -73,6 +73,8 @@ test("Document generated and media metadata fields exist", () => {
   const sourceMessageId = new mongoose.Types.ObjectId();
   const sourceDocumentId = new mongoose.Types.ObjectId();
   const transcriptDocumentId = new mongoose.Types.ObjectId();
+  const directMultimodalChunkId = new mongoose.Types.ObjectId();
+  const directMultimodalEmbeddedAt = new Date("2026-06-09T00:00:00.000Z");
 
   const generatedDocument = baseDocument({
     scope: DOCUMENT_SCOPE.GENERATED,
@@ -92,6 +94,10 @@ test("Document generated and media metadata fields exist", () => {
     },
     mediaMeta: {
       directMultimodalEmbeddingSeeded: true,
+      directMultimodalEmbeddedAt,
+      directMultimodalChunkId,
+      directMultimodalEmbeddingModel: "gemini-embedding-2",
+      directMultimodalEmbeddingDimensions: 768,
       transcriptDocumentId,
       durationSeconds: 42,
     },
@@ -100,6 +106,13 @@ test("Document generated and media metadata fields exist", () => {
   assert.equal(generatedDocument.generatedMeta.generationInstruction, "Summarize the rollout risks.");
   assert.equal(generatedDocument.generatedMeta.referencesIncluded, true);
   assert.equal(generatedDocument.mediaMeta.directMultimodalEmbeddingSeeded, true);
+  assert.equal(String(generatedDocument.mediaMeta.directMultimodalChunkId), String(directMultimodalChunkId));
+  assert.equal(
+    generatedDocument.mediaMeta.directMultimodalEmbeddedAt.toISOString(),
+    directMultimodalEmbeddedAt.toISOString(),
+  );
+  assert.equal(generatedDocument.mediaMeta.directMultimodalEmbeddingModel, "gemini-embedding-2");
+  assert.equal(generatedDocument.mediaMeta.directMultimodalEmbeddingDimensions, 768);
   assert.equal(String(generatedDocument.mediaMeta.transcriptDocumentId), String(transcriptDocumentId));
   assert.equal(generatedDocument.validateSync(), undefined);
 });

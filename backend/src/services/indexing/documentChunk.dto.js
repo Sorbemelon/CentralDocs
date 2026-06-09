@@ -11,6 +11,16 @@ export function toDocumentChunkDto(chunk = {}) {
     embeddingDimensions: chunk.embeddingDimensions || null,
     tokenEstimate: chunk.tokenEstimate || 0,
     sourceLocator: chunk.sourceLocator || {},
+    chunkKind: chunk.chunkKind || "text",
+    embeddingInputType: chunk.embeddingInputType || "text",
+    mediaMeta: chunk.mediaMeta
+      ? {
+          directMultimodal: Boolean(chunk.mediaMeta.directMultimodal),
+          seededAt: chunk.mediaMeta.seededAt || null,
+          sourceMimeType: chunk.mediaMeta.sourceMimeType || null,
+          sourceFilename: chunk.mediaMeta.sourceFilename || null,
+        }
+      : null,
     lifecycleStatus: chunk.lifecycleStatus || null,
     createdAt: chunk.createdAt || null,
   };

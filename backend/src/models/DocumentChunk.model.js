@@ -2,6 +2,12 @@ import mongoose from "mongoose";
 import { EMBEDDING_DIMENSIONS, EMBEDDING_MODEL } from "../constants/ai.constants.js";
 import { DOCUMENT_SCOPE, DOCUMENT_SCOPES } from "../constants/document.constants.js";
 import { LIFECYCLE_STATUS, LIFECYCLE_STATUSES } from "../constants/lifecycle.constants.js";
+import {
+  CHUNK_KIND,
+  CHUNK_KINDS,
+  EMBEDDING_INPUT_TYPE,
+  EMBEDDING_INPUT_TYPES,
+} from "../constants/mediaEmbedding.constants.js";
 
 const { ObjectId } = mongoose.Schema.Types;
 
@@ -15,6 +21,16 @@ const sourceLocatorSchema = new mongoose.Schema(
     sectionTitle: { type: String, default: null },
     mediaTimestampStart: { type: Number, default: null, min: 0 },
     mediaTimestampEnd: { type: Number, default: null, min: 0 },
+  },
+  { _id: false },
+);
+
+const chunkMediaMetaSchema = new mongoose.Schema(
+  {
+    directMultimodal: { type: Boolean, default: false },
+    seededAt: { type: Date, default: null },
+    sourceMimeType: { type: String, default: null },
+    sourceFilename: { type: String, default: null },
   },
   { _id: false },
 );
@@ -75,6 +91,22 @@ const documentChunkSchema = new mongoose.Schema(
       type: sourceLocatorSchema,
       default: () => ({}),
     },
+    chunkKind: {
+      type: String,
+      enum: CHUNK_KINDS,
+      default: CHUNK_KIND.TEXT,
+      index: true,
+    },
+    embeddingInputType: {
+      type: String,
+      enum: EMBEDDING_INPUT_TYPES,
+      default: EMBEDDING_INPUT_TYPE.TEXT,
+      index: true,
+    },
+    mediaMeta: {
+      type: chunkMediaMetaSchema,
+      default: null,
+    },
     lifecycleStatus: {
       type: String,
       enum: LIFECYCLE_STATUSES,
@@ -93,6 +125,7 @@ documentChunkSchema.index({ demoSessionId: 1, lifecycleStatus: 1 });
 documentChunkSchema.index({ folderId: 1, lifecycleStatus: 1 });
 documentChunkSchema.index({ scope: 1, lifecycleStatus: 1 });
 documentChunkSchema.index({ chunkIndex: 1 });
+documentChunkSchema.index({ documentId: 1, chunkKind: 1, lifecycleStatus: 1 });
 
 documentChunkSchema.statics.getAtlasVectorIndexMetadata = function getAtlasVectorIndexMetadata() {
   return {

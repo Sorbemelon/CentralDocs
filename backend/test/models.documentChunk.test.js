@@ -65,10 +65,42 @@ test("DocumentChunk model accepts a realistic embedded chunk payload", () => {
   assert.equal(chunk.sourceLocator.rowStart, 4);
 });
 
+test("DocumentChunk model accepts a direct media embedding chunk payload", () => {
+  const documentId = new mongoose.Types.ObjectId();
+  const chunk = new DocumentChunk({
+    documentId,
+    demoSessionId: null,
+    folderId: new mongoose.Types.ObjectId(),
+    scope: DOCUMENT_SCOPE.MOCK,
+    chunkIndex: 100000,
+    content: "Direct image embedding: Workflow Diagram",
+    embedding: Array.from({ length: 768 }, () => 0.25),
+    embeddingModel: "gemini-embedding-2",
+    embeddingDimensions: 768,
+    tokenEstimate: 0,
+    lifecycleStatus: LIFECYCLE_STATUS.ACTIVE,
+    chunkKind: "media_direct",
+    embeddingInputType: "image",
+    mediaMeta: {
+      directMultimodal: true,
+      seededAt: new Date("2026-06-09T00:00:00.000Z"),
+      sourceMimeType: "image/png",
+      sourceFilename: "workflow.png",
+    },
+  });
+
+  assert.equal(chunk.validateSync(), undefined);
+  assert.equal(chunk.chunkKind, "media_direct");
+  assert.equal(chunk.embeddingInputType, "image");
+  assert.equal(chunk.mediaMeta.directMultimodal, true);
+  assert.equal(chunk.mediaMeta.sourceMimeType, "image/png");
+});
+
 test("DocumentChunk indexes include later retrieval filters", () => {
   assert.equal(hasIndex(DocumentChunk.schema, { documentId: 1 }), true);
   assert.equal(hasIndex(DocumentChunk.schema, { demoSessionId: 1, lifecycleStatus: 1 }), true);
   assert.equal(hasIndex(DocumentChunk.schema, { folderId: 1, lifecycleStatus: 1 }), true);
   assert.equal(hasIndex(DocumentChunk.schema, { scope: 1, lifecycleStatus: 1 }), true);
   assert.equal(hasIndex(DocumentChunk.schema, { chunkIndex: 1 }), true);
+  assert.equal(hasIndex(DocumentChunk.schema, { documentId: 1, chunkKind: 1, lifecycleStatus: 1 }), true);
 });

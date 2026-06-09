@@ -38,6 +38,10 @@ const generatedMetaSchema = new mongoose.Schema(
 const mediaMetaSchema = new mongoose.Schema(
   {
     directMultimodalEmbeddingSeeded: { type: Boolean, default: false },
+    directMultimodalEmbeddedAt: { type: Date, default: null },
+    directMultimodalChunkId: { type: ObjectId, ref: "DocumentChunk", default: null },
+    directMultimodalEmbeddingModel: { type: String, default: null },
+    directMultimodalEmbeddingDimensions: { type: Number, default: null, min: 0 },
     transcriptDocumentId: { type: ObjectId, ref: "Document", default: null },
     durationSeconds: { type: Number, default: null, min: 0 },
   },

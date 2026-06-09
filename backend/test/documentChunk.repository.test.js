@@ -76,3 +76,52 @@ test("memory document chunk repository records replace operations", async () => 
   assert.equal(listed[0].chunkIndex, 0);
   assert.equal(repository.state.replaceCalls.length, 1);
 });
+
+test("document chunk repository builds direct media payload without local paths", () => {
+  const documentId = new mongoose.Types.ObjectId();
+  const payload = buildDocumentChunkPayload({
+    document: {
+      _id: documentId,
+      demoSessionId: null,
+      scope: "mock",
+    },
+    embeddedChunk: embeddedChunk({
+      documentId,
+      chunkIndex: 100000,
+      content: "Direct image embedding: Workflow Diagram",
+      tokenEstimate: 0,
+      chunkKind: "media_direct",
+      embeddingInputType: "image",
+      mediaMeta: {
+        directMultimodal: true,
+        seededAt: new Date("2026-06-09T00:00:00.000Z"),
+        sourceMimeType: "image/png",
+        sourceFilename: "workflow.png",
+        localPath: "D:\\private\\workflow.png",
+      },
+    }),
+  });
+
+  assert.equal(payload.chunkKind, "media_direct");
+  assert.equal(payload.embeddingInputType, "image");
+  assert.equal(payload.mediaMeta.directMultimodal, true);
+  assert.equal(payload.mediaMeta.sourceMimeType, "image/png");
+  assert.equal(JSON.stringify(payload).includes("localPath"), false);
+  assert.equal(JSON.stringify(payload).includes("private"), false);
+});
+
+test("memory document chunk repository lists direct media chunks separately", async () => {
+  const repository = createMemoryDocumentChunkRepository();
+  const documentId = new mongoose.Types.ObjectId();
+  await repository.insertChunksForDocument({
+    chunks: [
+      { documentId, chunkKind: "text", chunkIndex: 0, content: "Sidecar text." },
+      { documentId, chunkKind: "media_direct", chunkIndex: 100000, content: "Direct media." },
+    ],
+  });
+
+  const directChunk = await repository.findDirectMediaChunkForDocument({ documentId });
+
+  assert.equal(directChunk.chunkKind, "media_direct");
+  assert.equal(await repository.countDirectMediaChunksForDocument({ documentId }), 1);
+});

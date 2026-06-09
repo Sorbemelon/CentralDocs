@@ -23,6 +23,14 @@ function ensureInsideMockDocumentsRoot(candidatePath) {
   return resolved;
 }
 
+export function getMockDocumentsRoot() {
+  return mockDocumentsRoot;
+}
+
+export function assertPathInsideMockDocumentsRoot(candidatePath) {
+  return ensureInsideMockDocumentsRoot(candidatePath);
+}
+
 function normalizeManifestRelativePath(document = {}) {
   const rawPath =
     document.filePath || document.localPath || document.relativePath || `${document.folderSlug}/${document.filename}`;

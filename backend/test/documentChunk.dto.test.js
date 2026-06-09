@@ -31,3 +31,34 @@ test("document chunk DTO hides embeddings and storage internals", () => {
 test("document chunk DTO maps arrays", () => {
   assert.equal(toDocumentChunkDtos([{ chunkIndex: 0 }, { chunkIndex: 1 }]).length, 2);
 });
+
+test("document chunk DTO exposes safe direct media metadata", () => {
+  const dto = toDocumentChunkDto({
+    _id: "chunk_media",
+    documentId: "doc_media",
+    scope: "mock",
+    chunkIndex: 100000,
+    content: "Direct image embedding: Workflow Diagram",
+    embedding: Array.from({ length: 768 }, () => 0.1),
+    embeddingModel: "gemini-embedding-2",
+    embeddingDimensions: 768,
+    lifecycleStatus: "active",
+    chunkKind: "media_direct",
+    embeddingInputType: "image",
+    mediaMeta: {
+      directMultimodal: true,
+      seededAt: "2026-06-09T00:00:00.000Z",
+      sourceMimeType: "image/png",
+      sourceFilename: "workflow.png",
+      localPath: "D:\\private\\workflow.png",
+    },
+  });
+
+  assert.equal(dto.chunkKind, "media_direct");
+  assert.equal(dto.embeddingInputType, "image");
+  assert.equal(dto.mediaMeta.directMultimodal, true);
+  assert.equal(dto.mediaMeta.sourceMimeType, "image/png");
+  assert.equal(JSON.stringify(dto).includes("localPath"), false);
+  assert.equal(JSON.stringify(dto).includes("private"), false);
+  assert.equal("embedding" in dto, false);
+});

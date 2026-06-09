@@ -1,6 +1,7 @@
 import { EMBEDDING_DIMENSIONS, EMBEDDING_MODEL } from "../../constants/embedding.constants.js";
 import { DOCUMENT_SCOPE } from "../../constants/document.constants.js";
 import { LIFECYCLE_STATUS } from "../../constants/lifecycle.constants.js";
+import { CHUNK_KIND, EMBEDDING_INPUT_TYPE } from "../../constants/mediaEmbedding.constants.js";
 import { isMongoConnected } from "../../db/connectMongo.js";
 import { DocumentChunk } from "../../models/DocumentChunk.model.js";
 import { createHttpError } from "../../utils/httpError.js";
@@ -33,6 +34,19 @@ function sanitizeLocator(locator = {}) {
   };
 }
 
+function sanitizeMediaMeta(mediaMeta = null) {
+  if (!mediaMeta) {
+    return null;
+  }
+
+  return {
+    directMultimodal: mediaMeta.directMultimodal === true,
+    seededAt: mediaMeta.seededAt || null,
+    sourceMimeType: mediaMeta.sourceMimeType || null,
+    sourceFilename: mediaMeta.sourceFilename || null,
+  };
+}
+
 export function isDocumentChunkPersistenceAvailable() {
   return isMongoConnected();
 }
@@ -59,6 +73,9 @@ export function buildDocumentChunkPayload({ document = {}, embeddedChunk = {} } 
     embeddingDimensions: embeddedChunk.embeddingDimensions || EMBEDDING_DIMENSIONS,
     tokenEstimate: embeddedChunk.tokenEstimate || 0,
     sourceLocator: sanitizeLocator(embeddedChunk.sourceLocator),
+    chunkKind: embeddedChunk.chunkKind || CHUNK_KIND.TEXT,
+    embeddingInputType: embeddedChunk.embeddingInputType || EMBEDDING_INPUT_TYPE.TEXT,
+    mediaMeta: sanitizeMediaMeta(embeddedChunk.mediaMeta),
     lifecycleStatus: LIFECYCLE_STATUS.ACTIVE,
   };
 }
@@ -84,6 +101,19 @@ export async function replaceChunksForDocument({ documentId, chunks = [] } = {})
   };
 }
 
+export async function insertChunksForDocument({ chunks = [] } = {}) {
+  requirePersistence();
+  if (chunks.length === 0) {
+    return { insertedCount: 0, chunks: [] };
+  }
+
+  const inserted = await DocumentChunk.insertMany(chunks, { ordered: true });
+  return {
+    insertedCount: inserted.length,
+    chunks: inserted,
+  };
+}
+
 export async function deleteChunksForDocument({ documentId } = {}) {
   requirePersistence();
   const result = await DocumentChunk.deleteMany({ documentId });
@@ -102,6 +132,24 @@ export async function listChunksForDocument({ documentId, includeTrash = false }
 export async function countChunksForDocument({ documentId } = {}) {
   requirePersistence();
   return DocumentChunk.countDocuments({ documentId, lifecycleStatus: LIFECYCLE_STATUS.ACTIVE });
+}
+
+export async function findDirectMediaChunkForDocument({ documentId } = {}) {
+  requirePersistence();
+  return DocumentChunk.findOne({
+    documentId,
+    chunkKind: CHUNK_KIND.MEDIA_DIRECT,
+    lifecycleStatus: LIFECYCLE_STATUS.ACTIVE,
+  }).lean();
+}
+
+export async function countDirectMediaChunksForDocument({ documentId } = {}) {
+  requirePersistence();
+  return DocumentChunk.countDocuments({
+    documentId,
+    chunkKind: CHUNK_KIND.MEDIA_DIRECT,
+    lifecycleStatus: LIFECYCLE_STATUS.ACTIVE,
+  });
 }
 
 export async function softDeleteChunksForDocument({
@@ -145,8 +193,27 @@ export function createMemoryDocumentChunkRepository() {
       state.chunksByDocumentId.set(key, chunks);
       return { insertedCount: chunks.length, chunks };
     },
+    async insertChunksForDocument({ chunks = [] }) {
+      for (const chunk of chunks) {
+        const key = String(chunk.documentId);
+        const existing = state.chunksByDocumentId.get(key) || [];
+        existing.push(chunk);
+        state.chunksByDocumentId.set(key, existing);
+      }
+      return { insertedCount: chunks.length, chunks };
+    },
     async listChunksForDocument({ documentId }) {
       return state.chunksByDocumentId.get(String(documentId)) || [];
+    },
+    async findDirectMediaChunkForDocument({ documentId }) {
+      return (state.chunksByDocumentId.get(String(documentId)) || []).find(
+        (chunk) => chunk.chunkKind === CHUNK_KIND.MEDIA_DIRECT,
+      ) || null;
+    },
+    async countDirectMediaChunksForDocument({ documentId }) {
+      return (state.chunksByDocumentId.get(String(documentId)) || []).filter(
+        (chunk) => chunk.chunkKind === CHUNK_KIND.MEDIA_DIRECT,
+      ).length;
     },
     async deleteChunksForDocument({ documentId }) {
       const key = String(documentId);
