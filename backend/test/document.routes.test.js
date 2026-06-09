@@ -40,7 +40,7 @@ test("GET /api/documents/:mockDocumentId returns mock document detail", async ()
   assert.equal(response.body.document.id, briefDocumentId);
   assert.equal(response.body.document.title, "CentralDocs Transformation Brief");
   assert.equal(response.body.document.status, "ready");
-  assert.equal(response.body.document.downloadAvailable, "pending_s3_phase");
+  assert.equal(response.body.document.downloadAvailable, "pending_seed");
   assert.ok(response.body.document.demoQuestions.length > 0);
   assert.ok(!("objectKey" in response.body.document));
 });
@@ -68,7 +68,7 @@ test("PATCH and DELETE mock document return read-only error", async () => {
   assert.equal(deleteResponse.body.error.code, "READ_ONLY_RESOURCE");
 });
 
-test("upload and retry document routes remain unimplemented in Phase 2C", async () => {
+test("upload and retry document routes remain unimplemented", async () => {
   await request(app).post("/api/documents/upload").expect(404);
   await request(app).post(`/api/documents/${briefDocumentId}/retry`).expect(404);
 });

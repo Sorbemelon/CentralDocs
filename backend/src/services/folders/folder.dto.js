@@ -22,7 +22,7 @@ export function toFolderDto(folder) {
   const raw = folder?.toObject ? folder.toObject() : folder;
 
   return {
-    id: serializeId(raw.id || raw._id),
+    id: serializeId(raw.mockId || raw.id || raw._id),
     name: raw.name,
     parentFolderId: serializeId(raw.parentFolderId),
     path: raw.path,

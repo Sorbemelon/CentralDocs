@@ -6,21 +6,15 @@ import {
 import { LIFECYCLE_STATUS } from "../../constants/lifecycle.constants.js";
 import { toMockDocumentId, toMockFolderId } from "../../utils/ids.js";
 import { loadMockManifest } from "../mockData/mockManifest.service.js";
+import { listSeededMockWorkspace } from "../mockData/mockSeed.repository.js";
+import {
+  getMockWorkspaceStorageSummary,
+  MOCK_DOWNLOAD_PENDING_STATUS,
+} from "../mockData/mockStorageMetadata.service.js";
+import { toDocumentDtos } from "../documents/document.dto.js";
+import { toFolderDtos } from "../folders/folder.dto.js";
 
-const MOCK_DOWNLOAD_STATUS = "pending_s3_phase";
 const DIRECT_MULTIMODAL_INDEXING_MODE = "direct_multimodal_seed_cached";
-
-function getManifestStorageObjectKey(document) {
-  return (
-    document.objectKey ||
-    document.storageKey ||
-    document.s3ObjectKey ||
-    document.downloadObjectKey ||
-    document.storage?.objectKey ||
-    document.storage?.key ||
-    null
-  );
-}
 
 function toIsoDate(value) {
   if (!value) {
@@ -75,7 +69,6 @@ function buildMockFolder(folder, documentCount, timestamp) {
 function buildMockDocument(document, folder, timestamp) {
   const slug = `${document.folderSlug}/${document.filename}`;
   const isDirectMultimodalSeeded = document.indexingMode === DIRECT_MULTIMODAL_INDEXING_MODE;
-  const storageObjectKey = getManifestStorageObjectKey(document);
 
   return {
     id: toMockDocumentId(slug),
@@ -116,8 +109,8 @@ function buildMockDocument(document, folder, timestamp) {
     demoQuestions: document.demoQuestions || [],
     expectedTopics: document.expectedTopics || [],
     indexingMode: document.indexingMode || null,
-    storageObjectKey,
-    downloadAvailable: storageObjectKey ? true : MOCK_DOWNLOAD_STATUS,
+    seeded: false,
+    downloadAvailable: MOCK_DOWNLOAD_PENDING_STATUS,
     attachable: true,
     previewText: describeMockDocument(document),
   };
@@ -149,7 +142,51 @@ function matchesLifecycle(entity, filters = {}) {
   return filters.includeTrash === "true" || entity.lifecycleStatus === LIFECYCLE_STATUS.ACTIVE;
 }
 
-export async function buildDemoWorkspace() {
+function buildPersistentWorkspace(seedRecords) {
+  const folders = toFolderDtos(seedRecords.folders);
+  const documents = toDocumentDtos(seedRecords.documents).map((document) => ({
+    ...document,
+    attachable: true,
+    downloadAvailable: true,
+    seeded: true,
+  }));
+
+  return {
+    source: "persistent",
+    seeded: true,
+    workspaceTitle: "Orchid Retail Digital Transformation",
+    description: "Persistent seeded mock workspace metadata.",
+    version: null,
+    generatedAt: null,
+    sampleQuestions: [],
+    folders,
+    documents,
+    counts: {
+      folders: folders.length,
+      documents: documents.length,
+      mockFolders: folders.length,
+      mockDocuments: documents.length,
+    },
+    mockDataRules: {
+      readOnly: true,
+      seeded: true,
+    },
+    mockWorkspace: getMockWorkspaceStorageSummary({
+      source: "persistent",
+      folders,
+      documents,
+    }),
+  };
+}
+
+export async function buildDemoWorkspace({
+  seedRepository = { listSeededMockWorkspace },
+} = {}) {
+  const seededRecords = await seedRepository.listSeededMockWorkspace();
+  if (seededRecords.documents.length > 0) {
+    return buildPersistentWorkspace(seededRecords);
+  }
+
   const manifest = await loadMockManifest();
   const timestamp = toIsoDate(manifest.generatedAt || manifest.version);
   const folders = manifest.folders || [];
@@ -165,6 +202,8 @@ export async function buildDemoWorkspace() {
   );
 
   return {
+    source: "manifest",
+    seeded: false,
     workspaceTitle: manifest.workspaceTitle,
     description: manifest.description,
     version: manifest.version,
@@ -179,6 +218,11 @@ export async function buildDemoWorkspace() {
       mockDocuments: mockDocuments.length,
     },
     mockDataRules: manifest.mockDataRules || {},
+    mockWorkspace: getMockWorkspaceStorageSummary({
+      source: "manifest",
+      folders: mockFolders,
+      documents: mockDocuments,
+    }),
   };
 }
 
@@ -261,6 +305,6 @@ export async function getMockDocumentPreview(documentId) {
     previewText: document.previewText,
     previewUnavailable: false,
     extractionStatus: "not_started",
-    phaseLimit: "Phase 2B uses manifest-derived mock preview metadata only.",
+    phaseLimit: "Phase 3A uses manifest or seeded metadata for mock previews only.",
   };
 }

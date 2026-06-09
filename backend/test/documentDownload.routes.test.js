@@ -34,24 +34,26 @@ test("POST /api/documents/:mockDocumentId/download-url returns unavailable witho
   assert.equal(response.body.error.details.reason, "Mock document is not linked to S3 yet.");
 });
 
-test("POST /api/documents/:mockDocumentId/download-url returns signed URL with injected S3 key", async () => {
+test("POST /api/documents/:mockDocumentId/download-url returns signed URL for seeded mock record", async () => {
   let presignerInput = null;
 
   setDocumentDownloadDependenciesForTests({
-    findMockDocumentById: async (documentId) => {
+    findSeededMockDocumentByMockId: async (documentId) => {
       if (documentId !== "mock_document_with_route_s3_key") {
         return null;
       }
 
       return {
-        id: documentId,
+        mockId: documentId,
         title: "Route S3 Mock",
         downloadFilename: "route-source.md",
         mimeType: "text/markdown",
         lifecycleStatus: "active",
-        storageObjectKey: "mock/orchid-retail/original/mock_document_with_route_s3_key/route-source.md",
+        storageProvider: "s3",
+        objectKey: "mock/orchid-retail/original/mock_document_with_route_s3_key/route-source.md",
       };
     },
+    findMockDocumentById: async () => null,
   });
   setS3StorageDependenciesForTests({
     configured: true,

@@ -25,6 +25,8 @@ test("models barrel compiles core model exports", () => {
 test("Folder schema has required paths, enums, defaults, and indexes", () => {
   assert.equal(Folder.schema.path("name").isRequired, true);
   assert.equal(Folder.schema.path("path").isRequired, true);
+  assert.equal(Folder.schema.path("mockId").instance, "String");
+  assert.equal(Folder.schema.path("manifestPath").instance, "String");
   assert.deepEqual(Folder.schema.path("scope").enumValues, FOLDER_SCOPES);
   assert.deepEqual(Folder.schema.path("lifecycleStatus").enumValues, LIFECYCLE_STATUSES);
 
@@ -44,6 +46,7 @@ test("Folder schema has required paths, enums, defaults, and indexes", () => {
   assert.equal(hasIndex(Folder.schema, { scope: 1, lifecycleStatus: 1 }), true);
   assert.equal(hasIndex(Folder.schema, { parentFolderId: 1 }), true);
   assert.equal(hasIndex(Folder.schema, { path: 1 }), true);
+  assert.equal(hasIndex(Folder.schema, { mockId: 1, scope: 1 }), true);
 });
 
 test("Folder enforces user session ownership and mock read-only convention", async () => {

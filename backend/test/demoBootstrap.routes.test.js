@@ -17,8 +17,14 @@ test("POST /api/demo/bootstrap returns manifest-derived mock workspace", async (
   assert.equal(response.body.documents.length, 16);
   assert.equal(response.body.counts.mockFolders, 6);
   assert.equal(response.body.counts.mockDocuments, 16);
+  assert.equal(response.body.mockWorkspace.source, "manifest");
+  assert.equal(response.body.mockWorkspace.seeded, false);
+  assert.equal(response.body.mockWorkspace.documentsDownloadable, false);
+  assert.equal(response.body.mockWorkspace.mockFolderCount, 6);
+  assert.equal(response.body.mockWorkspace.mockDocumentCount, 16);
   assert.ok(response.body.folders.every((folder) => folder.readOnly === true));
   assert.ok(response.body.documents.every((document) => document.readOnly === true));
+  assert.ok(response.body.documents.every((document) => document.downloadAvailable === "pending_seed"));
   assert.match(response.body.phaseLimit, /manifest/);
 });
 

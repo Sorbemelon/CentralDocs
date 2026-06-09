@@ -40,6 +40,7 @@ demoRouter.post(
       folders: workspace.folders,
       documents: workspace.documents,
       counts: workspace.counts,
+      mockWorkspace: workspace.mockWorkspace,
       mockDataRules: workspace.mockDataRules,
       session: session
         ? {
@@ -53,7 +54,7 @@ demoRouter.post(
           }
         : null,
       phaseLimit:
-        "Phase 2B derives read-only mock workspace metadata from manifest only.",
+        "Phase 3A can use persistent seeded mock metadata when available and otherwise falls back to manifest-derived read-only mock workspace data.",
     });
   }),
 );

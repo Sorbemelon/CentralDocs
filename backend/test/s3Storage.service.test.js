@@ -100,13 +100,77 @@ test("S3 storage clamps expiry and calls injected presigner", async () => {
   assert.equal(captured.options.expiresIn, 900);
 });
 
-test("reserved S3 upload/delete methods fail safely without AWS calls", async () => {
-  for (const method of [putObject, deleteObject]) {
-    await assert.rejects(() => method(), {
-      statusCode: 501,
-      code: "STORAGE_METHOD_NOT_IMPLEMENTED",
-    });
-  }
+test("S3 putObject requires configured storage", async () => {
+  await assert.rejects(
+    () =>
+      putObject({
+        objectKey: "mock/orchid-retail/original/mock_doc/report.md",
+        body: Buffer.from("mock"),
+        contentType: "text/markdown",
+      }),
+    {
+      statusCode: 503,
+      code: "STORAGE_NOT_CONFIGURED",
+    },
+  );
+});
+
+test("S3 putObject rejects unsafe object keys", async () => {
+  await assert.rejects(
+    () =>
+      putObject(
+        {
+          objectKey: "mock/orchid-retail/../report.md",
+          body: Buffer.from("mock"),
+          contentType: "text/markdown",
+        },
+        {
+          configured: true,
+          bucket: "centraldocs-test",
+          client: {},
+          sender: async () => ({ ETag: "should-not-run" }),
+        },
+      ),
+    {
+      statusCode: 400,
+      code: "INVALID_STORAGE_KEY",
+    },
+  );
+});
+
+test("S3 putObject uses injected sender and returns safe metadata", async () => {
+  let captured = null;
+  const result = await putObject(
+    {
+      objectKey: "mock/orchid-retail/original/mock_doc/report.md",
+      body: Buffer.from("mock"),
+      contentType: "text/markdown",
+    },
+    {
+      configured: true,
+      bucket: "centraldocs-test",
+      client: { fake: true },
+      sender: async (client, command) => {
+        captured = { client, input: command.input };
+        return { ETag: '"abc123"' };
+      },
+    },
+  );
+
+  assert.equal(result.objectKey, "mock/orchid-retail/original/mock_doc/report.md");
+  assert.equal(result.bucketConfigured, true);
+  assert.equal(result.etag, '"abc123"');
+  assert.equal(captured.client.fake, true);
+  assert.equal(captured.input.Bucket, "centraldocs-test");
+  assert.equal(captured.input.Key, "mock/orchid-retail/original/mock_doc/report.md");
+  assert.equal(captured.input.ContentType, "text/markdown");
+});
+
+test("reserved S3 delete method fails safely without AWS calls", async () => {
+  await assert.rejects(() => deleteObject(), {
+    statusCode: 501,
+    code: "STORAGE_METHOD_NOT_IMPLEMENTED",
+  });
 
   resetS3StorageDependenciesForTests();
 });

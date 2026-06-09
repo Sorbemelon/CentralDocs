@@ -51,6 +51,16 @@ const documentSchema = new mongoose.Schema(
       default: null,
       index: true,
     },
+    mockId: {
+      type: String,
+      default: null,
+      index: true,
+    },
+    manifestPath: {
+      type: String,
+      default: null,
+      trim: true,
+    },
     folderId: {
       type: ObjectId,
       ref: "Folder",
@@ -134,6 +144,14 @@ const documentSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    description: {
+      type: String,
+      default: null,
+    },
+    demoQuestions: {
+      type: [String],
+      default: undefined,
+    },
     contentStats: {
       type: contentStatsSchema,
       default: () => ({}),
@@ -196,6 +214,7 @@ documentSchema.index({ sourceType: 1, lifecycleStatus: 1 });
 documentSchema.index({ status: 1 });
 documentSchema.index({ fileKind: 1 });
 documentSchema.index({ createdAt: -1 });
+documentSchema.index({ mockId: 1, scope: 1 }, { unique: true, sparse: true });
 
 documentSchema.path("demoSessionId").validate(function validateOwnedDocumentSession(value) {
   const sessionOwnedScope =

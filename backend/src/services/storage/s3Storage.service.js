@@ -25,6 +25,7 @@ function resolveDependencies(overrides = {}) {
     bucket: overrides.bucket ?? testOverrides.bucket ?? getS3BucketName(),
     configured: overrides.configured ?? testOverrides.configured ?? getS3ConfigStatus() === "configured",
     presigner: overrides.presigner ?? testOverrides.presigner ?? getSignedUrl,
+    sender: overrides.sender ?? testOverrides.sender ?? null,
     prefixDeleter: overrides.prefixDeleter ?? testOverrides.prefixDeleter ?? null,
   };
 }
@@ -87,9 +88,32 @@ export async function getPresignedDownloadUrl(
   };
 }
 
-export async function putObject() {
-  void PutObjectCommand;
-  throw createStorageMethodNotImplementedError("putObject");
+export async function putObject({ objectKey, body, contentType } = {}, overrides = {}) {
+  const dependencies = assertStorageConfigured(overrides);
+  const safeObjectKey = assertSafeObjectKey(objectKey);
+  const command = new PutObjectCommand({
+    Bucket: dependencies.bucket,
+    Key: safeObjectKey,
+    Body: body,
+    ...(contentType ? { ContentType: contentType } : {}),
+  });
+  const sender =
+    dependencies.sender ||
+    (typeof dependencies.client.send === "function"
+      ? (client, commandToSend) => client.send(commandToSend)
+      : null);
+
+  if (!sender) {
+    throw createStorageMethodNotImplementedError("putObject");
+  }
+
+  const result = await sender(dependencies.client, command);
+
+  return {
+    objectKey: safeObjectKey,
+    bucketConfigured: true,
+    etag: result?.ETag || result?.etag || null,
+  };
 }
 
 export async function deleteObject() {

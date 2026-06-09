@@ -60,7 +60,7 @@ function toContentStats(contentStats = {}) {
 export function toDocumentDto(document, { includePreview = false } = {}) {
   const raw = document?.toObject ? document.toObject() : document;
   const dto = {
-    id: serializeId(raw.id || raw._id),
+    id: serializeId(raw.mockId || raw.id || raw._id),
     title: raw.title,
     originalFilename: raw.originalFilename,
     downloadFilename: raw.downloadFilename,
@@ -86,6 +86,9 @@ export function toDocumentDto(document, { includePreview = false } = {}) {
 
   if (raw.description) {
     dto.description = raw.description;
+  }
+  if (raw.manifestPath) {
+    dto.manifestPath = raw.manifestPath;
   }
   if (raw.demoQuestions) {
     dto.demoQuestions = raw.demoQuestions;

@@ -6,6 +6,7 @@ import { Document } from "../../models/Document.model.js";
 import { isMockDocumentId } from "../../utils/ids.js";
 import { createHttpError } from "../../utils/httpError.js";
 import { findMockDocumentById } from "../demo/demoWorkspace.service.js";
+import { findSeededMockDocumentByMockId } from "../mockData/mockSeed.repository.js";
 import { getPresignedDownloadUrl } from "../storage/s3Storage.service.js";
 
 let testOverrides = {};
@@ -26,6 +27,10 @@ function getDependencies(overrides = {}) {
       overrides.createPresignedDownloadUrl ??
       testOverrides.createPresignedDownloadUrl ??
       getPresignedDownloadUrl,
+    findSeededMockDocumentByMockId:
+      overrides.findSeededMockDocumentByMockId ??
+      testOverrides.findSeededMockDocumentByMockId ??
+      findSeededMockDocumentByMockId,
   };
 }
 
@@ -107,10 +112,27 @@ export async function createDocumentDownloadUrl(
   overrides = {},
 ) {
   const dependencies = getDependencies(overrides);
+  const seededMockDocument = await dependencies.findSeededMockDocumentByMockId(documentId);
+  if (seededMockDocument) {
+    assertActiveForDownload(seededMockDocument);
+    assertDownloadableObject(seededMockDocument, "Seeded mock document is not linked to S3.");
+    return createUrlPayload(
+      {
+        ...seededMockDocument,
+        id: seededMockDocument.mockId || seededMockDocument.id || seededMockDocument._id,
+      },
+      requestedFilename,
+      dependencies,
+    );
+  }
+
   const mockDocument = await dependencies.findMockDocumentById(documentId);
 
   if (mockDocument) {
     assertActiveForDownload(mockDocument);
+    if (mockDocument.seeded === false) {
+      throw createDownloadUnavailableError("Mock document is not linked to S3 yet.");
+    }
     assertDownloadableObject(mockDocument, "Mock document is not linked to S3 yet.");
     return createUrlPayload(mockDocument, requestedFilename, dependencies);
   }

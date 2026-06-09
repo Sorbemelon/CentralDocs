@@ -11,6 +11,16 @@ const folderSchema = new mongoose.Schema(
       default: null,
       index: true,
     },
+    mockId: {
+      type: String,
+      default: null,
+      index: true,
+    },
+    manifestPath: {
+      type: String,
+      default: null,
+      trim: true,
+    },
     scope: {
       type: String,
       enum: FOLDER_SCOPES,
@@ -75,6 +85,7 @@ folderSchema.index({ demoSessionId: 1, lifecycleStatus: 1 });
 folderSchema.index({ scope: 1, lifecycleStatus: 1 });
 folderSchema.index({ parentFolderId: 1 });
 folderSchema.index({ path: 1 });
+folderSchema.index({ mockId: 1, scope: 1 }, { unique: true, sparse: true });
 
 folderSchema.path("demoSessionId").validate(function validateUserFolderSession(value) {
   return this.scope !== FOLDER_SCOPE.USER || Boolean(value);

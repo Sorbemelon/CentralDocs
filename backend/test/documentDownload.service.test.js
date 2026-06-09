@@ -29,21 +29,23 @@ test("mock document without object key returns DOWNLOAD_NOT_AVAILABLE", async ()
   });
 });
 
-test("mock document with injected object key returns signed URL shape", async () => {
+test("seeded mock document with object key returns signed URL shape", async () => {
   const response = await createDocumentDownloadUrl(
     {
       documentId: "mock_document_with_s3_key",
       requestedFilename: "Friendly Name.md",
     },
     {
-      findMockDocumentById: async () => ({
-        id: "mock_document_with_s3_key",
+      findSeededMockDocumentByMockId: async () => ({
+        mockId: "mock_document_with_s3_key",
         title: "Mock S3 Doc",
         downloadFilename: "mock-source.md",
         mimeType: "text/markdown",
         lifecycleStatus: "active",
-        storageObjectKey: "mock/orchid-retail/original/mock_document_with_s3_key/mock-source.md",
+        storageProvider: "s3",
+        objectKey: "mock/orchid-retail/original/mock_document_with_s3_key/mock-source.md",
       }),
+      findMockDocumentById: async () => null,
       createPresignedDownloadUrl: async ({ objectKey, downloadFilename, contentType }) => {
         assert.equal(
           objectKey,
@@ -70,6 +72,32 @@ test("mock document with injected object key returns signed URL shape", async ()
     storageProvider: "s3",
   });
   assert.equal("objectKey" in response, false);
+});
+
+test("manifest mock document with computed key remains unavailable when unseeded", async () => {
+  await assert.rejects(
+    () =>
+      createDocumentDownloadUrl(
+        {
+          documentId: "mock_document_unseeded",
+        },
+        {
+          findSeededMockDocumentByMockId: async () => null,
+          findMockDocumentById: async () => ({
+            id: "mock_document_unseeded",
+            title: "Unseeded Mock S3 Doc",
+            lifecycleStatus: "active",
+            seeded: false,
+            storageObjectKey:
+              "mock/orchid-retail/original/mock_document_unseeded/mock-source.md",
+          }),
+        },
+      ),
+    {
+      statusCode: 409,
+      code: "DOWNLOAD_NOT_AVAILABLE",
+    },
+  );
 });
 
 test("user/generated document path is persistence-gated when MongoDB is absent", async () => {
