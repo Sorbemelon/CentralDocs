@@ -44,6 +44,7 @@ test("Document schema has required paths, enums, defaults, and indexes", () => {
   assert.equal(Document.schema.path("manifestPath").instance, "String");
   assert.equal(Document.schema.path("description").instance, "String");
   assert.equal(Document.schema.path("demoQuestions").instance, "Array");
+  assert.equal(Document.schema.path("generatedMeta.sourceDocumentIds").instance, "Array");
   assert.deepEqual(Document.schema.path("scope").enumValues, DOCUMENT_SCOPES);
   assert.deepEqual(Document.schema.path("sourceType").enumValues, SOURCE_TYPES);
   assert.deepEqual(Document.schema.path("status").enumValues, DOCUMENT_STATUSES);
@@ -71,7 +72,7 @@ test("Document schema has required paths, enums, defaults, and indexes", () => {
 
 test("Document generated and media metadata fields exist", () => {
   const sourceMessageId = new mongoose.Types.ObjectId();
-  const sourceDocumentId = new mongoose.Types.ObjectId();
+  const sourceDocumentId = "mock_doc_1";
   const transcriptDocumentId = new mongoose.Types.ObjectId();
   const directMultimodalChunkId = new mongoose.Types.ObjectId();
   const directMultimodalEmbeddedAt = new Date("2026-06-09T00:00:00.000Z");
@@ -105,6 +106,7 @@ test("Document generated and media metadata fields exist", () => {
 
   assert.equal(generatedDocument.generatedMeta.generationInstruction, "Summarize the rollout risks.");
   assert.equal(generatedDocument.generatedMeta.referencesIncluded, true);
+  assert.deepEqual(generatedDocument.generatedMeta.sourceDocumentIds, ["mock_doc_1"]);
   assert.equal(generatedDocument.mediaMeta.directMultimodalEmbeddingSeeded, true);
   assert.equal(String(generatedDocument.mediaMeta.directMultimodalChunkId), String(directMultimodalChunkId));
   assert.equal(

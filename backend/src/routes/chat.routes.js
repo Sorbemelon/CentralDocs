@@ -8,6 +8,7 @@ import {
   updateSavedChatSession,
 } from "../services/chats/chatSession.service.js";
 import { createChatMessageWithRagAnswer } from "../services/chats/chatMessage.service.js";
+import { generateDocumentFromChat } from "../services/generatedDocuments/generatedDocument.service.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 
 export const chatRouter = Router();
@@ -104,6 +105,22 @@ chatRouter.post(
   "/:chatId/messages",
   asyncHandler(async (req, res) => {
     const result = await createChatMessageWithRagAnswer({
+      chatId: req.params.chatId,
+      demoSessionId: req.demoSessionId,
+      body: req.body,
+    });
+
+    res.status(201).json({
+      status: "created",
+      ...result,
+    });
+  }),
+);
+
+chatRouter.post(
+  "/:chatId/generated-documents",
+  asyncHandler(async (req, res) => {
+    const result = await generateDocumentFromChat({
       chatId: req.params.chatId,
       demoSessionId: req.demoSessionId,
       body: req.body,

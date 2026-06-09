@@ -165,6 +165,7 @@ export async function generateTextWithLane({
 } = {}) {
   const safePrompt = assertPrompt(prompt);
   const started = Date.now();
+  const actionType = options.actionType || AI_ACTION_TYPE.CHAT_ANSWER;
 
   if (client) {
     const model = models[0] || GENERATION_MODEL_LANE[0];
@@ -189,7 +190,7 @@ export async function generateTextWithLane({
       latencyMs: Date.now() - started,
       attempts: [
         toAiRoutingAttemptDto({
-          actionType: AI_ACTION_TYPE.CHAT_ANSWER,
+          actionType,
           model,
           status: AI_ROUTING_STATUS.SUCCESS,
           fallbackLevel: 0,
@@ -220,7 +221,7 @@ export async function generateTextWithLane({
         const classified = classifyAiProviderError(error);
         attempts.push(
           toAiRoutingAttemptDto({
-            actionType: AI_ACTION_TYPE.CHAT_ANSWER,
+            actionType,
             model,
             keySlot,
             status: AI_ROUTING_STATUS.FAILED,
@@ -236,7 +237,7 @@ export async function generateTextWithLane({
       }
 
       const successAttempt = toAiRoutingAttemptDto({
-        actionType: AI_ACTION_TYPE.CHAT_ANSWER,
+        actionType,
         model,
         keySlot,
         status: AI_ROUTING_STATUS.SUCCESS,

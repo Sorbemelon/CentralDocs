@@ -11,8 +11,10 @@ test("cleanup service builds deletion plan for only current demoSessionId", () =
 
   assert.equal(plan.demoSessionId, "demo_cleanup");
   assert.equal(plan.mongo.filters.Document.demoSessionId, "demo_cleanup");
+  assert.equal(plan.mongo.filters.DocumentChunk.demoSessionId, "demo_cleanup");
   assert.equal(plan.mongo.filters.Folder.demoSessionId, "demo_cleanup");
   assert.equal(plan.s3.prefix, "demo-sessions/demo_cleanup/");
+  assert.equal(plan.s3.prefix.includes("/generated/"), false);
   assert.ok(plan.preserves.includes("backend/mock-data"));
   assert.ok(plan.s3.preservedPrefixes.includes("mock/"));
 });

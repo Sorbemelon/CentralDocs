@@ -268,14 +268,29 @@ test("chat message route handles no selected context and AI prompt limit safely"
   assert.equal(limited.body.error.code, "AI_PROMPT_LIMIT_REACHED");
 });
 
-test("chat routes require a demo session and generated-document route remains absent", async () => {
+test("chat routes require a demo session and message creation does not return a generated document", async () => {
   installFakeDependencies();
 
   const response = await request(app).get("/api/chats").expect(401);
   assert.equal(response.body.error.code, "SESSION_NOT_FOUND");
 
-  await request(app)
-    .post("/api/chats/chat_1/generated-documents")
+  installFakeDependencies({
+    sessions: [
+      {
+        id: "chat_1",
+        demoSessionId: "demo_123",
+        title: "Chat",
+        currentSelectedDocumentIds: ["doc_2"],
+      },
+    ],
+  });
+  const message = await request(app)
+    .post("/api/chats/chat_1/messages")
     .set("x-demo-session-id", "demo_123")
-    .expect(404);
+    .send({ content: "Please create a brief from this." })
+    .expect(201);
+
+  assert.equal("document" in message.body, false);
+  assert.equal(message.body.userMessage.role, "user");
+  assert.equal(message.body.assistantMessage.role, "assistant");
 });

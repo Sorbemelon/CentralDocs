@@ -1,0 +1,317 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+
+const { generateDocumentFromChat } = await import(
+  "../src/services/generatedDocuments/generatedDocument.service.js"
+);
+const { createMemoryGeneratedDocumentRepository } = await import(
+  "../src/services/generatedDocuments/generatedDocument.repository.js"
+);
+const { createMemoryChatMessageRepository } = await import(
+  "../src/services/chats/chatMessage.repository.js"
+);
+const { createMemoryChatSessionRepository } = await import(
+  "../src/services/chats/chatSession.repository.js"
+);
+const { applyUsageDelta } = await import("../src/services/demo/demoUsage.service.js");
+
+function baseMessages() {
+  return [
+    {
+      id: "message_user",
+      chatSessionId: "chat_1",
+      demoSessionId: "demo_123",
+      role: "user",
+      content: "What are the rollout risks?",
+    },
+    {
+      id: "message_assistant",
+      chatSessionId: "chat_1",
+      demoSessionId: "demo_123",
+      role: "assistant",
+      content: "Approval ownership is the main risk [1].",
+      referencesUsed: [
+        {
+          citationNumber: 1,
+          documentId: "mock_doc_1",
+          documentTitle: "Risk Register",
+          fileType: "csv",
+          folderName: "Operations",
+          chunkId: "chunk_1",
+          excerptPreview: "Approval owner is missing.",
+        },
+      ],
+    },
+  ];
+}
+
+function dependencies({
+  messages = baseMessages(),
+  sessionUsage = {},
+  generatedOutput = "# Brief\n\nApproval ownership is the main risk.",
+  indexer,
+  storageSaver,
+  generator,
+} = {}) {
+  const generatedDocumentRepository = createMemoryGeneratedDocumentRepository();
+  const chatSessionRepository = createMemoryChatSessionRepository({
+    seed: [
+      {
+        id: "chat_1",
+        demoSessionId: "demo_123",
+        title: "Rollout risks",
+        currentSelectedDocumentIds: ["mock_doc_1"],
+        currentSelectedFolderIds: ["mock_folder_1"],
+      },
+    ],
+  });
+  const chatMessageRepository = createMemoryChatMessageRepository({ seed: messages });
+  const usageSession = {
+    sessionId: "demo_123",
+    expiresAt: "2026-06-12T00:00:00.000Z",
+    usage: {
+      uploadedFiles: 0,
+      chatSessions: 1,
+      aiPrompts: 0,
+      generatedDocuments: 0,
+      userFolders: 0,
+      storageBytes: 0,
+      ...sessionUsage,
+    },
+  };
+  const usageUpdates = [];
+
+  return {
+    deps: {
+      chatSessionRepository,
+      chatMessageRepository,
+      generatedDocumentRepository,
+      selectionResolver: async () => ({
+        selectedDocumentIds: ["mock_doc_1"],
+        selectedFolderIds: ["mock_folder_1"],
+        resolvedDocuments: [{ id: "mock_doc_1", title: "Risk Register", fileKind: "csv" }],
+        snapshots: {
+          attachedDocumentSnapshot: [{ id: "mock_doc_1", title: "Risk Register" }],
+          attachedFolderSnapshot: [{ id: "mock_folder_1", name: "Operations" }],
+          resolvedDocumentSnapshot: [{ id: "mock_doc_1", title: "Risk Register" }],
+        },
+      }),
+      generator:
+        generator ||
+        (async () => ({
+          text: generatedOutput,
+          model: "gemini-3.5-flash",
+          fallbackUsed: false,
+          fallbackLevel: 0,
+          keySlot: 0,
+          latencyMs: 10,
+          usage: { estimatedInputTokens: 50, estimatedOutputTokens: 10 },
+          warnings: [],
+        })),
+      storageSaver:
+        storageSaver ||
+        (async ({ demoSessionId, documentId, filename }) => ({
+          objectKey: `demo-sessions/${demoSessionId}/generated/${documentId}/${filename}`,
+          storageProvider: "s3",
+        })),
+      indexer:
+        indexer ||
+        (async () => ({
+          indexed: true,
+          contentStats: {
+            extractedCharCount: 44,
+            optimizedCharCount: 44,
+            estimatedTokenCount: 11,
+            chunkCount: 1,
+          },
+          warnings: [],
+        })),
+      demoSessionReader: async () => usageSession,
+      demoSessionUsageUpdater: async (sessionId, delta) => {
+        usageUpdates.push({ sessionId, delta });
+        Object.assign(usageSession, applyUsageDelta(usageSession, delta));
+        return usageSession;
+      },
+    },
+    generatedDocumentRepository,
+    chatSessionRepository,
+    chatMessageRepository,
+    usageUpdates,
+  };
+}
+
+test("generated document service creates saved downloadable generated document", async () => {
+  const ctx = dependencies();
+  const result = await generateDocumentFromChat({
+    chatId: "chat_1",
+    demoSessionId: "demo_123",
+    body: {
+      instruction: "Create a concise internal briefing.",
+      filename: "orchid-rollout-brief.md",
+      includeReferences: true,
+      includeCurrentSelectedDocuments: true,
+    },
+    dependencies: ctx.deps,
+  });
+
+  assert.equal(result.document.sourceType, "generated");
+  assert.equal(result.document.scope, "generated");
+  assert.equal(result.document.downloadFilename, "orchid-rollout-brief.md");
+  assert.equal(result.document.downloadAvailable, true);
+  assert.equal(result.document.generatedMeta.referencesIncluded, true);
+  assert.deepEqual(result.document.generatedMeta.sourceDocumentIds, ["mock_doc_1"]);
+  assert.equal(result.generation.model, "gemini-3.5-flash");
+  assert.equal(result.generation.indexed, true);
+  assert.equal(result.usage.generatedDocuments, 1);
+  assert.equal(result.remaining.generatedDocuments, 2);
+  assert.equal(ctx.usageUpdates.length, 1);
+  assert.equal(ctx.chatMessageRepository._unsafeSnapshot().length, 2);
+  assert.deepEqual(
+    ctx.chatSessionRepository._unsafeSnapshot()[0].currentSelectedDocumentIds,
+    ["mock_doc_1"],
+  );
+});
+
+test("generated document service validates instruction, filename, and chat messages", async () => {
+  const ctx = dependencies();
+  await assert.rejects(
+    () =>
+      generateDocumentFromChat({
+        chatId: "chat_1",
+        demoSessionId: "demo_123",
+        body: { instruction: "" },
+        dependencies: ctx.deps,
+      }),
+    { code: "GENERATED_DOCUMENT_INSTRUCTION_EMPTY" },
+  );
+  await assert.rejects(
+    () =>
+      generateDocumentFromChat({
+        chatId: "chat_1",
+        demoSessionId: "demo_123",
+        body: { instruction: "x".repeat(2001), filename: "brief.md" },
+        dependencies: ctx.deps,
+      }),
+    { code: "GENERATED_DOCUMENT_INSTRUCTION_TOO_LONG" },
+  );
+  await assert.rejects(
+    () =>
+      generateDocumentFromChat({
+        chatId: "chat_1",
+        demoSessionId: "demo_123",
+        body: { instruction: "Create brief", filename: "brief.docx" },
+        dependencies: ctx.deps,
+      }),
+    { code: "GENERATED_DOCUMENT_UNSUPPORTED_FORMAT" },
+  );
+
+  const emptyChat = dependencies({ messages: [] });
+  await assert.rejects(
+    () =>
+      generateDocumentFromChat({
+        chatId: "chat_1",
+        demoSessionId: "demo_123",
+        body: { instruction: "Create brief", filename: "brief.md" },
+        dependencies: emptyChat.deps,
+      }),
+    { code: "CHAT_HAS_NO_MESSAGES" },
+  );
+});
+
+test("generated document service enforces generated-document and storage limits", async () => {
+  const limited = dependencies({ sessionUsage: { generatedDocuments: 3 } });
+  await assert.rejects(
+    () =>
+      generateDocumentFromChat({
+        chatId: "chat_1",
+        demoSessionId: "demo_123",
+        body: { instruction: "Create brief", filename: "brief.md" },
+        dependencies: limited.deps,
+      }),
+    { code: "GENERATED_DOCUMENT_LIMIT_REACHED" },
+  );
+
+  const tooLarge = dependencies({ generatedOutput: "x".repeat(1024 * 100 + 1) });
+  await assert.rejects(
+    () =>
+      generateDocumentFromChat({
+        chatId: "chat_1",
+        demoSessionId: "demo_123",
+        body: { instruction: "Create brief", filename: "brief.md" },
+        dependencies: tooLarge.deps,
+      }),
+    { code: "GENERATED_DOCUMENT_TOO_LARGE" },
+  );
+
+  const storageLimited = dependencies({
+    sessionUsage: { storageBytes: 20 * 1024 * 1024 - 5 },
+    generatedOutput: "123456",
+  });
+  await assert.rejects(
+    () =>
+      generateDocumentFromChat({
+        chatId: "chat_1",
+        demoSessionId: "demo_123",
+        body: { instruction: "Create brief", filename: "brief.md" },
+        dependencies: storageLimited.deps,
+      }),
+    { code: "DEMO_STORAGE_LIMIT_REACHED" },
+  );
+});
+
+test("generated document service handles provider, storage, and indexing failures safely", async () => {
+  const providerFail = dependencies({
+    generator: async () => {
+      const error = new Error("provider failed");
+      error.statusCode = 502;
+      error.code = "GENERATION_PROVIDER_ERROR";
+      throw error;
+    },
+  });
+  await assert.rejects(
+    () =>
+      generateDocumentFromChat({
+        chatId: "chat_1",
+        demoSessionId: "demo_123",
+        body: { instruction: "Create brief", filename: "brief.md" },
+        dependencies: providerFail.deps,
+      }),
+    { code: "GENERATION_PROVIDER_ERROR" },
+  );
+
+  const storageFail = dependencies({
+    storageSaver: async () => {
+      const error = new Error("storage unavailable");
+      error.statusCode = 503;
+      error.code = "STORAGE_NOT_CONFIGURED";
+      throw error;
+    },
+  });
+  await assert.rejects(
+    () =>
+      generateDocumentFromChat({
+        chatId: "chat_1",
+        demoSessionId: "demo_123",
+        body: { instruction: "Create brief", filename: "brief.md" },
+        dependencies: storageFail.deps,
+      }),
+    { code: "STORAGE_NOT_CONFIGURED" },
+  );
+  assert.equal(storageFail.generatedDocumentRepository._unsafeSnapshot().length, 0);
+
+  const indexingFail = dependencies({
+    indexer: async () => ({
+      indexed: false,
+      warnings: [{ code: "GENERATED_DOCUMENT_INDEXING_FAILED" }],
+    }),
+  });
+  const result = await generateDocumentFromChat({
+    chatId: "chat_1",
+    demoSessionId: "demo_123",
+    body: { instruction: "Create brief", filename: "brief.md" },
+    dependencies: indexingFail.deps,
+  });
+  assert.equal(result.generation.indexed, false);
+  assert.deepEqual(result.generation.warnings, ["GENERATED_DOCUMENT_INDEXING_FAILED"]);
+  assert.equal(result.document.statusMessage.includes("indexing"), true);
+});

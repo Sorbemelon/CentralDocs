@@ -29,7 +29,7 @@ const generatedMetaSchema = new mongoose.Schema(
     fromChatSessionId: { type: ObjectId, ref: "ChatSession", default: null },
     generationInstruction: { type: String, default: null },
     sourceMessageIds: [{ type: ObjectId, ref: "ChatMessage" }],
-    sourceDocumentIds: [{ type: ObjectId, ref: "Document" }],
+    sourceDocumentIds: [{ type: String }],
     referencesIncluded: { type: Boolean, default: false },
   },
   { _id: false },

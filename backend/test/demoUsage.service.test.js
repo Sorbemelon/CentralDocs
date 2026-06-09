@@ -37,6 +37,7 @@ test("usage service computes remaining limits correctly", () => {
   assert.equal(getRemainingLimits(session).generatedDocuments, 2);
   assert.equal(getRemainingLimits(session).userFolders, 7);
   assert.equal(getRemainingLimits(session).storageBytes, 20 * 1024 * 1024 - 1024);
+  assert.equal(getRemainingLimits(session).generatedDocumentBytes, 100 * 1024);
 });
 
 test("usage service rejects upload count and storage limit breaches", () => {

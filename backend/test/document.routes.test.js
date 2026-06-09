@@ -1,4 +1,4 @@
-import { test } from "node:test";
+import { afterEach, test } from "node:test";
 import assert from "node:assert/strict";
 import request from "supertest";
 
@@ -7,10 +7,18 @@ delete process.env.MONGODB_URI;
 
 const { app } = await import("../src/app.js");
 const { toMockDocumentId } = await import("../src/utils/ids.js");
+const {
+  resetDocumentDownloadDependenciesForTests,
+  setDocumentDownloadDependenciesForTests,
+} = await import("../src/services/documents/documentDownload.service.js");
 
 const briefDocumentId = toMockDocumentId(
   "01-strategy-rollout/centraldocs-transformation-brief.md",
 );
+
+afterEach(() => {
+  resetDocumentDownloadDependenciesForTests();
+});
 
 test("GET /api/documents returns mock documents without MongoDB", async () => {
   const response = await request(app).get("/api/documents").expect(200);
@@ -71,4 +79,39 @@ test("PATCH and DELETE mock document return read-only error", async () => {
 test("upload and retry document routes remain unimplemented", async () => {
   await request(app).post("/api/documents/upload").expect(404);
   await request(app).post(`/api/documents/${briefDocumentId}/retry`).expect(404);
+});
+
+test("POST /api/documents/:documentId/download-url works for generated documents through safe metadata", async () => {
+  const generatedDocumentId = "64b64b64b64b64b64b64b64b";
+  setDocumentDownloadDependenciesForTests({
+    isMongoConnected: () => true,
+    findPersistentDocumentById: async () => ({
+      _id: generatedDocumentId,
+      demoSessionId: "demo_123",
+      scope: "generated",
+      sourceType: "generated",
+      storageProvider: "s3",
+      objectKey: "demo-sessions/demo_123/generated/64b64b64b64b64b64b64b64b/brief.md",
+      downloadFilename: "brief.md",
+      mimeType: "text/markdown",
+      lifecycleStatus: "active",
+    }),
+    createPresignedDownloadUrl: async ({ downloadFilename }) => ({
+      filename: downloadFilename,
+      expiresInSeconds: 300,
+      downloadUrl: "https://signed.example/brief.md",
+      storageProvider: "s3",
+    }),
+  });
+
+  const response = await request(app)
+    .post(`/api/documents/${generatedDocumentId}/download-url`)
+    .set("x-demo-session-id", "demo_123")
+    .send({})
+    .expect(200);
+
+  assert.equal(response.body.documentId, generatedDocumentId);
+  assert.equal(response.body.filename, "brief.md");
+  assert.equal(response.body.downloadUrl, "https://signed.example/brief.md");
+  assert.equal("objectKey" in response.body, false);
 });
