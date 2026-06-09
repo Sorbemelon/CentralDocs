@@ -234,6 +234,86 @@ export function validateUploadFile(file) {
   return { valid: true, kind, sizeLabel: formatBytes(file.size) };
 }
 
+// --- Semantic search ---
+
+/** Cosine similarity (~0..1) → compact percent label. */
+export function scoreToPercent(score) {
+  if (typeof score !== "number") return null;
+  return `${Math.round(Math.max(0, Math.min(1, score)) * 100)}%`;
+}
+
+function secondsToClock(value) {
+  const n = Number(value);
+  if (Number.isNaN(n)) return String(value);
+  const total = Math.round(n);
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+function formatTimestamp(ts) {
+  if (ts == null) return null;
+  const str = String(ts);
+  if (/^\d+(\.\d+)?(-\d+(\.\d+)?)?$/.test(str)) {
+    return str.split("-").map(secondsToClock).join("–");
+  }
+  return str;
+}
+
+/**
+ * Build a compact, safe locator label from a reference object.
+ * Uses only safe display fields (no internal storage keys, vectors, or paths).
+ */
+export function formatSearchLocator(ref = {}) {
+  const parts = [];
+  if (ref.pageNumber != null) parts.push(`page ${ref.pageNumber}`);
+  if (ref.slideNumber != null) parts.push(`slide ${ref.slideNumber}`);
+  if (ref.sheetName) parts.push(ref.rowRange ? `sheet ${ref.sheetName} · rows ${ref.rowRange}` : `sheet ${ref.sheetName}`);
+  else if (ref.rowRange) parts.push(`rows ${ref.rowRange}`);
+  if (ref.mediaTimestamp != null) parts.push(formatTimestamp(ref.mediaTimestamp));
+  if (ref.sectionTitle) parts.push(ref.sectionTitle);
+  return parts.length ? parts.join(" · ") : null;
+}
+
+/**
+ * Normalize a /search/semantic response into row + reference view models.
+ * Reads only safe display fields (no model internals, vectors, or storage keys).
+ */
+export function normalizeSearchResponse(res = {}) {
+  const refs = res.references || [];
+  const results = (res.results || []).map((r, i) => {
+    const ref = refs[i] || {};
+    return {
+      id: r.documentId || ref.documentId || null,
+      refNumber: ref.citationNumber ?? i + 1,
+      title: ref.documentTitle || r.documentTitle || "Untitled",
+      fileKind: ref.fileType || r.fileKind || null,
+      folderName: ref.folderName || r.folderName || null,
+      excerpt: ref.excerptPreview || r.contentPreview || "",
+      score: typeof r.score === "number" ? r.score : ref.similarityScore ?? null,
+      locator: formatSearchLocator(ref),
+      chunkId: r.chunkId || ref.chunkId || null,
+    };
+  });
+
+  const references = refs.map((ref, i) => ({
+    number: ref.citationNumber ?? i + 1,
+    title: ref.documentTitle || "Untitled",
+    locator: formatSearchLocator(ref),
+    usedFor: ref.usedFor || "semantic search match",
+  }));
+
+  return {
+    results,
+    references,
+    stats: {
+      resultCount: res.stats?.resultCount ?? results.length,
+      searchedDocumentCount: res.stats?.searchedDocumentCount ?? 0,
+    },
+    warnings: res.warnings || [],
+  };
+}
+
 /** Local (not-yet-persisted) chats use a `local-` id prefix. */
 export function isLocalChatId(id) {
   return typeof id === "string" && id.startsWith("local-");

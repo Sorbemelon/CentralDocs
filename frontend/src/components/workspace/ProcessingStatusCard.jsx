@@ -29,7 +29,13 @@ function ProcessingStatusCard({ ws }) {
 
   let current;
   let detail;
-  if (op) {
+  if (ws.search?.isSearching) {
+    current = "Searching";
+    detail = ws.search.query ? `"${ws.search.query}"` : "Running semantic search…";
+  } else if (ws.activeTab === "search" && ws.search?.error) {
+    current = "Failed";
+    detail = "Search failed.";
+  } else if (op) {
     current = op.status === "complete" ? "Ready" : op.status === "failed" ? "Failed" : "Working";
     detail = op.label;
   } else if (previewDoc) {

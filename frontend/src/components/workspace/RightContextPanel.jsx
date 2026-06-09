@@ -42,7 +42,7 @@ function RightContextPanel({ ws, className }) {
             <CurrentContextCard ws={ws} />
           </CollapsibleCard>
           <CollapsibleCard icon={Quote} title="References" defaultOpen={false}>
-            <ReferencesCard />
+            <ReferencesCard ws={ws} />
           </CollapsibleCard>
           <CollapsibleCard icon={Activity} title="Processing Status">
             <ProcessingStatusCard ws={ws} />

@@ -12,6 +12,7 @@ import { useDemoSession } from "@/lib/useDemoSession";
 import { useWorkspaceData } from "@/lib/useWorkspaceData";
 import { useChatSessions } from "@/lib/useChatSessions";
 import { useSelectedContext } from "@/lib/useSelectedContext";
+import { useSemanticSearch } from "@/lib/useSemanticSearch";
 import { updateChatSelection } from "@/services/chatApi";
 import { getDemoSession } from "@/services/demoApi";
 import {
@@ -74,6 +75,13 @@ export default function CentralDocsWorkspace() {
   useEffect(() => {
     if (chats.activeSelection) setFromChat(chats.activeSelection);
   }, [chats.activeSelection, setFromChat]);
+
+  // Semantic search (Search tab) — defaults to the active chat's selected context.
+  const search = useSemanticSearch({
+    online,
+    selectedDocumentIds: selection.docIds,
+    selectedFolderIds: selection.folderIds,
+  });
 
   const { folders, documents } = wsData;
   const getDocById = useCallback((id) => documents.find((d) => d.id === id) || null, [documents]);
@@ -350,6 +358,8 @@ export default function CentralDocsWorkspace() {
 
     sourceFilter,
     setSourceFilter,
+
+    search,
 
     previewDocId,
     openPreview,

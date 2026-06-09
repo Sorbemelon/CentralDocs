@@ -45,6 +45,15 @@ export const SAMPLE_QUESTIONS = Object.freeze([
   "Create a concise internal briefing from this chat.",
 ]);
 
+/** Sample questions surfaced in the semantic Search tab's empty state. */
+export const SEARCH_SAMPLE_QUESTIONS = Object.freeze([
+  "What is Orchid Retail trying to improve?",
+  "Which documents mention vendor onboarding?",
+  "What are the rollout risks?",
+  "What customer pain points relate to document search?",
+  "Which policy explains document storage and approval?",
+]);
+
 /** Operation states for the processing status card. */
 export const PROCESSING_STATES = Object.freeze([
   "Ready",

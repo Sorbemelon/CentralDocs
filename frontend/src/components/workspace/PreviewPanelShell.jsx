@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { DocStatusBadge } from "@/components/common/StatusBadge";
 import { EmptyState } from "@/components/common/EmptyState";
 import { DOC_STATUS } from "@/lib/constants";
+import { normalizeDocument } from "@/lib/workspaceData";
 import { getDocument, getDocumentStatus, previewDocument } from "@/services/documentApi";
 import { getFileIcon, SourceBadge } from "./DocumentList";
 
@@ -18,35 +19,40 @@ function FlagChip({ on, label }) {
 
 /** Preview tab. Fetches detail + preview + status when online; safe fields only. */
 function PreviewPanelShell({ ws }) {
-  const doc = ws.previewDocId ? ws.getDocById(ws.previewDocId) : null;
-  const [state, setState] = useState({ loading: false, preview: null, status: null });
+  const id = ws.previewDocId;
+  const listDoc = id ? ws.getDocById(id) : null;
+  const [state, setState] = useState({ loading: false, preview: null, status: null, fetchedDoc: null });
 
   useEffect(() => {
     let cancelled = false;
-    setState({ loading: false, preview: null, status: null });
-    if (!doc || !ws.online) return undefined;
+    setState({ loading: false, preview: null, status: null, fetchedDoc: null });
+    if (!id || !ws.online) return undefined;
     setState((s) => ({ ...s, loading: true }));
-    Promise.allSettled([previewDocument(doc.id), getDocumentStatus(doc.id), getDocument(doc.id)]).then(
-      ([p, st]) => {
-        if (cancelled) return;
-        setState({
-          loading: false,
-          preview: p.status === "fulfilled" ? p.value?.preview : null,
-          status: st.status === "fulfilled" ? st.value : null,
-        });
-      },
-    );
+    Promise.allSettled([previewDocument(id), getDocumentStatus(id), getDocument(id)]).then(([p, st, d]) => {
+      if (cancelled) return;
+      setState({
+        loading: false,
+        preview: p.status === "fulfilled" ? p.value?.preview : null,
+        status: st.status === "fulfilled" ? st.value : null,
+        fetchedDoc: d.status === "fulfilled" && d.value?.document ? normalizeDocument(d.value.document) : null,
+      });
+    });
     return () => {
       cancelled = true;
     };
-  }, [doc?.id, ws.online]);
+  }, [id, ws.online]);
+
+  const doc = listDoc || state.fetchedDoc;
 
   if (!doc) {
+    if (state.loading) {
+      return <p className="p-1 text-[12px] text-muted-foreground">Loading document…</p>;
+    }
     return (
       <EmptyState
         icon={FileText}
         title="No document open"
-        description="Use the preview action on any document row to open it here."
+        description="Use the preview action on a document row or a search result to open it here."
       />
     );
   }
