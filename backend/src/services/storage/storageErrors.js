@@ -19,3 +19,11 @@ export function createStorageMethodNotImplementedError(methodName) {
     "STORAGE_METHOD_NOT_IMPLEMENTED",
   );
 }
+
+export function createStorageReadFailedError(message = "Stored object could not be read.") {
+  return createHttpError(503, message, "STORAGE_READ_FAILED");
+}
+
+export function createStorageObjectNotFoundError() {
+  return createHttpError(404, "Stored object was not found.", "STORAGE_OBJECT_NOT_FOUND");
+}

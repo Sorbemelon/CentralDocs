@@ -101,6 +101,7 @@ documentRouter.post(
     const result = await retryDocumentProcessing({
       documentId: req.params.documentId,
       demoSessionId: req.demoSessionId,
+      force: req.body?.force === true,
     });
 
     res.json(result);

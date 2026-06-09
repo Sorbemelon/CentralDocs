@@ -1,4 +1,8 @@
-import { DOCUMENT_STATUS } from "../../constants/document.constants.js";
+import {
+  DOCUMENT_SCOPE,
+  DOCUMENT_STATUS,
+  SOURCE_TYPE,
+} from "../../constants/document.constants.js";
 import { toDocumentDto } from "../documents/document.dto.js";
 
 function toProcessingDto(processing = {}, document = {}) {
@@ -32,6 +36,29 @@ export function toDocumentStatusDto(document = {}) {
   const contentStats = raw.contentStats || {};
   const ready = raw.status === DOCUMENT_STATUS.READY && raw.lifecycleStatus === "active";
   const chunkCount = contentStats.chunkCount || 0;
+  const isActive = raw.lifecycleStatus === "active";
+  const isUpload =
+    raw.scope === DOCUMENT_SCOPE.USER &&
+    raw.sourceType === SOURCE_TYPE.UPLOAD &&
+    !raw.readOnly;
+  const hasOriginalObject = Boolean(raw.objectKey && raw.storageProvider === "s3");
+  const retryableStatus = [DOCUMENT_STATUS.FAILED, DOCUMENT_STATUS.UPLOADED].includes(raw.status);
+  const retryAvailable = Boolean(isActive && isUpload && hasOriginalObject && retryableStatus);
+  let retryReason = null;
+
+  if (!retryAvailable) {
+    if (!isActive) {
+      retryReason = "Document is not active.";
+    } else if (!isUpload) {
+      retryReason = "Only user uploaded documents can be retried.";
+    } else if (!hasOriginalObject) {
+      retryReason = "Original uploaded file is not available in storage.";
+    } else if (raw.status === DOCUMENT_STATUS.READY) {
+      retryReason = "Ready upload documents require force=true to reprocess.";
+    } else {
+      retryReason = "Document status is not retryable.";
+    }
+  }
 
   return {
     documentId: raw._id ? String(raw._id) : raw.id ? String(raw.id) : null,
@@ -46,5 +73,7 @@ export function toDocumentStatusDto(document = {}) {
     downloadAvailable: Boolean(raw.objectKey && raw.lifecycleStatus === "active"),
     searchable: Boolean(ready && chunkCount > 0),
     attachable: Boolean(ready),
+    retryAvailable,
+    retryReason,
   };
 }

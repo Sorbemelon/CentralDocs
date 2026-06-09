@@ -20,7 +20,11 @@ import {
 import { toDocumentDto } from "../documents/document.dto.js";
 import { validateUploadFiles } from "./uploadValidation.service.js";
 import { normalizeUploadFilename } from "./uploadFilename.service.js";
-import { saveUploadObject } from "./uploadStorage.service.js";
+import {
+  deleteUploadedObject,
+  readUploadedObjectBuffer,
+  saveUploadObject,
+} from "./uploadStorage.service.js";
 import {
   buildUploadDocumentPayload,
   createUploadDocumentId,
@@ -46,6 +50,8 @@ const defaultDependencies = Object.freeze({
   fileValidator: validateUploadFiles,
   filenameNormalizer: normalizeUploadFilename,
   storageSaver: saveUploadObject,
+  storageCleaner: deleteUploadedObject,
+  storageReader: readUploadedObjectBuffer,
   processor: processUploadedDocument,
   demoSessionReader: getDemoSession,
   demoSessionUsageUpdater: applyDemoSessionUsageDelta,
@@ -182,19 +188,100 @@ function assertRetryCandidate(document = {}) {
   if (
     document.scope === DOCUMENT_SCOPE.MOCK ||
     document.readOnly ||
-    ![SOURCE_TYPE.UPLOAD, SOURCE_TYPE.GENERATED].includes(document.sourceType)
+    document.scope !== DOCUMENT_SCOPE.USER ||
+    document.sourceType !== SOURCE_TYPE.UPLOAD
   ) {
     throw createHttpError(
       409,
-      "This document cannot be retried.",
+      "Only user uploaded documents can be retried.",
+      UPLOAD_ERROR_CODE.DOCUMENT_RETRY_UNSUPPORTED_SOURCE,
+    );
+  }
+  if (document.storageProvider !== "s3" || !document.objectKey) {
+    throw createHttpError(
+      409,
+      "This uploaded document does not have a readable original file.",
       UPLOAD_ERROR_CODE.DOCUMENT_RETRY_NOT_ALLOWED,
     );
   }
-  if (document.status !== DOCUMENT_STATUS.FAILED) {
+}
+
+function assertRetryStatusAllowed(document = {}, { force = false } = {}) {
+  if ([DOCUMENT_STATUS.FAILED, DOCUMENT_STATUS.UPLOADED].includes(document.status)) {
+    return;
+  }
+  if (force && document.status === DOCUMENT_STATUS.READY) {
+    return;
+  }
+
+  if (document.status === DOCUMENT_STATUS.READY) {
     throw createHttpError(
       409,
-      "Only failed documents can be retried.",
+      "Ready upload documents require force=true before retrying.",
       UPLOAD_ERROR_CODE.DOCUMENT_RETRY_NOT_ALLOWED,
+    );
+  }
+
+  throw createHttpError(
+    409,
+    "This document is not in a retryable processing state.",
+    UPLOAD_ERROR_CODE.DOCUMENT_RETRY_NOT_ALLOWED,
+  );
+}
+
+function buildStoredUploadFile(document = {}, buffer) {
+  const originalFilename = document.originalFilename || document.downloadFilename;
+  return {
+    originalname: originalFilename,
+    mimetype: document.mimeType,
+    buffer,
+    size: buffer.length,
+  };
+}
+
+function buildRetryFilenameMeta(document = {}) {
+  return {
+    originalFilename: document.originalFilename || document.downloadFilename,
+    downloadFilename: document.downloadFilename || document.originalFilename,
+    title: document.title || document.downloadFilename || document.originalFilename,
+    fileExtension: document.fileExtension,
+  };
+}
+
+function toSafeRetryProcessing(processing = {}, document = {}) {
+  return {
+    status: processing.status || null,
+    statusSequence: processing.statusSequence || [],
+    indexed: Boolean(processing.indexing),
+    statusMessage: (processing.document || document)?.statusMessage || null,
+    warnings: processing.warnings || [],
+  };
+}
+
+async function createUploadDocumentWithCleanup({ deps, payload, storageResult } = {}) {
+  try {
+    return await deps.repository.createUploadDocumentRecord(payload);
+  } catch (error) {
+    try {
+      await deps.storageCleaner({
+        objectKey: storageResult.objectKey,
+        storage: deps.storage,
+      });
+    } catch (cleanupError) {
+      throw createHttpError(
+        503,
+        "Upload metadata could not be saved and uploaded object cleanup failed.",
+        UPLOAD_ERROR_CODE.ORPHAN_CLEANUP_FAILED,
+        {
+          cleanupCode: cleanupError?.code || "UPLOAD_ORPHAN_CLEANUP_FAILED",
+        },
+      );
+    }
+
+    throw createHttpError(
+      error?.statusCode || 503,
+      "Uploaded file could not be saved as a CentralDocs document.",
+      UPLOAD_ERROR_CODE.SAVE_FAILED,
     );
   }
 }
@@ -238,7 +325,11 @@ export async function uploadDocumentForDemo({
     objectKey: storageResult.objectKey,
     expiresAt: usageSession.expiresAt || null,
   });
-  const document = await deps.repository.createUploadDocumentRecord(payload);
+  const document = await createUploadDocumentWithCleanup({
+    deps,
+    payload,
+    storageResult,
+  });
   const updatedSession = await updateUploadUsage({
     deps,
     demoSessionId,
@@ -286,6 +377,7 @@ export async function getUploadDocumentStatus({
 export async function retryDocumentProcessing({
   documentId,
   demoSessionId,
+  force = false,
   dependencies = {},
 } = {}) {
   requireDemoSessionId(demoSessionId);
@@ -294,13 +386,38 @@ export async function retryDocumentProcessing({
     await deps.repository.findUploadDocumentById({ documentId, demoSessionId }),
   );
   assertRetryCandidate(document);
+  assertRetryStatusAllowed(document, { force });
 
-  throw createHttpError(
-    409,
-    "Retry requires S3 read support and is reserved for a later upload processing phase.",
-    UPLOAD_ERROR_CODE.RETRY_NOT_AVAILABLE,
-    {
-      document: toDocumentDto(document),
+  const buffer = await deps.storageReader({
+    objectKey: document.objectKey,
+    storage: deps.storage,
+  });
+  const validation = deps.fileValidator([buildStoredUploadFile(document, buffer)]);
+  const processing = await deps.processor({
+    document,
+    uploadFile: {
+      validation,
+      filenameMeta: buildRetryFilenameMeta(document),
+      buffer: validation.buffer,
     },
-  );
+    repository: deps.repository,
+    extractor: deps.extractor,
+    indexer: deps.indexer,
+    embedder: deps.embedder,
+    indexingRepositories: deps.indexingRepositories,
+    options: {
+      includeUploadedStatus: false,
+      ...(deps.processingOptions || {}),
+    },
+  });
+
+  return {
+    status: processing.status === "completed" ? "retried" : "failed",
+    document: toDocumentDto(processing.document || document),
+    processing: toSafeRetryProcessing(processing, document),
+    retry: {
+      attempted: true,
+      force: Boolean(force),
+    },
+  };
 }

@@ -24,9 +24,11 @@ function dependencies({
   sessionUsage = {},
   folders = [],
   storageSaver,
+  storageReader,
+  storageCleaner,
   processor,
+  repository = createMemoryUploadDocumentRepository({ folders }),
 } = {}) {
-  const repository = createMemoryUploadDocumentRepository({ folders });
   const usageSession = {
     sessionId: "demo_123",
     expiresAt: "2026-06-12T00:00:00.000Z",
@@ -59,24 +61,33 @@ function dependencies({
           objectKey: `demo-sessions/${demoSessionId}/uploads/${documentId}/${filename}`,
           storageProvider: "s3",
         })),
+      storageReader: storageReader || (async () => Buffer.from("# Brief")),
+      storageCleaner: storageCleaner || (async () => ({ deleted: true })),
       processor:
         processor ||
-        (async ({ document }) => ({
-          status: "completed",
-          document: {
-            ...document,
-            status: "ready",
-            contentStats: {
-              extractedCharCount: 7,
-              optimizedCharCount: 7,
-              estimatedTokenCount: 2,
-              chunkCount: 1,
+        (async ({ document, repository }) => {
+          const ready = await repository.updateUploadDocumentStatus({
+            documentId: document._id,
+            demoSessionId: "demo_123",
+            patch: {
+              status: "ready",
+              statusMessage: null,
+              contentStats: {
+                extractedCharCount: 7,
+                optimizedCharCount: 7,
+                estimatedTokenCount: 2,
+                chunkCount: 1,
+              },
             },
-          },
-          indexing: { contentStats: { chunkCount: 1 } },
-          statusSequence: ["uploaded", "extracting", "optimizing", "chunking", "embedding", "ready"],
-          warnings: [],
-        })),
+          });
+          return {
+            status: "completed",
+            document: ready,
+            indexing: { contentStats: { chunkCount: 1 } },
+            statusSequence: ["uploaded", "extracting", "optimizing", "chunking", "embedding", "ready"],
+            warnings: [],
+          };
+        }),
     },
   };
 }
@@ -257,6 +268,102 @@ test("upload status and retry services return safe status and retry boundary", a
   assert.equal(status.status, "failed");
   assert.equal(status.downloadAvailable, true);
   assert.equal(status.searchable, false);
+  assert.equal(status.attachable, false);
+  assert.equal(status.retryAvailable, true);
+  assert.equal(status.retryReason, null);
+  await assert.rejects(
+    () =>
+      retryDocumentProcessing({
+        documentId: uploaded.document.id,
+        demoSessionId: "demo_123",
+        dependencies: {
+          ...ctx.deps,
+          storageReader: async () => Buffer.from("not a markdown binary\0"),
+        },
+      }),
+    { code: "UPLOAD_UNSUPPORTED_FILE_TYPE" },
+  );
+});
+
+test("retry failed uploaded document reads S3 object and reprocesses without usage increment", async () => {
+  let processorCalls = 0;
+  let readKey = null;
+  const ctx = dependencies({
+    storageReader: async ({ objectKey }) => {
+      readKey = objectKey;
+      return Buffer.from("# Retry");
+    },
+    processor: async ({ document, repository }) => {
+      processorCalls += 1;
+      if (processorCalls === 1) {
+        const failed = await repository.updateUploadDocumentStatus({
+          documentId: document._id,
+          demoSessionId: "demo_123",
+          patch: { status: "failed", statusMessage: "Extraction failed." },
+        });
+        return {
+          status: "failed",
+          document: failed,
+          statusSequence: ["uploaded", "extracting", "failed"],
+          warnings: [{ code: "DOCUMENT_PROCESSING_FAILED" }],
+        };
+      }
+      const ready = await repository.updateUploadDocumentStatus({
+        documentId: document._id,
+        demoSessionId: "demo_123",
+        patch: {
+          status: "ready",
+          statusMessage: null,
+          contentStats: {
+            extractedCharCount: 7,
+            optimizedCharCount: 7,
+            estimatedTokenCount: 2,
+            chunkCount: 1,
+          },
+        },
+      });
+      return {
+        status: "completed",
+        document: ready,
+        statusSequence: ["extracting", "optimizing", "chunking", "embedding", "ready"],
+        warnings: [],
+      };
+    },
+  });
+
+  const uploaded = await uploadDocumentForDemo({
+    demoSessionId: "demo_123",
+    files: [uploadFile()],
+    dependencies: ctx.deps,
+  });
+  const retried = await retryDocumentProcessing({
+    documentId: uploaded.document.id,
+    demoSessionId: "demo_123",
+    dependencies: ctx.deps,
+  });
+
+  assert.equal(retried.status, "retried");
+  assert.equal(retried.document.status, "ready");
+  assert.deepEqual(retried.processing.statusSequence, [
+    "extracting",
+    "optimizing",
+    "chunking",
+    "embedding",
+    "ready",
+  ]);
+  assert.equal(readKey, "demo-sessions/demo_123/uploads/upload_1/brief.md");
+  assert.equal(ctx.usageUpdates.length, 1);
+  assert.equal(JSON.stringify(retried).includes("demo-sessions/demo_123"), false);
+});
+
+test("retry ready document requires force and can reprocess when forced", async () => {
+  const ctx = dependencies();
+  const uploaded = await uploadDocumentForDemo({
+    demoSessionId: "demo_123",
+    files: [uploadFile()],
+    dependencies: ctx.deps,
+  });
+
   await assert.rejects(
     () =>
       retryDocumentProcessing({
@@ -264,6 +371,173 @@ test("upload status and retry services return safe status and retry boundary", a
         demoSessionId: "demo_123",
         dependencies: ctx.deps,
       }),
-    { code: "RETRY_NOT_AVAILABLE" },
+    { code: "DOCUMENT_RETRY_NOT_ALLOWED" },
   );
+
+  const retried = await retryDocumentProcessing({
+    documentId: uploaded.document.id,
+    demoSessionId: "demo_123",
+    force: true,
+    dependencies: ctx.deps,
+  });
+
+  assert.equal(retried.status, "retried");
+  assert.equal(retried.retry.force, true);
+  assert.equal(ctx.usageUpdates.length, 1);
+});
+
+test("retry rejects mock, generated, trashed, and other-session documents", async () => {
+  const repository = createMemoryUploadDocumentRepository({
+    documents: [
+      {
+        id: "mock_doc",
+        demoSessionId: null,
+        scope: "mock",
+        sourceType: "mock",
+        readOnly: true,
+        lifecycleStatus: "active",
+        status: "failed",
+        storageProvider: "s3",
+        objectKey: "mock/orchid-retail/original/mock_doc/file.md",
+      },
+      {
+        id: "generated_doc",
+        demoSessionId: "demo_123",
+        scope: "generated",
+        sourceType: "generated",
+        readOnly: false,
+        lifecycleStatus: "active",
+        status: "failed",
+        storageProvider: "s3",
+        objectKey: "demo-sessions/demo_123/generated/generated_doc/file.md",
+      },
+      {
+        id: "trashed_upload",
+        demoSessionId: "demo_123",
+        scope: "user",
+        sourceType: "upload",
+        readOnly: false,
+        lifecycleStatus: "trashed",
+        status: "failed",
+        storageProvider: "s3",
+        objectKey: "demo-sessions/demo_123/uploads/trashed_upload/file.md",
+      },
+      {
+        id: "other_upload",
+        demoSessionId: "demo_other",
+        scope: "user",
+        sourceType: "upload",
+        readOnly: false,
+        lifecycleStatus: "active",
+        status: "failed",
+        storageProvider: "s3",
+        objectKey: "demo-sessions/demo_other/uploads/other_upload/file.md",
+      },
+    ],
+  });
+  const ctx = dependencies({ repository });
+
+  await assert.rejects(
+    () =>
+      retryDocumentProcessing({
+        documentId: "mock_doc",
+        demoSessionId: "demo_123",
+        dependencies: ctx.deps,
+      }),
+    { code: "DOCUMENT_NOT_FOUND" },
+  );
+  await assert.rejects(
+    () =>
+      retryDocumentProcessing({
+        documentId: "generated_doc",
+        demoSessionId: "demo_123",
+        dependencies: ctx.deps,
+      }),
+    { code: "DOCUMENT_RETRY_UNSUPPORTED_SOURCE" },
+  );
+  await assert.rejects(
+    () =>
+      retryDocumentProcessing({
+        documentId: "trashed_upload",
+        demoSessionId: "demo_123",
+        dependencies: ctx.deps,
+      }),
+    { code: "DOCUMENT_TRASHED" },
+  );
+  await assert.rejects(
+    () =>
+      retryDocumentProcessing({
+        documentId: "other_upload",
+        demoSessionId: "demo_123",
+        dependencies: ctx.deps,
+      }),
+    { code: "DOCUMENT_NOT_FOUND" },
+  );
+});
+
+test("upload cleans orphan S3 object when metadata creation fails after storage save", async () => {
+  const cleanedKeys = [];
+  const repository = {
+    createDocumentId: () => "upload_1",
+    findUploadFolderById: async () => null,
+    createUploadDocumentRecord: async () => {
+      const error = new Error("Mongo connection string should not leak");
+      error.code = "PERSISTENCE_NOT_CONFIGURED";
+      error.statusCode = 503;
+      throw error;
+    },
+    findUploadDocumentById: async () => null,
+    updateUploadDocumentStatus: async () => null,
+  };
+  const ctx = dependencies({
+    repository,
+    storageCleaner: async ({ objectKey }) => {
+      cleanedKeys.push(objectKey);
+      return { deleted: true };
+    },
+  });
+
+  await assert.rejects(
+    () =>
+      uploadDocumentForDemo({
+        demoSessionId: "demo_123",
+        files: [uploadFile()],
+        dependencies: ctx.deps,
+      }),
+    { code: "UPLOAD_SAVE_FAILED" },
+  );
+
+  assert.deepEqual(cleanedKeys, ["demo-sessions/demo_123/uploads/upload_1/brief.md"]);
+  assert.equal(ctx.usageUpdates.length, 0);
+});
+
+test("upload surfaces safe orphan cleanup failure when cleanup cannot delete saved object", async () => {
+  const repository = {
+    createDocumentId: () => "upload_1",
+    findUploadFolderById: async () => null,
+    createUploadDocumentRecord: async () => {
+      throw new Error("metadata failed");
+    },
+    findUploadDocumentById: async () => null,
+    updateUploadDocumentStatus: async () => null,
+  };
+  const ctx = dependencies({
+    repository,
+    storageCleaner: async () => {
+      const error = new Error("delete failed for demo-sessions/demo_123/uploads/upload_1/brief.md");
+      error.code = "STORAGE_READ_FAILED";
+      throw error;
+    },
+  });
+
+  await assert.rejects(
+    () =>
+      uploadDocumentForDemo({
+        demoSessionId: "demo_123",
+        files: [uploadFile()],
+        dependencies: ctx.deps,
+      }),
+    { code: "UPLOAD_ORPHAN_CLEANUP_FAILED" },
+  );
+  assert.equal(ctx.usageUpdates.length, 0);
 });

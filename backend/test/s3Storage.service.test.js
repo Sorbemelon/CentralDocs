@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { Readable } from "node:stream";
 
 process.env.NODE_ENV = "test";
 delete process.env.AWS_REGION;
@@ -10,6 +11,8 @@ delete process.env.AWS_SECRET_ACCESS_KEY;
 const {
   deleteObject,
   deleteObjectsByPrefix,
+  getObjectBuffer,
+  getObjectText,
   getPresignedDownloadUrl,
   getStorageStatus,
   putObject,
@@ -166,11 +169,135 @@ test("S3 putObject uses injected sender and returns safe metadata", async () => 
   assert.equal(captured.input.ContentType, "text/markdown");
 });
 
-test("reserved S3 delete method fails safely without AWS calls", async () => {
-  await assert.rejects(() => deleteObject(), {
-    statusCode: 501,
-    code: "STORAGE_METHOD_NOT_IMPLEMENTED",
-  });
+test("S3 getObjectBuffer requires configured storage", async () => {
+  await assert.rejects(
+    () =>
+      getObjectBuffer({
+        objectKey: "demo-sessions/demo_123/uploads/upload_1/brief.md",
+      }),
+    {
+      statusCode: 503,
+      code: "STORAGE_NOT_CONFIGURED",
+    },
+  );
+});
+
+test("S3 getObjectBuffer validates safe readable prefixes", async () => {
+  const overrides = {
+    configured: true,
+    bucket: "centraldocs-test",
+    client: {},
+    sender: async () => ({ Body: Buffer.from("should-not-run") }),
+  };
+
+  for (const objectKey of [
+    "../unsafe.md",
+    "/demo-sessions/demo_123/uploads/upload_1/brief.md",
+    "demo-sessions\\demo_123\\uploads\\upload_1\\brief.md",
+    "other-prefix/doc.md",
+  ]) {
+    await assert.rejects(() => getObjectBuffer({ objectKey }, overrides), {
+      code: "INVALID_STORAGE_KEY",
+    });
+  }
+});
+
+test("S3 getObjectBuffer allows CentralDocs prefixes and returns Buffer", async () => {
+  const seen = [];
+  for (const objectKey of [
+    "demo-sessions/demo_123/uploads/upload_1/brief.md",
+    "mock/orchid-retail/original/doc/report.md",
+  ]) {
+    const buffer = await getObjectBuffer(
+      { objectKey },
+      {
+        configured: true,
+        bucket: "centraldocs-test",
+        client: { fake: true },
+        sender: async (client, command) => {
+          seen.push({ client, input: command.input });
+          return { Body: Buffer.from("stored") };
+        },
+      },
+    );
+
+    assert.equal(buffer.toString("utf8"), "stored");
+  }
+
+  assert.equal(seen[0].input.Key, "demo-sessions/demo_123/uploads/upload_1/brief.md");
+  assert.equal(seen[1].input.Key, "mock/orchid-retail/original/doc/report.md");
+});
+
+test("S3 getObjectBuffer handles stream-like fake bodies and text caps", async () => {
+  const text = await getObjectText(
+    { objectKey: "demo-sessions/demo_123/uploads/upload_1/brief.md", maxBytes: 5 },
+    {
+      configured: true,
+      bucket: "centraldocs-test",
+      client: {},
+      sender: async () => ({ Body: Readable.from(["hello", " world"]) }),
+    },
+  );
+
+  assert.equal(text, "hello");
+});
+
+test("S3 getObjectBuffer maps missing objects safely", async () => {
+  await assert.rejects(
+    () =>
+      getObjectBuffer(
+        { objectKey: "demo-sessions/demo_123/uploads/upload_1/missing.md" },
+        {
+          configured: true,
+          bucket: "centraldocs-test",
+          client: {},
+          sender: async () => {
+            const error = new Error("NoSuchKey with hidden details");
+            error.name = "NoSuchKey";
+            throw error;
+          },
+        },
+      ),
+    {
+      statusCode: 404,
+      code: "STORAGE_OBJECT_NOT_FOUND",
+    },
+  );
+});
+
+test("S3 deleteObject uses injected sender and validates object keys", async () => {
+  let captured = null;
+  const deleted = await deleteObject(
+    { objectKey: "demo-sessions/demo_123/uploads/upload_1/brief.md" },
+    {
+      configured: true,
+      bucket: "centraldocs-test",
+      client: { fake: true },
+      sender: async (client, command) => {
+        captured = { client, input: command.input };
+        return { $metadata: { requestId: "req-123" } };
+      },
+    },
+  );
+
+  assert.equal(deleted.deleted, true);
+  assert.equal(deleted.requestId, "req-123");
+  assert.equal(captured.input.Bucket, "centraldocs-test");
+  assert.equal(captured.input.Key, "demo-sessions/demo_123/uploads/upload_1/brief.md");
+
+  await assert.rejects(
+    () =>
+      deleteObject(
+        { objectKey: "../unsafe.md" },
+        {
+          configured: true,
+          bucket: "centraldocs-test",
+          client: {},
+          sender: async () => ({}),
+        },
+      ),
+    { code: "INVALID_STORAGE_KEY" },
+  );
 
   resetS3StorageDependenciesForTests();
 });

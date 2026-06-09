@@ -95,7 +95,8 @@ export async function processUploadedDocument({
 } = {}) {
   const documentId = getDocumentId(document);
   const demoSessionId = document?.demoSessionId;
-  const statusSequence = [DOCUMENT_STATUS.UPLOADED];
+  const { includeUploadedStatus = true, ...indexingOptions } = options;
+  const statusSequence = includeUploadedStatus ? [DOCUMENT_STATUS.UPLOADED] : [];
 
   try {
     await updateStatus({
@@ -131,7 +132,7 @@ export async function processUploadedDocument({
         }),
       options: {
         reindex: true,
-        ...options,
+        ...indexingOptions,
       },
     });
     const contentStats = indexing.contentStats || {
@@ -159,7 +160,7 @@ export async function processUploadedDocument({
       };
 
     const orderedStatusSequence = [
-      DOCUMENT_STATUS.UPLOADED,
+      ...(includeUploadedStatus ? [DOCUMENT_STATUS.UPLOADED] : []),
       DOCUMENT_STATUS.EXTRACTING,
       ...(indexing.statusSequence || []).filter(
         (status) => ![DOCUMENT_STATUS.EXTRACTING, DOCUMENT_STATUS.READY].includes(status),

@@ -11,6 +11,8 @@ import {
   createInvalidStorageKeyError,
   createStorageMethodNotImplementedError,
   createStorageNotConfiguredError,
+  createStorageObjectNotFoundError,
+  createStorageReadFailedError,
 } from "./storageErrors.js";
 
 let testOverrides = {};
@@ -45,6 +47,63 @@ function buildContentDisposition(filename) {
     safeFilename,
     value: `attachment; filename="${safeFilename}"`,
   };
+}
+
+export function assertSafeReadableObjectKey({ objectKey } = {}) {
+  const safeObjectKey = assertSafeObjectKey(objectKey);
+  if (!safeObjectKey.startsWith("mock/") && !safeObjectKey.startsWith("demo-sessions/")) {
+    throw createInvalidStorageKeyError("Only CentralDocs storage prefixes can be read.");
+  }
+
+  return safeObjectKey;
+}
+
+function createDefaultSender(client) {
+  if (typeof client?.send !== "function") {
+    return null;
+  }
+
+  return (resolvedClient, commandToSend) => resolvedClient.send(commandToSend);
+}
+
+function isNotFoundStorageError(error) {
+  return (
+    error?.code === "NoSuchKey" ||
+    error?.name === "NoSuchKey" ||
+    error?.name === "NotFound" ||
+    error?.$metadata?.httpStatusCode === 404 ||
+    error?.statusCode === 404
+  );
+}
+
+async function bodyToBuffer(body) {
+  if (!body) {
+    return Buffer.alloc(0);
+  }
+  if (Buffer.isBuffer(body)) {
+    return body;
+  }
+  if (body instanceof Uint8Array) {
+    return Buffer.from(body);
+  }
+  if (typeof body === "string") {
+    return Buffer.from(body);
+  }
+  if (typeof body.transformToByteArray === "function") {
+    return Buffer.from(await body.transformToByteArray());
+  }
+  if (typeof body.arrayBuffer === "function") {
+    return Buffer.from(await body.arrayBuffer());
+  }
+  if (typeof body[Symbol.asyncIterator] === "function") {
+    const chunks = [];
+    for await (const chunk of body) {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    }
+    return Buffer.concat(chunks);
+  }
+
+  throw createStorageReadFailedError("Stored object body could not be read safely.");
 }
 
 export function assertStorageConfigured(overrides = {}) {
@@ -97,11 +156,7 @@ export async function putObject({ objectKey, body, contentType } = {}, overrides
     Body: body,
     ...(contentType ? { ContentType: contentType } : {}),
   });
-  const sender =
-    dependencies.sender ||
-    (typeof dependencies.client.send === "function"
-      ? (client, commandToSend) => client.send(commandToSend)
-      : null);
+  const sender = dependencies.sender || createDefaultSender(dependencies.client);
 
   if (!sender) {
     throw createStorageMethodNotImplementedError("putObject");
@@ -116,9 +171,62 @@ export async function putObject({ objectKey, body, contentType } = {}, overrides
   };
 }
 
-export async function deleteObject() {
-  void DeleteObjectCommand;
-  throw createStorageMethodNotImplementedError("deleteObject");
+export async function getObjectBuffer({ objectKey } = {}, overrides = {}) {
+  const dependencies = assertStorageConfigured(overrides);
+  const safeObjectKey = assertSafeReadableObjectKey({ objectKey });
+  const command = new GetObjectCommand({
+    Bucket: dependencies.bucket,
+    Key: safeObjectKey,
+  });
+  const sender = dependencies.sender || createDefaultSender(dependencies.client);
+
+  if (!sender) {
+    throw createStorageMethodNotImplementedError("getObjectBuffer");
+  }
+
+  try {
+    const result = await sender(dependencies.client, command);
+    return await bodyToBuffer(result?.Body);
+  } catch (error) {
+    if (isNotFoundStorageError(error)) {
+      throw createStorageObjectNotFoundError();
+    }
+    if (error?.code === "INVALID_STORAGE_KEY" || error?.code === "STORAGE_NOT_CONFIGURED") {
+      throw error;
+    }
+    throw createStorageReadFailedError();
+  }
+}
+
+export async function getObjectText({ objectKey, maxBytes } = {}, overrides = {}) {
+  const buffer = await getObjectBuffer({ objectKey }, overrides);
+  const limit = Number(maxBytes);
+  const readable = Number.isFinite(limit) && limit > 0 ? buffer.subarray(0, limit) : buffer;
+
+  return readable.toString("utf8");
+}
+
+export async function deleteObject({ objectKey } = {}, overrides = {}) {
+  const dependencies = assertStorageConfigured(overrides);
+  const safeObjectKey = assertSafeObjectKey(objectKey);
+  const command = new DeleteObjectCommand({
+    Bucket: dependencies.bucket,
+    Key: safeObjectKey,
+  });
+  const sender = dependencies.sender || createDefaultSender(dependencies.client);
+
+  if (!sender) {
+    throw createStorageMethodNotImplementedError("deleteObject");
+  }
+
+  const result = await sender(dependencies.client, command);
+
+  return {
+    objectKey: safeObjectKey,
+    deleted: true,
+    bucketConfigured: true,
+    requestId: result?.$metadata?.requestId || null,
+  };
 }
 
 export async function deleteObjectsByPrefix({ prefix } = {}, overrides = {}) {

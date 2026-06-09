@@ -43,6 +43,10 @@ test("document status DTO marks failed uploaded document downloadable but not se
     status: "failed",
     statusMessage: "Extraction failed.",
     lifecycleStatus: "active",
+    scope: "user",
+    sourceType: "upload",
+    readOnly: false,
+    storageProvider: "s3",
     objectKey: "demo-sessions/demo_123/uploads/upload_1/brief.md",
     contentStats: { chunkCount: 0 },
   });
@@ -50,4 +54,38 @@ test("document status DTO marks failed uploaded document downloadable but not se
   assert.equal(dto.downloadAvailable, true);
   assert.equal(dto.searchable, false);
   assert.equal(dto.attachable, false);
+  assert.equal(dto.retryAvailable, true);
+  assert.equal(dto.retryReason, null);
+});
+
+test("document status DTO reports safe retry reasons without storage internals", () => {
+  const generated = toDocumentStatusDto({
+    _id: "generated_1",
+    status: "failed",
+    lifecycleStatus: "active",
+    scope: "generated",
+    sourceType: "generated",
+    readOnly: false,
+    storageProvider: "s3",
+    objectKey: "demo-sessions/demo_123/generated/generated_1/brief.md",
+    contentStats: {},
+  });
+  const readyUpload = toDocumentStatusDto({
+    _id: "upload_1",
+    status: "ready",
+    lifecycleStatus: "active",
+    scope: "user",
+    sourceType: "upload",
+    readOnly: false,
+    storageProvider: "s3",
+    objectKey: "demo-sessions/demo_123/uploads/upload_1/brief.md",
+    contentStats: { chunkCount: 1 },
+  });
+
+  assert.equal(generated.retryAvailable, false);
+  assert.equal(generated.retryReason, "Only user uploaded documents can be retried.");
+  assert.equal(readyUpload.retryAvailable, false);
+  assert.equal(readyUpload.retryReason, "Ready upload documents require force=true to reprocess.");
+  assert.equal(JSON.stringify(generated).includes("demo-sessions/demo_123"), false);
+  assert.equal(JSON.stringify(readyUpload).includes("demo-sessions/demo_123"), false);
 });

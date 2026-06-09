@@ -15,8 +15,8 @@ const { createMemoryUploadDocumentRepository } = await import(
 );
 const { applyUsageDelta } = await import("../src/services/demo/demoUsage.service.js");
 
-function installUploadRouteDependencies({ sessionUsage = {}, processor = null } = {}) {
-  const repository = createMemoryUploadDocumentRepository();
+function installUploadRouteDependencies({ sessionUsage = {}, processor = null, documents = [] } = {}) {
+  const repository = createMemoryUploadDocumentRepository({ documents });
   const usageSession = {
     sessionId: "demo_123",
     expiresAt: "2026-06-12T00:00:00.000Z",
@@ -42,6 +42,7 @@ function installUploadRouteDependencies({ sessionUsage = {}, processor = null } 
       objectKey: `demo-sessions/${demoSessionId}/uploads/${documentId}/${filename}`,
       storageProvider: "s3",
     }),
+    storageReader: async () => Buffer.from("# Retried Brief"),
     processor:
       processor ||
       (async ({ document }) => ({
@@ -132,8 +133,32 @@ test("upload route returns JSON errors for missing, unsupported, oversized, and 
 });
 
 test("upload status route and retry route return safe responses", async () => {
+  let processorCalls = 0;
   const ctx = installUploadRouteDependencies({
     processor: async ({ document, repository }) => {
+      processorCalls += 1;
+      if (processorCalls > 1) {
+        const ready = await repository.updateUploadDocumentStatus({
+          documentId: document._id,
+          demoSessionId: "demo_123",
+          patch: {
+            status: "ready",
+            statusMessage: null,
+            contentStats: {
+              extractedCharCount: 15,
+              optimizedCharCount: 15,
+              estimatedTokenCount: 4,
+              chunkCount: 1,
+            },
+          },
+        });
+        return {
+          status: "completed",
+          document: ready,
+          statusSequence: ["extracting", "optimizing", "chunking", "embedding", "ready"],
+          warnings: [],
+        };
+      }
       const failed = await repository.updateUploadDocumentStatus({
         documentId: document._id,
         demoSessionId: "demo_123",
@@ -164,11 +189,70 @@ test("upload status route and retry route return safe responses", async () => {
   assert.equal(status.body.status, "failed");
   assert.equal(status.body.downloadAvailable, true);
   assert.equal(status.body.searchable, false);
+  assert.equal(status.body.attachable, false);
+  assert.equal(status.body.retryAvailable, true);
+  assert.equal(status.body.retryReason, null);
   assert.equal(ctx.repository._unsafeSnapshot().documents.length, 1);
 
   const retry = await request(app)
     .post(`/api/documents/${uploaded.body.document.id}/retry`)
     .set("x-demo-session-id", "demo_123")
+    .expect(200);
+  assert.equal(retry.body.status, "retried");
+  assert.equal(retry.body.document.status, "ready");
+  assert.equal(retry.body.document.searchable, true);
+  assert.equal("objectKey" in retry.body.document, false);
+});
+
+test("retry route returns JSON errors for missing, mock, generated, and trashed documents", async () => {
+  installUploadRouteDependencies({
+    documents: [
+      {
+        id: "generated_doc",
+        demoSessionId: "demo_123",
+        scope: "generated",
+        sourceType: "generated",
+        readOnly: false,
+        lifecycleStatus: "active",
+        status: "failed",
+        storageProvider: "s3",
+        objectKey: "demo-sessions/demo_123/generated/generated_doc/brief.md",
+      },
+      {
+        id: "trashed_upload",
+        demoSessionId: "demo_123",
+        scope: "user",
+        sourceType: "upload",
+        readOnly: false,
+        lifecycleStatus: "trashed",
+        status: "failed",
+        storageProvider: "s3",
+        objectKey: "demo-sessions/demo_123/uploads/trashed_upload/brief.md",
+      },
+    ],
+  });
+
+  const missing = await request(app)
+    .post("/api/documents/missing_doc/retry")
+    .set("x-demo-session-id", "demo_123")
+    .expect(404);
+  assert.equal(missing.body.error.code, "DOCUMENT_NOT_FOUND");
+
+  const generated = await request(app)
+    .post("/api/documents/generated_doc/retry")
+    .set("x-demo-session-id", "demo_123")
     .expect(409);
-  assert.equal(retry.body.error.code, "RETRY_NOT_AVAILABLE");
+  assert.equal(generated.body.error.code, "DOCUMENT_RETRY_UNSUPPORTED_SOURCE");
+
+  const trashed = await request(app)
+    .post("/api/documents/trashed_upload/retry")
+    .set("x-demo-session-id", "demo_123")
+    .expect(409);
+  assert.equal(trashed.body.error.code, "DOCUMENT_TRASHED");
+
+  const mock = await request(app)
+    .post("/api/documents/mock_doc_any/retry")
+    .set("x-demo-session-id", "demo_123")
+    .expect(404);
+  assert.equal(mock.body.error.code, "DOCUMENT_NOT_FOUND");
 });

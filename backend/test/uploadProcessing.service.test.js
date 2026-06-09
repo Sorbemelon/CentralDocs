@@ -132,3 +132,48 @@ test("upload processing failure marks failed safely and keeps object-backed down
   assert.equal(result.document.statusMessage.includes("SECRET"), false);
   assert.equal(result.warnings[0].code, "DOCUMENT_PROCESSING_FAILED");
 });
+
+test("upload retry processing can omit uploaded from status sequence", async () => {
+  const { repository, document } = uploadFixture();
+  await repository.createUploadDocumentRecord({ ...document, status: "failed" });
+
+  const result = await processUploadedDocument({
+    document: { ...document, status: "failed" },
+    uploadFile,
+    repository,
+    extractor: async () => ({
+      title: "Brief",
+      fileKind: "markdown",
+      originalFilename: "brief.md",
+      extractedText: "# Brief",
+      optimizedText: "# Brief",
+      textPreview: "# Brief",
+      sourceBlocks: [],
+      stats: {
+        extractedCharCount: 7,
+        optimizedCharCount: 7,
+        estimatedTokenCount: 2,
+      },
+      warnings: [],
+    }),
+    indexer: async () => ({
+      contentStats: {
+        extractedCharCount: 7,
+        optimizedCharCount: 7,
+        estimatedTokenCount: 2,
+        chunkCount: 1,
+      },
+      statusSequence: ["extracting", "optimizing", "chunking", "embedding", "ready"],
+      warnings: [],
+    }),
+    options: { includeUploadedStatus: false },
+  });
+
+  assert.deepEqual(result.statusSequence, [
+    "extracting",
+    "optimizing",
+    "chunking",
+    "embedding",
+    "ready",
+  ]);
+});
