@@ -1,4 +1,4 @@
-import { Check, CloudOff, Info, MessagesSquare, Search } from "lucide-react";
+import { Check, Info, MessagesSquare, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -149,18 +149,17 @@ function SearchPanelShell({ ws }) {
             maxLength={500}
           />
         </div>
-        <Button size="sm" onClick={() => search.runSearch()} disabled={!canSearch}>
+        <Button
+          size="sm"
+          onClick={() => search.runSearch()}
+          disabled={!canSearch}
+          title={offline ? "Backend is offline" : undefined}
+        >
           <Search /> Search
         </Button>
       </div>
 
       <ScopeChips scope={search.scope} onChange={search.setScope} />
-
-      {offline && (
-        <div className="flex items-center gap-1.5 rounded-md bg-warning-subtle px-2 py-1 text-[11px] text-warning-subtle-foreground">
-          <CloudOff className="size-3.5 shrink-0" /> Backend is offline. Search requires the backend.
-        </div>
-      )}
 
       {!offline && needsContext && (
         <div className="flex items-center gap-1.5 rounded-md bg-teal-subtle px-2 py-1 text-[11px] text-teal-subtle-foreground">

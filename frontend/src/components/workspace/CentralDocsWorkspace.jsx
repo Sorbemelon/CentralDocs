@@ -477,14 +477,52 @@ export default function CentralDocsWorkspace() {
     () => selection.docIds.map(getDocById).filter(Boolean),
     [selection.docIds, getDocById],
   );
-  // All documents in context: directly selected + those inside selected folders.
+  // Folder hierarchy (children grouped by parent id; unknown parents go to root).
+  const folderChildren = useMemo(() => {
+    const ids = new Set(folders.map((f) => f.id));
+    const map = new Map();
+    folders.forEach((f) => {
+      const key = f.parentFolderId && ids.has(f.parentFolderId) ? f.parentFolderId : null;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(f);
+    });
+    return map;
+  }, [folders]);
+
+  // Selecting a folder cascades to all descendant folders (display + context).
+  const effectiveFolderIds = useMemo(() => {
+    const set = new Set(selection.folderIds);
+    const walk = (id) => {
+      (folderChildren.get(id) || []).forEach((child) => {
+        if (!set.has(child.id)) {
+          set.add(child.id);
+          walk(child.id);
+        }
+      });
+    };
+    selection.folderIds.forEach(walk);
+    return set;
+  }, [selection.folderIds, folderChildren]);
+
+  // All documents in context: directly selected + those inside (effectively) selected folders.
   const contextDocIds = useMemo(() => {
     const set = new Set(selection.docIds);
     documents.forEach((d) => {
-      if (selection.folderIds.includes(d.folderId)) set.add(d.id);
+      if (effectiveFolderIds.has(d.folderId)) set.add(d.id);
     });
     return Array.from(set);
-  }, [selection.docIds, selection.folderIds, documents]);
+  }, [selection.docIds, effectiveFolderIds, documents]);
+
+  // Display-level selection: true when ticked directly OR included via a selected folder.
+  const isEffectivelySelected = useCallback(
+    (kind, id) => {
+      if (kind === "folder") return effectiveFolderIds.has(id);
+      if (selection.docIds.includes(id)) return true;
+      const doc = documents.find((d) => d.id === id);
+      return doc ? effectiveFolderIds.has(doc.folderId) : false;
+    },
+    [effectiveFolderIds, selection.docIds, documents],
+  );
 
   const counts = useMemo(
     () => ({
@@ -521,6 +559,9 @@ export default function CentralDocsWorkspace() {
     selectedFolders,
     selectedDocs,
     contextDocIds,
+    folderChildren,
+    effectiveFolderIds,
+    isEffectivelySelected,
     counts,
     hasContext,
 

@@ -67,24 +67,29 @@ function SourceUploadCard({ ws, className }) {
         onChange={onFileChange}
       />
 
-      <div className="flex items-center gap-2">
-        <span className="inline-flex size-6 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+      <div className="flex items-start gap-2">
+        <span className="mt-0.5 inline-flex size-6 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
           <Upload className="size-3.5" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-[12px] font-semibold leading-tight text-foreground">Upload</p>
-          <p className="truncate text-[10px] leading-tight text-muted-foreground" title={UPLOAD_COPY.sizeCaps}>
-            {UPLOAD_ALLOWED_LABEL} · one at a time{offline ? " · needs backend" : ""}
+          <p className="text-[12px] font-semibold leading-tight text-foreground">Upload File</p>
+          <p className="text-[10px] leading-snug text-muted-foreground">
+            {UPLOAD_ALLOWED_LABEL} · one at a time · {UPLOAD_COPY.sizeCaps}
           </p>
         </div>
         {file ? (
-          <Button size="xs" onClick={handleUpload} disabled={!canUpload}>
+          <Button
+            size="xs"
+            onClick={handleUpload}
+            disabled={!canUpload}
+            title={offline ? "Backend is offline" : undefined}
+          >
             {uploading ? <Loader2 className="animate-spin" /> : <Upload />}
             {uploading ? "Uploading" : "Upload"}
           </Button>
         ) : (
-          <Button size="xs" variant="secondary" onClick={pickFile} disabled={uploading || offline} title={offline ? "Backend is offline" : undefined}>
-            <Paperclip /> Choose
+          <Button size="xs" variant="secondary" onClick={pickFile} disabled={uploading}>
+            <Paperclip /> Browse
           </Button>
         )}
       </div>

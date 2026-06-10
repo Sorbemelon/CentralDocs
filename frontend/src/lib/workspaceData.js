@@ -55,6 +55,7 @@ export function normalizeFolder(dto = {}) {
   return {
     id: dto.id,
     name: dto.name,
+    parentFolderId: dto.parentFolderId || null,
     source: isMock ? SOURCE_KIND.mock : SOURCE_KIND.uploaded,
     readOnly: dto.readOnly === true,
     group: isMock ? "demo" : "user",
@@ -398,7 +399,10 @@ export function normalizeChatMessage(dto = {}) {
     content: dto.content || "",
     status: dto.status || null,
     createdAt: dto.createdAt || null,
-    contextDocTitles: contextDocs.map((d) => d.title || d.originalFilename || "Untitled").filter(Boolean),
+    contextDocs: contextDocs.map((d) => ({
+      title: d.title || d.originalFilename || "Untitled",
+      folderName: d.folderName || null,
+    })),
     attachedFolderNames: attachedFolders.map((f) => f.name || f.title || "").filter(Boolean),
     references: (dto.referencesUsed || []).map(normalizeReference),
     aiMeta: meta

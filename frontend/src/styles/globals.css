@@ -123,15 +123,20 @@
   }
 }
 
-/* Landing backdrop: layered blue/teal radial glows on a softly tinted base.
+/* Landing backdrop: layered blue/teal radial glows over a tinted slate→teal wash.
    Uses theme vars so it adapts to dark mode; restrained, no purple AI gradient. */
 .landing-bg {
   background-color: var(--background);
   background-image:
-    radial-gradient(56rem 38rem at -8% -14%, color-mix(in oklab, var(--primary) 10%, transparent), transparent 62%),
-    radial-gradient(50rem 34rem at 108% 114%, color-mix(in oklab, var(--teal) 13%, transparent), transparent 62%),
-    radial-gradient(34rem 24rem at 86% -6%, color-mix(in oklab, var(--success) 7%, transparent), transparent 60%),
-    linear-gradient(to bottom, color-mix(in oklab, var(--secondary) 65%, transparent), transparent 38%);
+    radial-gradient(60rem 40rem at -10% -16%, color-mix(in oklab, var(--primary) 16%, transparent), transparent 64%),
+    radial-gradient(52rem 36rem at 110% 116%, color-mix(in oklab, var(--teal) 20%, transparent), transparent 64%),
+    radial-gradient(36rem 26rem at 88% -8%, color-mix(in oklab, var(--success) 11%, transparent), transparent 62%),
+    radial-gradient(42rem 30rem at -8% 112%, color-mix(in oklab, var(--primary) 10%, transparent), transparent 60%),
+    linear-gradient(
+      to bottom,
+      color-mix(in oklab, var(--secondary) 85%, transparent),
+      color-mix(in oklab, var(--teal-subtle) 40%, transparent)
+    );
 }
 
 @media (prefers-reduced-motion: reduce) {

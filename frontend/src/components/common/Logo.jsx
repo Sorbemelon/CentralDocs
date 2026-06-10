@@ -4,8 +4,8 @@ const ICON_SRC = "/brand/centraldocs_icon_light_transparent.png";
 
 const SIZES = {
   sm: { icon: "size-6", text: "text-sm" },
-  md: { icon: "size-8", text: "text-lg" },
-  lg: { icon: "size-10", text: "text-2xl" },
+  md: { icon: "size-9", text: "text-xl" },
+  lg: { icon: "size-11", text: "text-2xl" },
   xl: { icon: "size-16", text: "text-4xl" },
 };
 

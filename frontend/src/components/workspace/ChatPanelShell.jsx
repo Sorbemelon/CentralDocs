@@ -9,8 +9,23 @@ import { DEMO_LIMITS } from "@/lib/constants";
 import { CHAT_SAMPLE_QUESTIONS } from "@/data/demoCopy";
 
 function UserMessage({ message }) {
-  const docs = message.contextDocTitles || [];
+  const docs = message.contextDocs || [];
   const folders = message.attachedFolderNames || [];
+  // Group document names under their folder (folders the user selected first).
+  const grouped = new Map();
+  const loose = [];
+  docs.forEach((d) => {
+    if (d.folderName) {
+      if (!grouped.has(d.folderName)) grouped.set(d.folderName, []);
+      grouped.get(d.folderName).push(d.title);
+    } else {
+      loose.push(d.title);
+    }
+  });
+  folders.forEach((name) => {
+    if (!grouped.has(name)) grouped.set(name, []);
+  });
+
   return (
     <div className="flex flex-col items-end gap-1">
       <div className="max-w-[80%] whitespace-pre-wrap rounded-lg rounded-br-sm bg-primary px-3 py-2 text-sm text-primary-foreground">
@@ -22,19 +37,27 @@ function UserMessage({ message }) {
             <AccordionTrigger className="text-[11px] text-muted-foreground">
               Documents used: {docs.length}
             </AccordionTrigger>
-            <AccordionContent className="flex flex-col gap-1 rounded-md border border-border bg-card p-2 text-[12px]">
-              {docs.map((title) => (
+            <AccordionContent className="flex flex-col gap-0.5 rounded-md border border-border bg-card p-2 text-[12px]">
+              {[...grouped.entries()].map(([folderName, titles]) => (
+                <div key={folderName} className="flex flex-col gap-0.5">
+                  <p className="flex items-center gap-1.5 font-medium text-foreground">
+                    <Folder className="size-3 shrink-0 text-teal" />
+                    <span className="min-w-0 truncate">{folderName}</span>
+                  </p>
+                  {titles.map((title) => (
+                    <p key={title} className="ml-2.5 flex items-center gap-1.5 border-l border-border pl-2 text-foreground">
+                      <FileText className="size-3 shrink-0 text-primary" />
+                      <span className="min-w-0 truncate">{title}</span>
+                    </p>
+                  ))}
+                </div>
+              ))}
+              {loose.map((title) => (
                 <p key={title} className="flex items-center gap-1.5 text-foreground">
                   <FileText className="size-3 shrink-0 text-primary" />
                   <span className="min-w-0 truncate">{title}</span>
                 </p>
               ))}
-              {folders.length > 0 && (
-                <p className="flex items-center gap-1.5 pt-0.5 text-[11px] text-muted-foreground">
-                  <Folder className="size-3 shrink-0" />
-                  From {folders.length === 1 ? "folder" : "folders"}: {folders.join(", ")}
-                </p>
-              )}
             </AccordionContent>
           </AccordionItem>
         </Accordion>
@@ -194,17 +217,14 @@ function ChatPanelShell({ ws }) {
             placeholder="Ask about selected documents..."
             aria-label="Chat prompt"
             className="min-h-0 resize-none border-0 bg-transparent p-1 shadow-none focus-visible:ring-0"
-            disabled={offline || noRealChat}
           />
           <div className="flex items-center justify-between gap-2 pt-1">
             <span className="text-[11px] text-muted-foreground">
-              {offline
-                ? "Backend is offline. Sending requires the backend."
-                : noRealChat
-                  ? "Start or select a saved chat to send."
-                  : !ws.hasContext
-                    ? "Tick a document or folder in Sources first."
-                    : `Prompt limit ${DEMO_LIMITS.promptLength.toLocaleString()} chars`}
+              {noRealChat
+                ? "Start or select a saved chat to send."
+                : !ws.hasContext
+                  ? "Tick a document or folder in Sources first."
+                  : `Prompt limit ${DEMO_LIMITS.promptLength.toLocaleString()} chars`}
             </span>
             <div className="flex items-center gap-2">
               {showCount && (
@@ -212,7 +232,12 @@ function ChatPanelShell({ ws }) {
                   {draft.length}/{DEMO_LIMITS.promptLength}
                 </span>
               )}
-              <Button size="sm" onClick={() => chat.sendMessage()} disabled={!canSend}>
+              <Button
+                size="sm"
+                onClick={() => chat.sendMessage()}
+                disabled={!canSend}
+                title={offline ? "Backend is offline" : undefined}
+              >
                 {chat.isSending ? <Loader2 className="animate-spin" /> : <Send />} Send
               </Button>
             </div>

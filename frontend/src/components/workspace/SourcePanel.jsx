@@ -1,4 +1,4 @@
-import { CloudOff, FolderOpen, FolderPlus, RotateCcw } from "lucide-react";
+import { FolderOpen, RotateCcw } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { IconButton } from "@/components/common/IconButton";
@@ -87,17 +87,8 @@ function SourcePanel({ ws, className }) {
           <FolderOpen className="size-4 text-primary" /> Sources
           <Badge variant="muted" className="px-1 py-0 text-[10px] tabular-nums">{ws.data.documents.length}</Badge>
         </h2>
-        <div className="flex items-center gap-1">
-          <Segmented value={ws.sourceFilter} onChange={ws.setSourceFilter} />
-          <IconButton icon={FolderPlus} label="New folder" size="icon-xs" onClick={() => ws.createFolder()} />
-        </div>
+        <Segmented value={ws.sourceFilter} onChange={ws.setSourceFilter} />
       </div>
-
-      {!ws.online && (
-        <p className="mx-2.5 mb-1 flex items-center gap-1 text-[10px] text-warning-subtle-foreground">
-          <CloudOff className="size-3 shrink-0" /> Offline — showing demo data.
-        </p>
-      )}
 
       <ScrollArea className="flex-1 px-1.5 pb-2">
         {loading ? (
