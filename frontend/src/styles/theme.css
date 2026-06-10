@@ -67,13 +67,18 @@
   --input: oklch(0.9 0.006 247);
   --ring: oklch(0.47 0.123 258);
 
-  /* Secondary neutral layer for sidebar/toolbars (cooler than content) */
-  --sidebar: oklch(0.975 0.005 247);
+  /* Secondary neutral layer for the LEFT sidebar (blue-slate, cooler than content) */
+  --sidebar: oklch(0.967 0.009 252);
   --sidebar-foreground: oklch(0.24 0.024 257);
-  --sidebar-border: oklch(0.91 0.006 247);
-  --sidebar-accent: oklch(0.95 0.012 245);
+  --sidebar-border: oklch(0.9 0.012 250);
+  --sidebar-accent: oklch(0.945 0.016 250);
   --sidebar-accent-foreground: oklch(0.4 0.07 258);
   --sidebar-ring: oklch(0.47 0.123 258);
+
+  /* Support layer for the RIGHT context panel (teal-slate: evidence/status, not work) */
+  --panel: oklch(0.972 0.009 210);
+  --panel-foreground: oklch(0.24 0.024 257);
+  --panel-border: oklch(0.9 0.014 212);
 
   --radius: 0.625rem;
 }
@@ -124,10 +129,14 @@
   --input: oklch(0.34 0.02 257);
   --ring: oklch(0.7 0.12 256);
 
-  --sidebar: oklch(0.18 0.018 257);
+  --sidebar: oklch(0.178 0.02 255);
   --sidebar-foreground: oklch(0.95 0.005 247);
-  --sidebar-border: oklch(0.3 0.02 257);
-  --sidebar-accent: oklch(0.3 0.022 257);
+  --sidebar-border: oklch(0.3 0.022 255);
+  --sidebar-accent: oklch(0.3 0.024 255);
   --sidebar-accent-foreground: oklch(0.92 0.01 247);
   --sidebar-ring: oklch(0.7 0.12 256);
+
+  --panel: oklch(0.19 0.018 225);
+  --panel-foreground: oklch(0.95 0.005 247);
+  --panel-border: oklch(0.3 0.024 222);
 }

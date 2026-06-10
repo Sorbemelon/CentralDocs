@@ -1,10 +1,12 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import {
+  ArrowDown,
   ArrowRight,
   Database,
   FileText,
+  ListOrdered,
   Loader2,
   MessagesSquare,
   Search,
@@ -16,7 +18,7 @@ import { ThemeToggle } from "@/components/common/ThemeToggle";
 import { BackendStatusBadge } from "@/components/common/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useBackendStatus } from "@/lib/useBackendStatus";
 import {
   ARCHITECTURE,
@@ -29,44 +31,48 @@ import {
 import { warmBackend } from "@/services/healthApi";
 import { bootstrapDemo, createOrResumeSession } from "@/services/demoApi";
 
-const CAPABILITY_ICONS = [FileText, Search, MessagesSquare, Sparkles];
+const CAPABILITIES = [
+  { icon: FileText, label: "Document management" },
+  { icon: Search, label: "Semantic search" },
+  { icon: MessagesSquare, label: "Grounded chat with references" },
+  { icon: Sparkles, label: "Generated documents" },
+];
 
-function NavLinkA({ href, children }) {
+function ArchIcon({ role }) {
+  const Icon =
+    role === "Files" || role === "Metadata" ? Database : role === "API" ? Server : role === "Frontend" ? FileText : Sparkles;
   return (
-    <a href={href} className="hidden text-sm text-muted-foreground transition-colors hover:text-foreground sm:inline">
-      {children}
-    </a>
+    <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary [&_svg]:size-4">
+      <Icon />
+    </span>
   );
 }
 
+/**
+ * Compact one-viewport landing: hero + CTA on the left, a tabbed info card
+ * (Demo Flow / Architecture / Questions / Limits) on the right. Desktop fits
+ * 100dvh; small screens stack and scroll naturally.
+ */
 function LandingPage() {
   const navigate = useNavigate();
-  const { status, check } = useBackendStatus({ auto: true });
+  const { status } = useBackendStatus({ auto: true });
   const [launching, setLaunching] = useState(false);
+  const [infoTab, setInfoTab] = useState("flow");
 
   // Best-effort warm/session/bootstrap, then enter the workspace either way.
   const launchDemo = async () => {
     setLaunching(true);
     try {
-      await check({ warm: true });
-    } catch {
-      /* ignore */
-    }
-    try {
       await warmBackend();
     } catch {
-      /* ignore */
+      /* warm is best-effort */
     }
     try {
       await createOrResumeSession();
-    } catch {
-      /* ignore */
-    }
-    try {
       await bootstrapDemo();
     } catch {
       toast("Starting in offline mode", {
-        description: "The backend is cold or unavailable; the workspace shell will still load.",
+        description: "The backend is cold or unavailable; the workspace will show demo data.",
       });
     }
     setLaunching(false);
@@ -74,175 +80,148 @@ function LandingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <header className="sticky top-0 z-20 border-b border-border bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/70">
-        <div className="mx-auto flex h-14 max-w-5xl items-center gap-4 px-4">
+    <div className="flex min-h-dvh flex-col bg-background text-foreground lg:h-dvh lg:overflow-hidden">
+      <header className="shrink-0 border-b border-border bg-card/80">
+        <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-3 px-4">
           <Logo size="sm" />
-          <nav className="ml-auto flex items-center gap-4">
-            <NavLinkA href="#project">Project</NavLinkA>
-            <NavLinkA href="#architecture">Architecture</NavLinkA>
-            <NavLinkA href="#guide">Demo Guide</NavLinkA>
+          <div className="ml-auto flex items-center gap-2">
+            <BackendStatusBadge status={status} className="hidden sm:inline-flex" />
             <ThemeToggle />
             <Button size="sm" onClick={launchDemo} disabled={launching}>
               {launching ? <Loader2 className="animate-spin" /> : null}
               Launch Demo
             </Button>
-          </nav>
+          </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-5xl px-4">
-        {/* Hero */}
-        <section className="flex flex-col items-start gap-4 py-12 md:py-16">
-          <BackendStatusBadge status={status} />
-          <h1 className="text-3xl font-semibold tracking-tight text-balance md:text-5xl">{HERO.name}</h1>
-          <p className="text-lg font-medium text-primary md:text-xl">{HERO.tagline}</p>
-          <p className="max-w-[60ch] text-sm text-muted-foreground md:text-base">{HERO.description}</p>
-          <div className="flex flex-wrap items-center gap-2 pt-1">
-            <Button size="lg" onClick={launchDemo} disabled={launching}>
-              {launching ? <Loader2 className="animate-spin" /> : <Sparkles />}
-              Launch Demo Workspace
-            </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              onClick={() => document.getElementById("guide")?.scrollIntoView({ behavior: "smooth" })}
-            >
-              View Demo Flow <ArrowRight />
-            </Button>
-          </div>
-        </section>
+      <main className="mx-auto flex w-full max-w-6xl flex-1 items-center px-4 py-8 lg:min-h-0 lg:overflow-y-auto lg:py-4">
+        <div className="grid w-full items-center gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:gap-12">
+          {/* Hero */}
+          <section className="flex flex-col items-start gap-4">
+            <BackendStatusBadge status={status} className="sm:hidden" />
+            <div>
+              <h1 className="text-4xl font-semibold tracking-tight text-balance md:text-5xl">{HERO.name}</h1>
+              <p className="mt-2 text-lg font-medium text-primary">{HERO.tagline}</p>
+              <p className="mt-2 max-w-[58ch] text-sm leading-relaxed text-muted-foreground md:text-[15px]">
+                {HERO.description}
+              </p>
+            </div>
 
-        <Separator />
+            <div className="flex w-full max-w-md flex-col gap-1.5 rounded-lg border border-border bg-card p-3 text-[13px]">
+              <p className="flex items-center gap-2">
+                <Badge variant="muted" className="w-18 justify-center">Problem</Badge>
+                <span className="min-w-0 truncate text-muted-foreground">{PROBLEM_SOLUTION.problem.title}</span>
+              </p>
+              <p className="flex items-center gap-2">
+                <Badge variant="success" className="w-18 justify-center">Solution</Badge>
+                <span className="min-w-0 truncate text-foreground">{PROBLEM_SOLUTION.solution.title}</span>
+              </p>
+            </div>
 
-        {/* Problem / Solution */}
-        <section id="project" className="grid gap-4 py-10 md:grid-cols-2">
-          <div className="rounded-lg border border-border bg-card p-4">
-            <Badge variant="muted" className="mb-2">Problem</Badge>
-            <h2 className="text-base font-semibold">{PROBLEM_SOLUTION.problem.title}</h2>
-            <p className="mt-1 text-sm text-muted-foreground">{PROBLEM_SOLUTION.problem.body}</p>
-          </div>
-          <div className="rounded-lg border border-border bg-card p-4">
-            <Badge variant="success" className="mb-2">Solution</Badge>
-            <h2 className="text-base font-semibold">{PROBLEM_SOLUTION.solution.title}</h2>
-            <p className="mt-1 text-sm text-muted-foreground">{PROBLEM_SOLUTION.solution.body}</p>
-          </div>
-        </section>
-
-        {/* Capabilities */}
-        <section className="grid gap-3 pb-10 sm:grid-cols-2 lg:grid-cols-4">
-          {[
-            { t: "Document management", d: "Folders, types, statuses, and trash in one compact panel." },
-            { t: "Semantic search", d: "Find by meaning across selected sources, not just keywords." },
-            { t: "Grounded chat", d: "Answers cite the documents you attached, with references." },
-            { t: "Generated documents", d: "Turn a useful chat into a downloadable document." },
-          ].map((c, i) => {
-            const Icon = CAPABILITY_ICONS[i];
-            return (
-              <div key={c.t} className="rounded-lg border border-border bg-card p-3">
-                <span className="inline-flex size-8 items-center justify-center rounded-md bg-primary/10 text-primary [&_svg]:size-4">
-                  <Icon />
-                </span>
-                <h3 className="mt-2 text-sm font-semibold">{c.t}</h3>
-                <p className="mt-0.5 text-xs text-muted-foreground">{c.d}</p>
-              </div>
-            );
-          })}
-        </section>
-
-        <Separator />
-
-        {/* Architecture */}
-        <section id="architecture" className="py-10">
-          <h2 className="text-base font-semibold">Architecture</h2>
-          <p className="mt-1 text-sm text-muted-foreground">A simple, deployable path from browser to AI.</p>
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            {ARCHITECTURE.map((node, i) => (
-              <div key={node.label} className="flex items-center gap-2">
-                <div className="flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2">
-                  <ArchIcon role={node.role} />
-                  <div>
-                    <p className="text-[13px] font-medium leading-tight">{node.label}</p>
-                    <p className="text-[11px] text-muted-foreground">{node.role}</p>
-                  </div>
-                </div>
-                {i < ARCHITECTURE.length - 1 && <ArrowRight className="size-4 text-muted-foreground" />}
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <Separator />
-
-        {/* Demo guide + sample questions */}
-        <section id="guide" className="grid gap-6 py-10 md:grid-cols-2">
-          <div>
-            <h2 className="text-base font-semibold">Core demo flow</h2>
-            <ol className="mt-3 flex flex-col gap-2">
-              {DEMO_FLOW.map((step, i) => (
-                <li key={step} className="flex items-start gap-2.5 text-sm">
-                  <span className="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground">
-                    {i + 1}
+            <ul className="grid w-full max-w-md grid-cols-1 gap-x-4 gap-y-1.5 sm:grid-cols-2">
+              {CAPABILITIES.map(({ icon: Icon, label }) => (
+                <li key={label} className="flex items-center gap-2 text-[13px] text-foreground">
+                  <span className="inline-flex size-6 shrink-0 items-center justify-center rounded-md bg-teal-subtle text-teal-subtle-foreground [&_svg]:size-3.5">
+                    <Icon />
                   </span>
-                  {step}
+                  {label}
                 </li>
               ))}
-            </ol>
-          </div>
-          <div>
-            <h2 className="text-base font-semibold">Sample questions</h2>
-            <div className="mt-3 flex flex-col gap-1.5">
-              {SAMPLE_QUESTIONS.map((q) => (
-                <div key={q} className="rounded-md border border-border bg-card px-3 py-2 text-sm text-muted-foreground">
-                  {q}
-                </div>
-              ))}
+            </ul>
+
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <Button size="lg" onClick={launchDemo} disabled={launching}>
+                {launching ? <Loader2 className="animate-spin" /> : <Sparkles />}
+                Launch Demo Workspace
+              </Button>
+              <Button size="lg" variant="outline" onClick={() => setInfoTab("flow")}>
+                View Demo Flow <ArrowRight />
+              </Button>
             </div>
-          </div>
-        </section>
+            <p className="text-xs text-muted-foreground">
+              No account needed · anonymous 3-day demo session · mock data included
+            </p>
+          </section>
 
-        <Separator />
+          {/* Tabbed info card */}
+          <section className="rounded-xl border border-border bg-card p-3 shadow-sm">
+            <Tabs value={infoTab} onValueChange={setInfoTab} className="gap-3">
+              <TabsList className="w-full">
+                <TabsTrigger value="flow" className="flex-1 justify-center px-2">Demo Flow</TabsTrigger>
+                <TabsTrigger value="arch" className="flex-1 justify-center px-2">Architecture</TabsTrigger>
+                <TabsTrigger value="questions" className="flex-1 justify-center px-2">Questions</TabsTrigger>
+                <TabsTrigger value="limits" className="flex-1 justify-center px-2">Limits</TabsTrigger>
+              </TabsList>
 
-        {/* Demo limits */}
-        <section className="py-10">
-          <h2 className="text-base font-semibold">Demo limits</h2>
-          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {DEMO_LIMITS_SUMMARY.map((l) => (
-              <div key={l.label} className="rounded-md border border-border bg-card px-3 py-2">
-                <p className="text-[11px] text-muted-foreground">{l.label}</p>
-                <p className="text-sm font-semibold tabular-nums">{l.value}</p>
+              <div className="min-h-76 px-1 pb-1">
+                <TabsContent value="flow">
+                  <p className="mb-2.5 text-xs text-muted-foreground">Five steps from sources to a downloadable document.</p>
+                  <ol className="flex flex-col gap-2">
+                    {DEMO_FLOW.map((step, i) => (
+                      <li key={step} className="flex items-center gap-2.5 rounded-md border border-border bg-background px-2.5 py-2 text-sm">
+                        <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground">
+                          {i + 1}
+                        </span>
+                        {step}
+                      </li>
+                    ))}
+                  </ol>
+                </TabsContent>
+
+                <TabsContent value="arch">
+                  <p className="mb-2.5 text-xs text-muted-foreground">A simple, deployable path from browser to AI.</p>
+                  <div className="flex flex-col items-stretch gap-1">
+                    {ARCHITECTURE.map((node, i) => (
+                      <div key={node.label} className="flex flex-col items-center gap-1">
+                        <div className="flex w-full items-center gap-2.5 rounded-md border border-border bg-background px-2.5 py-1.5">
+                          <ArchIcon role={node.role} />
+                          <p className="text-[13px] font-medium">{node.label}</p>
+                          <p className="ml-auto text-[11px] text-muted-foreground">{node.role}</p>
+                        </div>
+                        {i < ARCHITECTURE.length - 1 && <ArrowDown className="size-3.5 text-muted-foreground/70" />}
+                      </div>
+                    ))}
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="questions">
+                  <p className="mb-2.5 text-xs text-muted-foreground">Try these against the built-in Orchid Retail demo documents.</p>
+                  <div className="flex flex-col gap-1.5">
+                    {SAMPLE_QUESTIONS.map((q) => (
+                      <p key={q} className="rounded-md border border-border bg-background px-2.5 py-2 text-[13px] text-foreground">
+                        {q}
+                      </p>
+                    ))}
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="limits">
+                  <p className="mb-2.5 text-xs text-muted-foreground">Each anonymous demo session is capped to keep the demo fair.</p>
+                  <div className="flex flex-col gap-1">
+                    {DEMO_LIMITS_SUMMARY.map((l) => (
+                      <div key={l.label} className="flex items-center justify-between rounded-md border border-border bg-background px-2.5 py-1.5 text-[13px]">
+                        <span className="text-muted-foreground">{l.label}</span>
+                        <span className="font-medium tabular-nums">{l.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </TabsContent>
               </div>
-            ))}
-          </div>
-        </section>
-
-        {/* CTA footer */}
-        <section className="flex flex-col items-center gap-3 rounded-lg border border-border bg-card px-4 py-10 text-center">
-          <h2 className="text-xl font-semibold">Explore the workspace</h2>
-          <p className="max-w-[48ch] text-sm text-muted-foreground">
-            No account needed. Launch the demo and try documents, search, grounded chat, and generated documents.
-          </p>
-          <Button size="lg" onClick={launchDemo} disabled={launching}>
-            {launching ? <Loader2 className="animate-spin" /> : <Sparkles />}
-            Launch Demo Workspace
-          </Button>
-        </section>
-
-        <footer className="flex items-center justify-between gap-2 py-6 text-xs text-muted-foreground">
-          <Logo size="sm" withName />
-          <span>Tech: React · Vite · Tailwind · Express · MongoDB · S3 · Gemini</span>
-        </footer>
+            </Tabs>
+          </section>
+        </div>
       </main>
-    </div>
-  );
-}
 
-function ArchIcon({ role }) {
-  const Icon = role === "Files" ? Database : role === "Metadata" ? Database : role === "API" ? Server : role === "AI / embeddings" ? Sparkles : FileText;
-  return (
-    <span className="inline-flex size-7 items-center justify-center rounded-md bg-muted text-muted-foreground [&_svg]:size-4">
-      <Icon />
-    </span>
+      <footer className="shrink-0 border-t border-border">
+        <div className="mx-auto flex h-11 w-full max-w-6xl items-center justify-between gap-2 px-4 text-xs text-muted-foreground">
+          <span className="inline-flex items-center gap-1.5">
+            <ListOrdered className="size-3.5" /> Demo project · Orchid Retail story
+          </span>
+          <span className="truncate">React · Vite · Tailwind · Express · MongoDB · S3 · Gemini</span>
+        </div>
+      </footer>
+    </div>
   );
 }
 

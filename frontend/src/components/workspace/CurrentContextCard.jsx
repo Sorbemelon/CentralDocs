@@ -5,10 +5,18 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { cn } from "@/lib/cn";
 
 function CountStat({ label, value }) {
+  const active = value > 0;
   return (
-    <div className="flex flex-col items-center rounded-md bg-muted px-2 py-1.5">
-      <span className="text-sm font-semibold tabular-nums text-foreground">{value}</span>
-      <span className="text-[10px] text-muted-foreground">{label}</span>
+    <div
+      className={cn(
+        "flex flex-col items-center rounded-md px-2 py-1.5",
+        active ? "bg-teal-subtle" : "bg-muted",
+      )}
+    >
+      <span className={cn("text-sm font-semibold tabular-nums", active ? "text-teal-subtle-foreground" : "text-foreground")}>
+        {value}
+      </span>
+      <span className={cn("text-[10px]", active ? "text-teal-subtle-foreground/80" : "text-muted-foreground")}>{label}</span>
     </div>
   );
 }

@@ -50,8 +50,8 @@ function TabsTrigger({ value, className, children, ...props }) {
       className={cn(
         "inline-flex items-center gap-1.5 rounded-[6px] px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         selected
-          ? "bg-card text-foreground shadow-sm"
-          : "text-muted-foreground hover:text-foreground",
+          ? "bg-primary text-primary-foreground shadow-sm"
+          : "text-muted-foreground hover:bg-card/70 hover:text-foreground",
         className,
       )}
       {...props}

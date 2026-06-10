@@ -14,7 +14,7 @@ function ChatRow({ ws, chat }) {
     <div
       className={cn(
         "group flex items-center gap-2 rounded-md border border-transparent px-2 py-1.5 transition-colors",
-        active ? "border-border bg-accent text-accent-foreground" : "hover:bg-accent/60",
+        active ? "border-primary/30 bg-primary/10" : "hover:bg-accent/60",
       )}
     >
       <button
@@ -57,9 +57,11 @@ function ChatRow({ ws, chat }) {
 function ChatSessionList({ ws, className }) {
   return (
     <section className={cn("flex min-h-0 flex-col", className)}>
-      <div className="flex items-center justify-between gap-2 px-3 pb-2 pt-2">
+      <div className="mx-2 mb-1 mt-2 flex items-center justify-between gap-2 rounded-md bg-sidebar-accent px-2 py-1.5">
         <div className="flex items-center gap-2">
-          <h2 className="text-sm font-semibold tracking-tight">Chats</h2>
+          <h2 className="flex items-center gap-1.5 text-sm font-semibold tracking-tight">
+            <MessageSquareText className="size-4 text-teal" /> Chats
+          </h2>
           <Badge variant="muted">{ws.chats.length}</Badge>
         </div>
         <Button size="xs" variant="secondary" onClick={ws.newChat}>

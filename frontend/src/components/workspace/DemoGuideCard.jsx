@@ -1,7 +1,13 @@
+import { MessageSquarePlus } from "lucide-react";
 import { DEMO_FLOW, SAMPLE_QUESTIONS } from "@/data/demoCopy";
 
-/** Compact demo instructions + sample questions. */
+/** Compact demo instructions + sample questions that prefill the chat draft. */
 function DemoGuideCard({ ws }) {
+  const askInChat = (q) => {
+    ws.chat.prefillDraftFromSearch(q);
+    ws.setActiveTab("chat");
+  };
+
   return (
     <div className="flex flex-col gap-2.5">
       <ol className="flex flex-col gap-1">
@@ -17,16 +23,18 @@ function DemoGuideCard({ ws }) {
 
       <div>
         <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Sample questions
+          Sample questions · click to ask in chat
         </p>
         <div className="flex flex-col gap-1">
           {SAMPLE_QUESTIONS.map((q) => (
             <button
               key={q}
               type="button"
-              onClick={() => ws.notifyDeferred("Ask sample question")}
-              className="rounded-md border border-border bg-card/60 px-2 py-1 text-left text-[12px] text-foreground transition-colors hover:border-primary/40 hover:bg-accent/60"
+              onClick={() => askInChat(q)}
+              title="Prefill this question in the Chat tab"
+              className="group flex items-start gap-1.5 rounded-md border border-border bg-background px-2 py-1 text-left text-[12px] text-foreground transition-colors hover:border-teal/40 hover:bg-teal-subtle/40"
             >
+              <MessageSquarePlus className="mt-0.5 size-3 shrink-0 text-muted-foreground group-hover:text-teal" />
               {q}
             </button>
           ))}

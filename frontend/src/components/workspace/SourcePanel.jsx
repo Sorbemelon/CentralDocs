@@ -1,4 +1,4 @@
-import { CloudOff, FolderPlus, RotateCcw } from "lucide-react";
+import { CloudOff, FolderOpen, FolderPlus, RotateCcw } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { IconButton } from "@/components/common/IconButton";
@@ -82,7 +82,9 @@ function SourcePanel({ ws, className }) {
   return (
     <section className={cn("flex min-h-0 flex-col", className)}>
       <div className="flex items-center justify-between gap-2 px-3 pt-3">
-        <h2 className="text-sm font-semibold tracking-tight">Sources</h2>
+        <h2 className="flex items-center gap-1.5 text-sm font-semibold tracking-tight">
+          <FolderOpen className="size-4 text-primary" /> Sources
+        </h2>
         <IconButton icon={FolderPlus} label="Create folder" onClick={ws.createFolder} />
       </div>
 

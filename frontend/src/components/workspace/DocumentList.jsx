@@ -76,7 +76,7 @@ export function DocumentRow({ ws, doc }) {
     <div
       className={cn(
         "group flex items-center gap-2 rounded-md border border-transparent px-2 py-1.5 transition-colors hover:bg-accent/60",
-        selected && "border-border bg-accent/40",
+        selected && "border-teal/35 bg-teal-subtle/60",
       )}
     >
       <Icon className="size-4 shrink-0 text-muted-foreground" />
@@ -101,11 +101,11 @@ export function DocumentRow({ ws, doc }) {
           }
           onClick={() => ws.attach("document", doc.id)}
           disabled={selected || doc.attachable === false}
-          className={cn(selected && "text-primary")}
+          className={cn("hover:text-teal", selected && "text-teal")}
         />
         <IconButton icon={Eye} label="Preview" onClick={() => ws.openPreview(doc.id)} />
         {doc.retryAvailable && (
-          <IconButton icon={RefreshCw} label="Retry processing" onClick={() => ws.retryDocument(doc)} />
+          <IconButton icon={RefreshCw} label="Retry processing" onClick={() => ws.retryDocument(doc)} className="hover:text-teal" />
         )}
         <IconButton
           icon={Download}

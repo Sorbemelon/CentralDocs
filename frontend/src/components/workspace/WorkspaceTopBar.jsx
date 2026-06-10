@@ -13,7 +13,7 @@ import { IconButton } from "@/components/common/IconButton";
 function WorkspaceTopBar({ ws, onToggleSources, onToggleContext }) {
   const { usage } = ws.data;
   return (
-    <header className="flex h-[54px] shrink-0 items-center gap-2 border-b border-border bg-card px-3">
+    <header className="relative z-20 flex h-13.5 shrink-0 items-center gap-2 border-b border-border bg-card px-3 shadow-sm">
       <IconButton
         icon={PanelLeft}
         label="Toggle sources"

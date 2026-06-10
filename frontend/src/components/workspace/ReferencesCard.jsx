@@ -7,14 +7,22 @@ const EXAMPLE_REFERENCES = [
 
 function ReferenceRow({ reference, usedForFallback }) {
   return (
-    <div className="rounded-md border border-border bg-card/60 p-2 text-[12px]">
+    <div className="rounded-md border border-border bg-background p-2 text-[12px] shadow-sm">
       <p className="flex items-center gap-1.5 font-medium text-foreground">
-        <span className="text-primary">[{reference.number}]</span>
-        <Quote className="size-3 shrink-0 text-muted-foreground" />
+        <span className="inline-flex size-4.5 shrink-0 items-center justify-center rounded bg-primary/10 text-[10px] font-semibold text-primary">
+          {reference.number}
+        </span>
         <span className="min-w-0 truncate">{reference.title}</span>
+        <Quote className="ml-auto size-3 shrink-0 text-muted-foreground/70" />
       </p>
-      {reference.locator && <p className="pl-5 font-mono text-[11px] text-muted-foreground">{reference.locator}</p>}
-      <p className="pl-5 text-[11px] text-muted-foreground">Used for: {reference.usedFor || usedForFallback}</p>
+      {reference.locator && (
+        <p className="mt-0.5 pl-6">
+          <span className="rounded bg-teal-subtle px-1 py-px font-mono text-[10px] text-teal-subtle-foreground">
+            {reference.locator}
+          </span>
+        </p>
+      )}
+      <p className="mt-0.5 pl-6 text-[11px] text-muted-foreground">Used for: {reference.usedFor || usedForFallback}</p>
     </div>
   );
 }

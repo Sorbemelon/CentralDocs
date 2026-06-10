@@ -71,46 +71,51 @@ function PreviewPanelShell({ ws }) {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2">
-          <Icon className="size-5 shrink-0 text-muted-foreground" />
-          <div className="min-w-0">
-            <h3 className="truncate text-sm font-semibold">{doc.title}</h3>
-            <div className="mt-1 flex flex-wrap items-center gap-1">
-              <Badge variant="outline">{doc.type}</Badge>
-              <SourceBadge source={doc.source} />
-              <DocStatusBadge status={doc.status} />
+      <div className="flex flex-col gap-2 rounded-lg border border-border bg-card p-3 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+              <Icon className="size-5" />
+            </span>
+            <div className="min-w-0">
+              <h3 className="truncate text-sm font-semibold">{doc.title}</h3>
+              <div className="mt-1 flex flex-wrap items-center gap-1">
+                <Badge variant="outline">{doc.type}</Badge>
+                <SourceBadge source={doc.source} />
+                <DocStatusBadge status={doc.status} />
+              </div>
             </div>
           </div>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <Button size="sm" variant="outline" onClick={() => ws.downloadDocument(doc)} disabled={downloadAvailable === false}>
-            <Download /> Download
-          </Button>
-          {attachable !== false && (
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => ws.attach("document", doc.id)}
-              disabled={ws.isSelected("document", doc.id)}
-            >
-              <Plus /> Attach
+          <div className="flex items-center gap-1.5">
+            <Button size="sm" variant="outline" onClick={() => ws.downloadDocument(doc)} disabled={downloadAvailable === false}>
+              <Download /> Download
             </Button>
-          )}
-          {retryAvailable && (
-            <Button size="sm" variant="ghost" onClick={() => ws.retryDocument(doc)}>
-              <RefreshCw /> Retry
-            </Button>
-          )}
+            {attachable !== false && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => ws.attach("document", doc.id)}
+                disabled={ws.isSelected("document", doc.id)}
+                className="hover:text-teal"
+              >
+                <Plus /> Attach
+              </Button>
+            )}
+            {retryAvailable && (
+              <Button size="sm" variant="ghost" onClick={() => ws.retryDocument(doc)} className="hover:text-teal">
+                <RefreshCw /> Retry
+              </Button>
+            )}
+          </div>
         </div>
-      </div>
 
-      <div className="flex flex-wrap items-center gap-2 text-[12px] text-muted-foreground">
-        <span className="inline-flex items-center gap-1">
-          <FolderOpen className="size-3.5" /> {doc.folderName || "—"}
-        </span>
-        <span>·</span>
-        <span>Chunks: {chunkCount}</span>
+        <div className="flex flex-wrap items-center gap-2 border-t border-border pt-2 text-[12px] text-muted-foreground">
+          <span className="inline-flex items-center gap-1">
+            <FolderOpen className="size-3.5" /> {doc.folderName || "—"}
+          </span>
+          <span>·</span>
+          <span>Chunks: {chunkCount}</span>
+        </div>
       </div>
 
       {failed && (

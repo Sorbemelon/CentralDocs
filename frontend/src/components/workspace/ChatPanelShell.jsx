@@ -60,8 +60,8 @@ function AssistantMessage({ message, selected, onSelect }) {
         type="button"
         onClick={onSelect}
         className={cn(
-          "max-w-[80%] whitespace-pre-wrap rounded-lg rounded-bl-sm border bg-card px-3 py-2 text-left text-sm text-card-foreground transition-colors",
-          selected ? "border-primary/50" : "border-border hover:border-primary/30",
+          "max-w-[80%] whitespace-pre-wrap rounded-lg rounded-bl-sm border bg-card px-3 py-2 text-left text-sm text-card-foreground shadow-sm transition-colors",
+          selected ? "border-primary/50 ring-1 ring-primary/20" : "border-border hover:border-primary/30",
         )}
       >
         {message.content}
@@ -74,7 +74,7 @@ function AssistantMessage({ message, selected, onSelect }) {
                 <Quote className="size-3" /> References used: {refs.length}
               </span>
             </AccordionTrigger>
-            <AccordionContent className="flex flex-col gap-1 rounded-md border border-border bg-card p-2 text-[12px]">
+            <AccordionContent className="flex flex-col gap-1 rounded-md border border-teal/25 bg-teal-subtle/40 p-2 text-[12px]">
               {refs.map((r) => (
                 <div key={`${r.number}-${r.documentId}`} className="text-muted-foreground">
                   <span className="font-medium text-primary">[{r.number}]</span>{" "}
@@ -163,7 +163,7 @@ function ChatPanelShell({ ws }) {
         </Alert>
       )}
 
-      <div className="flex flex-col gap-3 rounded-md border border-border bg-background p-3">
+      <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-3 shadow-sm">
         {chat.isLoadingMessages ? (
           <LoadingState rows={3} />
         ) : chat.messages.length ? (

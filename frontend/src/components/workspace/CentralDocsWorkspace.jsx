@@ -578,7 +578,7 @@ export default function CentralDocsWorkspace() {
   ];
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-background text-foreground">
+    <div className="flex h-dvh flex-col overflow-hidden bg-background text-foreground">
       <WorkspaceTopBar
         ws={ws}
         onToggleSources={() => setSourcesDrawer((v) => !v)}

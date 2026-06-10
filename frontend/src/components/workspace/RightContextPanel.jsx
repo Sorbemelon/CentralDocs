@@ -9,7 +9,7 @@ import { DemoGuideCard } from "./DemoGuideCard";
 import { UsageCard } from "./UsageCard";
 
 /** Collapsible titled card used to stack the context panel sections. */
-function CollapsibleCard({ icon: Icon, title, badge, defaultOpen = true, children }) {
+function CollapsibleCard({ icon: Icon, iconClass, title, badge, defaultOpen = true, children }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
     <div className="rounded-lg border border-border bg-card shadow-sm">
@@ -19,7 +19,7 @@ function CollapsibleCard({ icon: Icon, title, badge, defaultOpen = true, childre
         aria-expanded={open}
         className="flex w-full items-center gap-2 px-3 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg"
       >
-        {Icon && <Icon className="size-4 shrink-0 text-muted-foreground" />}
+        {Icon && <Icon className={cn("size-4 shrink-0", iconClass || "text-muted-foreground")} />}
         <span className="flex-1 text-[13px] font-semibold tracking-tight">{title}</span>
         {badge}
         <ChevronDown className={cn("size-4 text-muted-foreground transition-transform", open && "rotate-180")} />
@@ -29,28 +29,28 @@ function CollapsibleCard({ icon: Icon, title, badge, defaultOpen = true, childre
   );
 }
 
-/** Right = current context, references, status, guide, usage. Does not duplicate the source tree. */
+/** Right = supporting context/evidence/status on a teal-slate surface (not a second work area). */
 function RightContextPanel({ ws, className }) {
   return (
-    <aside className={cn("flex min-h-0 flex-col border-l border-sidebar-border bg-sidebar", className)}>
-      <div className="flex h-[42px] shrink-0 items-center px-3">
+    <aside className={cn("flex min-h-0 flex-col border-l border-panel-border bg-panel", className)}>
+      <div className="flex h-10.5 shrink-0 items-center px-3">
         <h2 className="text-sm font-semibold tracking-tight">Context</h2>
       </div>
       <ScrollArea className="flex-1 px-2.5 pb-3">
         <div className="flex flex-col gap-2.5">
-          <CollapsibleCard icon={Layers} title="Current Context">
+          <CollapsibleCard icon={Layers} iconClass="text-teal" title="Current Context">
             <CurrentContextCard ws={ws} />
           </CollapsibleCard>
-          <CollapsibleCard icon={Quote} title="References" defaultOpen={false}>
+          <CollapsibleCard icon={Quote} iconClass="text-primary" title="References" defaultOpen={false}>
             <ReferencesCard ws={ws} />
           </CollapsibleCard>
-          <CollapsibleCard icon={Activity} title="Processing Status">
+          <CollapsibleCard icon={Activity} iconClass="text-success" title="Processing Status">
             <ProcessingStatusCard ws={ws} />
           </CollapsibleCard>
-          <CollapsibleCard icon={Compass} title="Demo Guide">
+          <CollapsibleCard icon={Compass} iconClass="text-teal" title="Demo Guide" defaultOpen={false}>
             <DemoGuideCard ws={ws} />
           </CollapsibleCard>
-          <CollapsibleCard icon={BarChart3} title="Usage">
+          <CollapsibleCard icon={BarChart3} iconClass="text-primary" title="Usage">
             <UsageCard ws={ws} />
           </CollapsibleCard>
         </div>

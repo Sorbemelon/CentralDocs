@@ -49,8 +49,10 @@ function GeneratedPanelShell({ ws }) {
           {generated.map((doc) => {
             const Icon = getFileIcon(doc.type);
             return (
-              <div key={doc.id} className="flex items-center gap-2 rounded-md border border-border bg-card p-2.5">
-                <Icon className="size-4 shrink-0 text-muted-foreground" />
+              <div key={doc.id} className="flex items-center gap-2 rounded-md border border-border bg-card p-2.5 shadow-sm">
+                <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-md bg-success-subtle text-success-subtle-foreground">
+                  <Icon className="size-4" />
+                </span>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[13px] font-medium">{doc.title}</p>
                   <div className="mt-0.5 flex items-center gap-1">

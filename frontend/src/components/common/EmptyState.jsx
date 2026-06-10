@@ -10,7 +10,7 @@ function EmptyState({ icon: Icon, title, description, action, className }) {
       )}
     >
       {Icon && (
-        <span className="mb-0.5 inline-flex size-8 items-center justify-center rounded-full bg-muted text-muted-foreground [&_svg]:size-4">
+        <span className="mb-0.5 inline-flex size-8 items-center justify-center rounded-full bg-teal-subtle text-teal-subtle-foreground [&_svg]:size-4">
           <Icon />
         </span>
       )}

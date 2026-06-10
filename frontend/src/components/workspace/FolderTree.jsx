@@ -11,7 +11,7 @@ function FolderRow({ ws, folder, docCount }) {
     <div
       className={cn(
         "group flex items-center gap-2 rounded-md border border-transparent px-2 py-1.5 transition-colors hover:bg-accent/60",
-        selected && "border-border bg-accent/40",
+        selected && "border-teal/35 bg-teal-subtle/60",
       )}
     >
       <Folder className="size-4 shrink-0 text-primary/80" />
@@ -35,7 +35,7 @@ function FolderRow({ ws, folder, docCount }) {
           label={selected ? "In context" : "Attach folder to context"}
           onClick={() => ws.attach("folder", folder.id)}
           disabled={selected}
-          className={cn(selected && "text-primary")}
+          className={cn("hover:text-teal", selected && "text-teal")}
         />
         {folder.readOnly ? (
           <IconButton icon={Trash2} label="Read-only (mock cannot be deleted)" disabled className="opacity-40" />

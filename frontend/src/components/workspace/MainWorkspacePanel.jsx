@@ -14,7 +14,7 @@ function MainWorkspacePanel({ ws, className }) {
       <Tabs value={ws.activeTab} onValueChange={ws.setActiveTab} className="flex min-h-0 flex-1 flex-col">
         <WorkspaceTabs />
         <ScrollArea className="flex-1">
-          <div className="p-3">
+          <div className="mx-auto w-full max-w-3xl p-3 md:p-4">
             <TabsContent value="chat">
               <ChatPanelShell ws={ws} />
             </TabsContent>
