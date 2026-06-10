@@ -100,7 +100,18 @@ function ResultRow({ ws, result }) {
           >
             <Plus /> Attach
           </Button>
-          <Button size="xs" variant="ghost" onClick={() => ws.notifyDeferred("Ask in chat")}>
+          <Button
+            size="xs"
+            variant="ghost"
+            onClick={() => {
+              const q =
+                ws.search.query?.trim() ||
+                ws.search.lastQuery ||
+                (result.title ? `Tell me about "${result.title}".` : "");
+              ws.chat.prefillDraftFromSearch(q);
+              ws.setActiveTab("chat");
+            }}
+          >
             <MessageSquarePlus /> Ask
           </Button>
         </div>

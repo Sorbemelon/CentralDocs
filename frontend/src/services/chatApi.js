@@ -29,3 +29,12 @@ export function deleteChat(chatId) {
 export function updateChatSelection(chatId, payload) {
   return apiClient.patch(`/chats/${chatId}/selection`, payload);
 }
+
+/**
+ * POST /chats/:chatId/messages — send a prompt and get the grounded answer.
+ * payload: { content, selectedDocumentIds?, selectedFolderIds? }
+ * Response: { chat, userMessage, assistantMessage, references, usage, remaining }.
+ */
+export function sendChatMessage(chatId, payload, options) {
+  return apiClient.post(`/chats/${chatId}/messages`, payload || {}, options);
+}

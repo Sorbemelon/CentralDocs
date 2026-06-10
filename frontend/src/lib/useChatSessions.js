@@ -151,6 +151,18 @@ export function useChatSessions({ online }) {
     [online],
   );
 
+  // Patch a chat in place (e.g. messageCount/lastMessageAt after sending a message).
+  const applyChat = useCallback((chat) => {
+    if (!chat?.id) return;
+    setChats((prev) => {
+      const idx = prev.findIndex((c) => c.id === chat.id);
+      if (idx === -1) return prev;
+      const next = prev.slice();
+      next[idx] = { ...next[idx], ...chat };
+      return next;
+    });
+  }, []);
+
   const activeChat = chats.find((c) => c.id === activeChatId) || null;
 
   return {
@@ -164,6 +176,7 @@ export function useChatSessions({ online }) {
     setActiveChat,
     newChat,
     removeChat,
+    applyChat,
     reload: load,
   };
 }

@@ -314,6 +314,56 @@ export function normalizeSearchResponse(res = {}) {
   };
 }
 
+// --- Chat messages ---
+
+/** Normalize one reference (shared shape with search). Safe display fields only. */
+export function normalizeReference(ref = {}) {
+  return {
+    number: ref.citationNumber ?? null,
+    documentId: ref.documentId || null,
+    title: ref.documentTitle || "Untitled",
+    fileType: ref.fileType || null,
+    folderName: ref.folderName || null,
+    locator: formatSearchLocator(ref),
+    excerpt: ref.excerptPreview || "",
+    score: ref.similarityScore ?? null,
+    usedFor: ref.usedFor || null,
+  };
+}
+
+/**
+ * Normalize a ChatMessage DTO into a compact view model.
+ * Keeps only safe aiMeta fields (model/latency/tokens/fallback); drops internals.
+ */
+export function normalizeChatMessage(dto = {}) {
+  const attachedDocs = dto.attachedDocumentSnapshot || [];
+  const attachedFolders = dto.attachedFolderSnapshot || [];
+  const resolvedDocs = dto.resolvedDocumentSnapshot || [];
+  const meta = dto.aiMeta;
+  return {
+    id: dto.id,
+    role: dto.role,
+    content: dto.content || "",
+    status: dto.status || null,
+    createdAt: dto.createdAt || null,
+    attachedCounts: {
+      folders: attachedFolders.length,
+      documents: attachedDocs.length,
+      resolved: resolvedDocs.length,
+    },
+    references: (dto.referencesUsed || []).map(normalizeReference),
+    aiMeta: meta
+      ? {
+          model: meta.generationModel || null,
+          fallbackUsed: Boolean(meta.fallbackUsed),
+          latencyMs: meta.latencyMs ?? null,
+          inputTokens: meta.estimatedInputTokens ?? null,
+          outputTokens: meta.estimatedOutputTokens ?? null,
+        }
+      : null,
+  };
+}
+
 /** Local (not-yet-persisted) chats use a `local-` id prefix. */
 export function isLocalChatId(id) {
   return typeof id === "string" && id.startsWith("local-");

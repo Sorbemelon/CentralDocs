@@ -29,7 +29,13 @@ function ProcessingStatusCard({ ws }) {
 
   let current;
   let detail;
-  if (ws.search?.isSearching) {
+  if (ws.chat?.isSending) {
+    current = ws.chat.pendingStep || "Generating answer";
+    detail = "Answering from the attached sources…";
+  } else if (ws.activeTab === "chat" && ws.chat?.sendError) {
+    current = "Failed";
+    detail = "Answer generation failed.";
+  } else if (ws.search?.isSearching) {
     current = "Searching";
     detail = ws.search.query ? `"${ws.search.query}"` : "Running semantic search…";
   } else if (ws.activeTab === "search" && ws.search?.error) {

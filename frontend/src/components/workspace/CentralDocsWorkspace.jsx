@@ -4,6 +4,7 @@ import { cn } from "@/lib/cn";
 import { SOURCE_FILTER, SOURCE_KIND } from "@/lib/constants";
 import {
   isLocalChatId,
+  normalizeChat,
   normalizeDocument,
   normalizeUsage,
   normalizeUsageFromSnapshot,
@@ -13,6 +14,7 @@ import { useWorkspaceData } from "@/lib/useWorkspaceData";
 import { useChatSessions } from "@/lib/useChatSessions";
 import { useSelectedContext } from "@/lib/useSelectedContext";
 import { useSemanticSearch } from "@/lib/useSemanticSearch";
+import { useChatMessages } from "@/lib/useChatMessages";
 import { updateChatSelection } from "@/services/chatApi";
 import { getDemoSession } from "@/services/demoApi";
 import {
@@ -81,6 +83,27 @@ export default function CentralDocsWorkspace() {
     online,
     selectedDocumentIds: selection.docIds,
     selectedFolderIds: selection.folderIds,
+  });
+
+  // Merge only the prompt counter from a chat response (other counters stay).
+  const mergePromptUsage = useCallback(
+    (aiPrompts) => {
+      setUsageOverride((prev) => {
+        const base = prev ?? demo.usage;
+        return { ...base, prompts: { ...base.prompts, used: aiPrompts } };
+      });
+    },
+    [demo.usage],
+  );
+
+  // RAG chat (Chat tab) — sends with the active chat's selected context.
+  const chat = useChatMessages({
+    online,
+    activeChatId: chats.activeChatId,
+    selectedDocumentIds: selection.docIds,
+    selectedFolderIds: selection.folderIds,
+    onChatUpdated: (chatDto) => chats.applyChat(normalizeChat(chatDto)),
+    onPromptUsage: mergePromptUsage,
   });
 
   const { folders, documents } = wsData;
@@ -360,6 +383,7 @@ export default function CentralDocsWorkspace() {
     setSourceFilter,
 
     search,
+    chat,
 
     previewDocId,
     openPreview,

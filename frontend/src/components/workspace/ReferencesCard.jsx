@@ -5,7 +5,7 @@ const EXAMPLE_REFERENCES = [
   { number: 2, title: "Digital Workspace Rollout Plan", locator: "slide 7", usedFor: "Phase 2 migration and approval risks." },
 ];
 
-function ReferenceRow({ reference }) {
+function ReferenceRow({ reference, usedForFallback }) {
   return (
     <div className="rounded-md border border-border bg-card/60 p-2 text-[12px]">
       <p className="flex items-center gap-1.5 font-medium text-foreground">
@@ -14,28 +14,45 @@ function ReferenceRow({ reference }) {
         <span className="min-w-0 truncate">{reference.title}</span>
       </p>
       {reference.locator && <p className="pl-5 font-mono text-[11px] text-muted-foreground">{reference.locator}</p>}
-      <p className="pl-5 text-[11px] text-muted-foreground">Used for: {reference.usedFor}</p>
+      <p className="pl-5 text-[11px] text-muted-foreground">Used for: {reference.usedFor || usedForFallback}</p>
     </div>
   );
 }
 
 /**
- * References card. When the Search tab is active and has results, shows the
- * latest semantic-search references. Otherwise shows the assistant-answer
- * placeholder format. Safe display fields only (no internal vectors or storage keys).
+ * References card. Chat tab → selected/latest assistant references; Search tab →
+ * latest semantic-search references; otherwise the assistant-answer placeholder.
+ * Safe display fields only (no internal vectors or storage keys).
  */
 function ReferencesCard({ ws }) {
-  const searchRefs = ws?.activeTab === "search" ? ws?.search?.references || [] : [];
+  const tab = ws?.activeTab;
 
-  if (searchRefs.length) {
-    return (
-      <div className="flex flex-col gap-2">
-        <p className="text-[11px] text-muted-foreground">Search references from the latest query:</p>
-        {searchRefs.map((ref) => (
-          <ReferenceRow key={ref.number} reference={ref} />
-        ))}
-      </div>
-    );
+  if (tab === "chat") {
+    const refs = ws?.chat?.activeReferences || [];
+    if (refs.length) {
+      return (
+        <div className="flex flex-col gap-2">
+          <p className="text-[11px] text-muted-foreground">References used by the selected answer:</p>
+          {refs.map((ref) => (
+            <ReferenceRow key={ref.number} reference={ref} usedForFallback="chat answer evidence" />
+          ))}
+        </div>
+      );
+    }
+  }
+
+  if (tab === "search") {
+    const refs = ws?.search?.references || [];
+    if (refs.length) {
+      return (
+        <div className="flex flex-col gap-2">
+          <p className="text-[11px] text-muted-foreground">Search references from the latest query:</p>
+          {refs.map((ref) => (
+            <ReferenceRow key={ref.number} reference={ref} usedForFallback="semantic search match" />
+          ))}
+        </div>
+      );
+    }
   }
 
   return (

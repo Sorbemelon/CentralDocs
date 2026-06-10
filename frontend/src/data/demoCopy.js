@@ -45,6 +45,37 @@ export const SAMPLE_QUESTIONS = Object.freeze([
   "Create a concise internal briefing from this chat.",
 ]);
 
+/** Sample questions surfaced in the Chat tab's empty state (reuses the demo questions). */
+export const CHAT_SAMPLE_QUESTIONS = SAMPLE_QUESTIONS;
+
+/**
+ * Offline/local-chat fallback conversation (already in the normalized message shape).
+ * Shown only when the backend is offline or the active chat is a local placeholder.
+ */
+export const FALLBACK_CHAT_MESSAGES = Object.freeze([
+  {
+    id: "fallback-user-1",
+    role: "user",
+    content: "What are the rollout risks?",
+    status: "complete",
+    createdAt: null,
+    attachedCounts: { folders: 1, documents: 5, resolved: 5 },
+    references: [],
+    aiMeta: null,
+  },
+  {
+    id: "fallback-assistant-1",
+    role: "assistant",
+    content:
+      "Connect to the backend to get grounded answers. Live responses cite the attached sources with inline markers like [1].",
+    status: "complete",
+    createdAt: null,
+    attachedCounts: { folders: 0, documents: 0, resolved: 0 },
+    references: [],
+    aiMeta: null,
+  },
+]);
+
 /** Sample questions surfaced in the semantic Search tab's empty state. */
 export const SEARCH_SAMPLE_QUESTIONS = Object.freeze([
   "What is Orchid Retail trying to improve?",
