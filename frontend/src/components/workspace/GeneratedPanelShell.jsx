@@ -63,8 +63,8 @@ function GeneratedPanelShell({ ws }) {
                   <IconButton icon={Eye} label="Preview" onClick={() => ws.openPreview(doc.id)} />
                   <IconButton icon={Download} label="Download" onClick={() => ws.downloadDocument(doc)} />
                   <IconButton icon={Plus} label="Attach" onClick={() => ws.attach("document", doc.id)} disabled={ws.isSelected("document", doc.id) || doc.attachable === false} />
-                  <IconButton icon={FolderInput} label="Move" onClick={() => ws.notifyDeferred("Move document")} />
-                  <IconButton icon={Trash2} label="Delete" onClick={() => ws.deleteDocument(doc)} className="hover:text-destructive" />
+                  <IconButton icon={FolderInput} label="Move" onClick={() => ws.requestMove(doc)} />
+                  <IconButton icon={Trash2} label="Delete" onClick={() => ws.requestDeleteDocument(doc)} className="hover:text-destructive" />
                 </div>
               </div>
             );

@@ -38,14 +38,14 @@ function ChatRow({ ws, chat }) {
           </Button>
         }
       >
-        <DropdownMenuItem onClick={() => ws.notifyDeferred("Rename chat")}>
+        <DropdownMenuItem onClick={() => ws.requestRename({ kind: "chat", target: chat.id, title: chat.title })}>
           <Pencil /> Rename
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => ws.notifyDeferred("Archive chat")}>
+        <DropdownMenuItem onClick={() => ws.archiveChat(chat.id)}>
           <Archive /> Archive
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem tone="destructive" onClick={() => ws.removeChat(chat.id)}>
+        <DropdownMenuItem tone="destructive" onClick={() => ws.requestDeleteChat(chat)}>
           <Trash2 /> Delete
         </DropdownMenuItem>
       </DropdownMenu>

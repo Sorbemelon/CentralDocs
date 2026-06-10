@@ -17,10 +17,11 @@ import { useSemanticSearch } from "@/lib/useSemanticSearch";
 import { useChatMessages } from "@/lib/useChatMessages";
 import { useGeneratedDocuments } from "@/lib/useGeneratedDocuments";
 import { updateChatSelection } from "@/services/chatApi";
-import { getDemoSession } from "@/services/demoApi";
+import { clearDemoSession, getDemoSession } from "@/services/demoApi";
 import {
   createDownloadUrl,
   deleteDocument as apiDeleteDocument,
+  moveDocument as apiMoveDocument,
   restoreDocument as apiRestoreDocument,
   retryDocument as apiRetryDocument,
   uploadDocument as apiUploadDocument,
@@ -28,8 +29,11 @@ import {
 import {
   createFolder as apiCreateFolder,
   deleteFolder as apiDeleteFolder,
+  renameFolder as apiRenameFolder,
   restoreFolder as apiRestoreFolder,
 } from "@/services/folderApi";
+import { CLEAR_SESSION_DIALOG, DELETE_CONFIRM } from "@/data/demoCopy";
+import { ConfirmDialog, PromptDialog, ChoiceDialog } from "@/components/ui/dialog";
 import { WorkspaceTopBar } from "./WorkspaceTopBar";
 import { SourceSidebar } from "./SourceSidebar";
 import { MainWorkspacePanel } from "./MainWorkspacePanel";
@@ -53,6 +57,7 @@ export default function CentralDocsWorkspace() {
   const [contextDrawer, setContextDrawer] = useState(false);
   const [operation, setOperation] = useState(null); // { kind, status, label }
   const [usageOverride, setUsageOverride] = useState(null);
+  const [dialog, setDialog] = useState(null); // { type: 'confirm'|'rename'|'move', ... }
 
   const wsData = useWorkspaceData({ online, bootstrap: demo.bootstrap, filter: sourceFilter });
   const chats = useChatSessions({ online });
@@ -156,6 +161,11 @@ export default function CentralDocsWorkspace() {
     toast(`${action} is not wired yet`, {
       description: "This comes in a later frontend phase.",
     });
+  }, []);
+
+  // Online-only management actions degrade to a clear offline note (not "deferred").
+  const notifyOffline = useCallback(() => {
+    toast.error("This action needs the backend — you're offline.");
   }, []);
 
   const openPreview = useCallback((id) => {
@@ -325,6 +335,132 @@ export default function CentralDocsWorkspace() {
     [chats],
   );
 
+  // --- management actions (rename / move / archive / clear; online-only) ---
+  const renameFolder = useCallback(
+    async (folder, name) => {
+      if (folder.readOnly) return;
+      if (!online) return notifyOffline();
+      setOperation({ kind: "rename", status: "processing", label: `Renaming ${folder.name}` });
+      try {
+        await apiRenameFolder(folder.id, { name });
+        wsData.reloadActive();
+        setOperation({ kind: "rename", status: "complete", label: "Folder renamed" });
+        toast.success("Folder renamed");
+      } catch (err) {
+        setOperation({ kind: "rename", status: "failed", label: "Rename failed" });
+        toast.error(err?.message || "Couldn't rename the folder");
+      }
+    },
+    [online, notifyDeferred, wsData],
+  );
+
+  const moveDocument = useCallback(
+    async (doc, folderId) => {
+      if (doc.readOnly) return;
+      if (!online) return notifyOffline();
+      setOperation({ kind: "move", status: "processing", label: `Moving ${doc.title}` });
+      try {
+        const res = await apiMoveDocument(doc.id, { folderId: folderId || null });
+        if (res?.document) wsData.applyDocument(normalizeDocument(res.document));
+        wsData.reloadActive();
+        setOperation({ kind: "move", status: "complete", label: "Document moved" });
+        toast.success("Document moved");
+      } catch (err) {
+        setOperation({ kind: "move", status: "failed", label: "Move failed" });
+        toast.error(err?.message || "Couldn't move the document");
+      }
+    },
+    [online, notifyDeferred, wsData],
+  );
+
+  const renameChat = useCallback(
+    async (id, title) => {
+      setOperation({ kind: "rename", status: "processing", label: "Renaming chat" });
+      try {
+        await chats.renameChat(id, title);
+        setOperation({ kind: "rename", status: "complete", label: "Chat renamed" });
+        toast.success("Chat renamed");
+      } catch (err) {
+        setOperation({ kind: "rename", status: "failed", label: "Rename failed" });
+        toast.error(err?.message || "Couldn't rename the chat");
+      }
+    },
+    [chats],
+  );
+
+  const archiveChat = useCallback(
+    async (id) => {
+      setOperation({ kind: "archive", status: "processing", label: "Archiving chat" });
+      try {
+        await chats.archiveChat(id); // local chats archive locally; saved chats hit the backend
+        setOperation({ kind: "archive", status: "complete", label: "Chat archived" });
+        toast.success("Chat archived");
+      } catch (err) {
+        setOperation({ kind: "archive", status: "failed", label: "Archive failed" });
+        toast.error(err?.message || "Couldn't archive the chat");
+      }
+    },
+    [chats],
+  );
+
+  const clearSession = useCallback(async () => {
+    if (!online) return;
+    setOperation({ kind: "clear", status: "processing", label: "Clearing session" });
+    try {
+      await clearDemoSession();
+      selection.setFromChat(null); // clear without persisting to the old chat
+      setPreviewDocId(null);
+      setActiveTab("chat");
+      search.clearSearch();
+      generate.clearGeneratedResult();
+      generate.closeGenerateModal();
+      setUsageOverride(null);
+      await demo.reload();
+      await Promise.all([wsData.reloadActive(), wsData.reloadTrash()]);
+      chats.reload();
+      setOperation({ kind: "clear", status: "complete", label: "Session cleared" });
+      toast.success("Session cleared — your demo data was reset");
+    } catch {
+      setOperation({ kind: "clear", status: "failed", label: "Clear failed" });
+      toast.error("Couldn't clear the session");
+    }
+  }, [online, selection, search, generate, demo, wsData, chats]);
+
+  // --- dialog requests (compact confirm / rename / move) ---
+  const confirmAction = useCallback((cfg) => setDialog({ type: "confirm", ...cfg }), []);
+  const requestRename = useCallback((payload) => setDialog({ type: "rename", ...payload }), []);
+  const requestMove = useCallback((doc) => setDialog({ type: "move", doc }), []);
+
+  const requestClearSession = useCallback(() => {
+    if (!online) return;
+    confirmAction({ ...CLEAR_SESSION_DIALOG, tone: "destructive", onConfirm: clearSession });
+  }, [online, confirmAction, clearSession]);
+
+  const requestDeleteDocument = useCallback(
+    (doc) => {
+      if (doc.readOnly) return;
+      if (!online) return notifyOffline();
+      confirmAction({ ...DELETE_CONFIRM.document(doc.title), tone: "destructive", onConfirm: () => deleteDocument(doc) });
+    },
+    [online, notifyOffline, confirmAction, deleteDocument],
+  );
+
+  const requestDeleteFolder = useCallback(
+    (folder) => {
+      if (folder.readOnly) return;
+      if (!online) return notifyOffline();
+      confirmAction({ ...DELETE_CONFIRM.folder(folder.name), tone: "destructive", onConfirm: () => deleteFolder(folder) });
+    },
+    [online, notifyOffline, confirmAction, deleteFolder],
+  );
+
+  const requestDeleteChat = useCallback(
+    (chat) => {
+      confirmAction({ ...DELETE_CONFIRM.chat(chat.title), tone: "destructive", onConfirm: () => removeChat(chat.id) });
+    },
+    [confirmAction, removeChat],
+  );
+
   // --- derived selection ---
   const selectedFolders = useMemo(
     () => selection.folderIds.map(getFolderById).filter(Boolean),
@@ -411,9 +547,35 @@ export default function CentralDocsWorkspace() {
     uploadDocument,
     retryDocument,
 
+    // management actions (Phase 7G)
+    renameFolder,
+    moveDocument,
+    renameChat,
+    archiveChat,
+    requestClearSession,
+    requestRename,
+    requestMove,
+    requestDeleteDocument,
+    requestDeleteFolder,
+    requestDeleteChat,
+    confirmAction,
+
     openGenerateModal: generate.openGenerateModal,
     notifyDeferred,
   };
+
+  // Move-to-folder options: user folders only (mock excluded), + root when foldered.
+  const moveDoc = dialog?.type === "move" ? dialog.doc : null;
+  const moveOptions = [
+    ...(moveDoc?.folderId ? [{ id: null, label: "No folder (root)" }] : []),
+    ...folders
+      .filter((f) => f.group === "user" && !f.readOnly)
+      .map((f) => ({
+        id: f.id,
+        label: moveDoc && moveDoc.folderId === f.id ? `${f.name} (current)` : f.name,
+        disabled: moveDoc ? moveDoc.folderId === f.id : false,
+      })),
+  ];
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background text-foreground">
@@ -443,6 +605,37 @@ export default function CentralDocsWorkspace() {
         ws={ws}
         open={generate.modalOpen}
         onOpenChange={(v) => (v ? generate.setModalOpen(true) : generate.closeGenerateModal())}
+      />
+
+      {/* Compact management dialogs (confirm / rename / move) */}
+      <ConfirmDialog
+        open={dialog?.type === "confirm"}
+        onOpenChange={(v) => !v && setDialog(null)}
+        title={dialog?.title}
+        description={dialog?.description}
+        confirmLabel={dialog?.confirmLabel}
+        tone={dialog?.tone}
+        onConfirm={dialog?.onConfirm}
+      />
+      <PromptDialog
+        open={dialog?.type === "rename"}
+        onOpenChange={(v) => !v && setDialog(null)}
+        title={dialog?.kind === "folder" ? "Rename folder" : "Rename chat"}
+        label="Name"
+        defaultValue={dialog?.title || ""}
+        confirmLabel="Rename"
+        onConfirm={(value) =>
+          dialog?.kind === "folder" ? renameFolder(dialog.folder, value) : renameChat(dialog.target, value)
+        }
+      />
+      <ChoiceDialog
+        open={dialog?.type === "move"}
+        onOpenChange={(v) => !v && setDialog(null)}
+        title="Move to folder"
+        description={moveDoc ? `Move "${moveDoc.title}" to one of your folders.` : undefined}
+        options={moveOptions}
+        emptyText="Create a folder in your workspace first."
+        onSelect={(folderId) => moveDoc && moveDocument(moveDoc, folderId)}
       />
     </div>
   );

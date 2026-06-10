@@ -7,12 +7,16 @@ import {
   FileSpreadsheet,
   FileText,
   FileVideo,
+  FolderInput,
+  MoreHorizontal,
   Plus,
   Presentation,
   RefreshCw,
   Trash2,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { DocStatusBadge } from "@/components/common/StatusBadge";
 import { IconButton } from "@/components/common/IconButton";
 import { cn } from "@/lib/cn";
@@ -117,12 +121,21 @@ export function DocumentRow({ ws, doc }) {
             className="opacity-40"
           />
         ) : (
-          <IconButton
-            icon={Trash2}
-            label="Delete"
-            onClick={() => ws.deleteDocument(doc)}
-            className="hover:text-destructive"
-          />
+          <DropdownMenu
+            trigger={
+              <Button variant="ghost" size="icon-sm" aria-label="Document options">
+                <MoreHorizontal />
+              </Button>
+            }
+          >
+            <DropdownMenuItem onClick={() => ws.requestMove(doc)}>
+              <FolderInput /> Move to folder
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem tone="destructive" onClick={() => ws.requestDeleteDocument(doc)}>
+              <Trash2 /> Delete
+            </DropdownMenuItem>
+          </DropdownMenu>
         )}
       </div>
     </div>

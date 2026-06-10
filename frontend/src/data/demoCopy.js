@@ -90,6 +90,33 @@ export const GENERATED_DOC_STEPS = Object.freeze([
   "Indexing document",
 ]);
 
+/** Clear Session confirmation copy (uploads/generated/chats/user folders cleared; mock remains). */
+export const CLEAR_SESSION_DIALOG = Object.freeze({
+  title: "Clear this demo session?",
+  description:
+    "This removes uploaded files, generated documents, saved chats, and user-created folders for this session. Mock demo documents will remain.",
+  confirmLabel: "Clear session",
+});
+
+/** Compact delete-confirmation copy (soft-delete; restorable from Trash). */
+export const DELETE_CONFIRM = Object.freeze({
+  document: (title) => ({
+    title: "Delete this document?",
+    description: `"${title}" moves to Trash. You can restore it while the session is active.`,
+    confirmLabel: "Delete",
+  }),
+  folder: (name) => ({
+    title: "Delete this folder?",
+    description: `"${name}" moves to Trash. Its documents stay in your session and can be restored.`,
+    confirmLabel: "Delete",
+  }),
+  chat: (title) => ({
+    title: "Delete this chat?",
+    description: `"${title}" will be removed from your saved chats.`,
+    confirmLabel: "Delete",
+  }),
+});
+
 /** Sample questions surfaced in the semantic Search tab's empty state. */
 export const SEARCH_SAMPLE_QUESTIONS = Object.freeze([
   "What is Orchid Retail trying to improve?",

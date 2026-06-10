@@ -1,5 +1,7 @@
-import { Folder, Lock, Plus, Trash2 } from "lucide-react";
+import { Folder, Lock, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { IconButton } from "@/components/common/IconButton";
 import { cn } from "@/lib/cn";
 
@@ -38,12 +40,21 @@ function FolderRow({ ws, folder, docCount }) {
         {folder.readOnly ? (
           <IconButton icon={Trash2} label="Read-only (mock cannot be deleted)" disabled className="opacity-40" />
         ) : (
-          <IconButton
-            icon={Trash2}
-            label="Delete folder"
-            onClick={() => ws.deleteFolder(folder)}
-            className="hover:text-destructive"
-          />
+          <DropdownMenu
+            trigger={
+              <Button variant="ghost" size="icon-sm" aria-label="Folder options">
+                <MoreHorizontal />
+              </Button>
+            }
+          >
+            <DropdownMenuItem onClick={() => ws.requestRename({ kind: "folder", folder, title: folder.name })}>
+              <Pencil /> Rename
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem tone="destructive" onClick={() => ws.requestDeleteFolder(folder)}>
+              <Trash2 /> Delete
+            </DropdownMenuItem>
+          </DropdownMenu>
         )}
       </div>
     </div>

@@ -45,7 +45,9 @@ function WorkspaceTopBar({ ws, onToggleSources, onToggleContext }) {
           variant="outline"
           size="sm"
           className="hidden sm:inline-flex"
-          onClick={() => ws.notifyDeferred("Clear session")}
+          onClick={ws.requestClearSession}
+          disabled={!ws.online}
+          title={ws.online ? "Clear uploaded files, generated docs, chats, and user folders" : "Backend is offline"}
         >
           <Trash2 />
           <span className="hidden md:inline">Clear Session</span>

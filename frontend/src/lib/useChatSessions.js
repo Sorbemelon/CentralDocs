@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { createChat, deleteChat, getChat, listChats } from "@/services/chatApi";
+import { createChat, deleteChat, getChat, listChats, updateChat } from "@/services/chatApi";
 import { isLocalChatId, normalizeChat } from "./workspaceData";
 import { FALLBACK_CHATS } from "@/data/mockWorkspaceFallback";
 
@@ -163,6 +163,33 @@ export function useChatSessions({ online }) {
     });
   }, []);
 
+  // Rename a chat (backend when online + saved; local otherwise).
+  const renameChat = useCallback(
+    async (id, title) => {
+      const name = String(title || "").trim();
+      if (!id || !name) return;
+      if (online && !isLocalChatId(id)) {
+        const res = await updateChat(id, { title: name });
+        applyChat(normalizeChat(res.chat));
+      } else {
+        applyChat({ id, title: name });
+      }
+    },
+    [online, applyChat],
+  );
+
+  // Archive a chat: hide it from the list (backend archive when online + saved).
+  const archiveChat = useCallback(
+    async (id) => {
+      if (online && !isLocalChatId(id)) {
+        await updateChat(id, { archived: true });
+      }
+      setChats((prev) => prev.filter((c) => c.id !== id));
+      setActiveChatId((prev) => (prev === id ? chatsRef.current.find((c) => c.id !== id)?.id || null : prev));
+    },
+    [online],
+  );
+
   const activeChat = chats.find((c) => c.id === activeChatId) || null;
 
   return {
@@ -177,6 +204,8 @@ export function useChatSessions({ online }) {
     newChat,
     removeChat,
     applyChat,
+    renameChat,
+    archiveChat,
     reload: load,
   };
 }
