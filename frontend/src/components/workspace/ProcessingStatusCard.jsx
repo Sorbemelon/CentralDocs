@@ -29,7 +29,13 @@ function ProcessingStatusCard({ ws }) {
 
   let current;
   let detail;
-  if (ws.chat?.isSending) {
+  if (ws.generate?.isGenerating) {
+    current = ws.generate.genStep || "Generating document";
+    detail = "Creating a document from this chat…";
+  } else if (ws.generate?.generationError && ws.generate?.modalOpen) {
+    current = "Failed";
+    detail = "Document generation failed.";
+  } else if (ws.chat?.isSending) {
     current = ws.chat.pendingStep || "Generating answer";
     detail = "Answering from the attached sources…";
   } else if (ws.activeTab === "chat" && ws.chat?.sendError) {

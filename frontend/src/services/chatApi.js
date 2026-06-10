@@ -38,3 +38,12 @@ export function updateChatSelection(chatId, payload) {
 export function sendChatMessage(chatId, payload, options) {
   return apiClient.post(`/chats/${chatId}/messages`, payload || {}, options);
 }
+
+/**
+ * POST /chats/:chatId/generated-documents — turn the chat into a saved document.
+ * payload: { instruction, filename, includeReferences, includeCurrentSelectedDocuments }
+ * Response: { document, generation, download, usage, remaining }.
+ */
+export function generateDocumentFromChat(chatId, payload, options) {
+  return apiClient.post(`/chats/${chatId}/generated-documents`, payload || {}, options);
+}

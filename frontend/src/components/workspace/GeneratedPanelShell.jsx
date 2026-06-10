@@ -11,6 +11,14 @@ import { getFileIcon } from "./DocumentList";
 /** Generated documents tab shell. Generated docs are normal documents too. */
 function GeneratedPanelShell({ ws }) {
   const { generated } = ws.data;
+  const canGenerate = ws.online && ws.activeChat && !ws.activeChat.local && (ws.chat?.messages?.length || 0) > 0;
+  const generateReason = !ws.online
+    ? "Backend is offline"
+    : !ws.activeChat || ws.activeChat.local
+      ? "Open a saved chat"
+      : (ws.chat?.messages?.length || 0) === 0
+        ? "Send a message first"
+        : undefined;
 
   return (
     <div className="flex flex-col gap-3">
@@ -18,7 +26,7 @@ function GeneratedPanelShell({ ws }) {
         <h3 className="flex items-center gap-1.5 text-sm font-semibold">
           <Sparkles className="size-4 text-teal" /> Generated documents
         </h3>
-        <Button size="sm" variant="teal" onClick={ws.openGenerateModal}>
+        <Button size="sm" variant="teal" onClick={ws.openGenerateModal} disabled={!canGenerate} title={generateReason}>
           <Sparkles /> Generate
         </Button>
       </div>
@@ -34,7 +42,7 @@ function GeneratedPanelShell({ ws }) {
         <EmptyState
           icon={Sparkles}
           title="No generated documents yet"
-          description="Generate one from a chat to see it here."
+          description="Use Generate Document from the Chat tab to create one."
         />
       ) : (
         <div className="flex flex-col gap-2">

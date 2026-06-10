@@ -76,6 +76,20 @@ export const FALLBACK_CHAT_MESSAGES = Object.freeze([
   },
 ]);
 
+/** Generate Document modal defaults. */
+export const GENERATED_DEFAULT_FILENAME = "orchid-rollout-brief.md";
+
+export const GENERATED_INSTRUCTION_PLACEHOLDER =
+  "Write a concise internal briefing with background, findings, risks, decisions, next steps, and references.";
+
+/** Cosmetic generation steps (backend answers in one request). */
+export const GENERATED_DOC_STEPS = Object.freeze([
+  "Preparing chat context",
+  "Generating document",
+  "Saving document",
+  "Indexing document",
+]);
+
 /** Sample questions surfaced in the semantic Search tab's empty state. */
 export const SEARCH_SAMPLE_QUESTIONS = Object.freeze([
   "What is Orchid Retail trying to improve?",

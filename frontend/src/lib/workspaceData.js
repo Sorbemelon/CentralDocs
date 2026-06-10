@@ -83,6 +83,7 @@ export function normalizeDocument(dto = {}) {
     attachable: dto.attachable,
     searchable: dto.searchable,
     downloadAvailable: dto.downloadAvailable,
+    createdAt: dto.createdAt ? relativeTime(dto.createdAt) : null,
     // Backend /status is authoritative; this derived flag drives the row affordance.
     retryAvailable: source === SOURCE_KIND.uploaded && ["failed", "uploaded"].includes(rawStatus),
   };
@@ -232,6 +233,53 @@ export function validateUploadFile(file) {
   }
 
   return { valid: true, kind, sizeLabel: formatBytes(file.size) };
+}
+
+// --- Generated document validation (client-side gate; backend re-validates) ---
+
+/** Generated documents may only be saved as Markdown or plain text. */
+export const GENERATED_DOC_FORMATS = Object.freeze(["md", "txt"]);
+
+const GENERATED_FILENAME_MAX = 120; // mirrors backend maxFilenameLength
+
+/** Validate the free-form instruction. Returns { valid, value?, error? }. */
+export function validateGeneratedInstruction(text) {
+  const trimmed = String(text || "").trim();
+  if (!trimmed) return { valid: false, error: "Describe the document to generate." };
+  if (trimmed.length > DEMO_LIMITS.generateInstructionLength) {
+    return {
+      valid: false,
+      error: `Instruction must be ${DEMO_LIMITS.generateInstructionLength.toLocaleString()} characters or fewer.`,
+    };
+  }
+  return { valid: true, value: trimmed };
+}
+
+/**
+ * Validate/normalize the output filename. Returns { valid, value?, extension?, error? }.
+ * Mirrors the backend: trim, default `.md`, allow only md/txt, reject path
+ * segments and "..", require a basename, and cap the total length.
+ */
+export function validateGeneratedFilename(filename) {
+  const raw = String(filename || "").trim();
+  if (!raw) return { valid: false, error: "Enter a filename." };
+  if (/[\\/]/.test(raw) || raw.includes("..")) {
+    return { valid: false, error: "Filename can't contain folders or path segments." };
+  }
+  const dot = raw.lastIndexOf(".");
+  const hasExt = dot > 0 && dot < raw.length - 1;
+  const base = hasExt ? raw.slice(0, dot) : raw;
+  const ext = hasExt ? raw.slice(dot + 1).toLowerCase() : "md"; // default to .md
+  if (!base.trim()) return { valid: false, error: "Enter a name before the extension." };
+  if (!GENERATED_DOC_FORMATS.includes(ext)) {
+    return { valid: false, error: "Use a .md or .txt filename." };
+  }
+  let value = `${base}.${ext}`;
+  if (value.length > GENERATED_FILENAME_MAX) {
+    const cap = Math.max(1, GENERATED_FILENAME_MAX - (ext.length + 1));
+    value = `${base.slice(0, cap)}.${ext}`;
+  }
+  return { valid: true, value, extension: ext };
 }
 
 // --- Semantic search ---

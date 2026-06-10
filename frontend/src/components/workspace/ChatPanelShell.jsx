@@ -112,6 +112,15 @@ function ChatPanelShell({ ws }) {
   const chat = ws.chat;
   const offline = !ws.online;
   const noRealChat = !ws.activeChat || ws.activeChat.local;
+  const hasMessages = (chat.messages?.length || 0) > 0;
+  const canGenerate = !offline && !noRealChat && hasMessages;
+  const generateReason = offline
+    ? "Backend is offline"
+    : noRealChat
+      ? "Open a saved chat"
+      : !hasMessages
+        ? "Send a message first"
+        : undefined;
   const draft = chat.draft;
   const tooLong = draft.length > DEMO_LIMITS.promptLength;
   const canSend = Boolean(draft.trim()) && !offline && !noRealChat && ws.hasContext && !chat.isSending && !tooLong;
@@ -131,7 +140,13 @@ function ChatPanelShell({ ws }) {
           <h3 className="truncate text-sm font-semibold">{ws.activeChat?.title || "New chat"}</h3>
           <p className="text-[11px] text-muted-foreground">Selection persists across prompts in this chat.</p>
         </div>
-        <Button size="sm" variant="teal" onClick={ws.openGenerateModal}>
+        <Button
+          size="sm"
+          variant="teal"
+          onClick={ws.openGenerateModal}
+          disabled={!canGenerate}
+          title={generateReason}
+        >
           <Sparkles /> Generate Document
         </Button>
       </div>

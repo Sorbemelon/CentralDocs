@@ -15,6 +15,7 @@ import { useChatSessions } from "@/lib/useChatSessions";
 import { useSelectedContext } from "@/lib/useSelectedContext";
 import { useSemanticSearch } from "@/lib/useSemanticSearch";
 import { useChatMessages } from "@/lib/useChatMessages";
+import { useGeneratedDocuments } from "@/lib/useGeneratedDocuments";
 import { updateChatSelection } from "@/services/chatApi";
 import { getDemoSession } from "@/services/demoApi";
 import {
@@ -48,7 +49,6 @@ export default function CentralDocsWorkspace() {
   const [activeTab, setActiveTab] = useState("chat");
   const [sourceFilter, setSourceFilter] = useState(SOURCE_FILTER.active);
   const [previewDocId, setPreviewDocId] = useState(null);
-  const [generateOpen, setGenerateOpen] = useState(false);
   const [sourcesDrawer, setSourcesDrawer] = useState(false);
   const [contextDrawer, setContextDrawer] = useState(false);
   const [operation, setOperation] = useState(null); // { kind, status, label }
@@ -104,6 +104,17 @@ export default function CentralDocsWorkspace() {
     selectedFolderIds: selection.folderIds,
     onChatUpdated: (chatDto) => chats.applyChat(normalizeChat(chatDto)),
     onPromptUsage: mergePromptUsage,
+  });
+
+  // Generate Document (Chat header) — turns the active chat into a saved document.
+  const generate = useGeneratedDocuments({
+    online,
+    activeChatId: chats.activeChatId,
+    onGenerated: (doc, res) => {
+      wsData.applyDocument(doc);
+      wsData.reloadActive();
+      if (res?.usage) setUsageOverride(normalizeUsageFromSnapshot(res.usage));
+    },
   });
 
   const { folders, documents } = wsData;
@@ -384,6 +395,7 @@ export default function CentralDocsWorkspace() {
 
     search,
     chat,
+    generate,
 
     previewDocId,
     openPreview,
@@ -399,7 +411,7 @@ export default function CentralDocsWorkspace() {
     uploadDocument,
     retryDocument,
 
-    openGenerateModal: () => setGenerateOpen(true),
+    openGenerateModal: generate.openGenerateModal,
     notifyDeferred,
   };
 
@@ -427,7 +439,11 @@ export default function CentralDocsWorkspace() {
         <RightContextPanel ws={ws} className="flex w-full border-0" />
       </Drawer>
 
-      <GenerateDocumentModalShell ws={ws} open={generateOpen} onOpenChange={setGenerateOpen} />
+      <GenerateDocumentModalShell
+        ws={ws}
+        open={generate.modalOpen}
+        onOpenChange={(v) => (v ? generate.setModalOpen(true) : generate.closeGenerateModal())}
+      />
     </div>
   );
 }
