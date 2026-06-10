@@ -381,12 +381,16 @@ export function normalizeReference(ref = {}) {
 
 /**
  * Normalize a ChatMessage DTO into a compact view model.
+ * Exposes the exact document names used (folder selections included) so the
+ * prompt's context collapse can list names, not counts.
  * Keeps only safe aiMeta fields (model/latency/tokens/fallback); drops internals.
  */
 export function normalizeChatMessage(dto = {}) {
   const attachedDocs = dto.attachedDocumentSnapshot || [];
   const attachedFolders = dto.attachedFolderSnapshot || [];
-  const resolvedDocs = dto.resolvedDocumentSnapshot || [];
+  const contextDocs = dto.resolvedDocumentSnapshot?.length
+    ? dto.resolvedDocumentSnapshot
+    : attachedDocs;
   const meta = dto.aiMeta;
   return {
     id: dto.id,
@@ -394,11 +398,8 @@ export function normalizeChatMessage(dto = {}) {
     content: dto.content || "",
     status: dto.status || null,
     createdAt: dto.createdAt || null,
-    attachedCounts: {
-      folders: attachedFolders.length,
-      documents: attachedDocs.length,
-      resolved: resolvedDocs.length,
-    },
+    contextDocTitles: contextDocs.map((d) => d.title || d.originalFilename || "Untitled").filter(Boolean),
+    attachedFolderNames: attachedFolders.map((f) => f.name || f.title || "").filter(Boolean),
     references: (dto.referencesUsed || []).map(normalizeReference),
     aiMeta: meta
       ? {

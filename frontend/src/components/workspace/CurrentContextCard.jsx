@@ -1,68 +1,84 @@
-import { FileStack, Folder, Layers, Minus } from "lucide-react";
+import { FileText, Folder, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { IconButton } from "@/components/common/IconButton";
 import { EmptyState } from "@/components/common/EmptyState";
-import { cn } from "@/lib/cn";
 
-function CountStat({ label, value }) {
-  const active = value > 0;
+function Row({ icon: Icon, iconClass, name, sub, onRemove }) {
   return (
-    <div
-      className={cn(
-        "flex flex-col items-center rounded-md px-2 py-1.5",
-        active ? "bg-teal-subtle" : "bg-muted",
-      )}
-    >
-      <span className={cn("text-sm font-semibold tabular-nums", active ? "text-teal-subtle-foreground" : "text-foreground")}>
-        {value}
+    <div className="group flex items-center gap-1.5 rounded-md border border-transparent px-1 py-0.5 hover:bg-accent/60">
+      <Icon className={`size-3 shrink-0 ${iconClass}`} />
+      <span className="min-w-0 flex-1 truncate text-[12px] text-foreground" title={name}>
+        {name}
+        {sub && <span className="ml-1 text-[10px] text-muted-foreground">{sub}</span>}
       </span>
-      <span className={cn("text-[10px]", active ? "text-teal-subtle-foreground/80" : "text-muted-foreground")}>{label}</span>
+      {onRemove && (
+        <button
+          type="button"
+          onClick={onRemove}
+          className="shrink-0 rounded px-1 text-[11px] font-medium text-destructive opacity-0 transition-opacity hover:bg-destructive-subtle group-focus-within:opacity-100 group-hover:opacity-100"
+        >
+          Remove
+        </button>
+      )}
     </div>
   );
 }
 
-function ContextRow({ icon: Icon, name, onRemove }) {
-  return (
-    <div className="group flex items-center gap-2 rounded-md border border-transparent px-1.5 py-1 hover:bg-accent/60">
-      <Icon className="size-3.5 shrink-0 text-muted-foreground" />
-      <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-foreground">{name}</span>
-      <IconButton icon={Minus} label="Remove from context" onClick={onRemove} className="opacity-70 group-hover:opacity-100" />
-    </div>
-  );
-}
-
-/** Selected folders/documents with a minus icon to remove each. */
+/**
+ * Current selected context: counts documents only (folder selections contribute
+ * their documents). Items are removed with a text "Remove" action.
+ */
 function CurrentContextCard({ ws }) {
+  const docCount = ws.counts.contextDocs;
+  const selectedDocIds = new Set(ws.selection.docIds);
+  // Documents contributed by selected folders (not directly ticked themselves).
+  const folderDocs = ws.data.documents.filter(
+    (d) => ws.selection.folderIds.includes(d.folderId) && !selectedDocIds.has(d.id),
+  );
+
+  if (!ws.hasContext) {
+    return (
+      <EmptyState
+        icon={Layers}
+        title="No context selected"
+        description="Tick a folder or document in Sources to attach it."
+        className="py-3"
+      />
+    );
+  }
+
   return (
-    <div className="flex flex-col gap-2">
-      <div className="grid grid-cols-3 gap-1.5">
-        <CountStat label="Folders" value={ws.counts.folders} />
-        <CountStat label="Documents" value={ws.counts.documents} />
-        <CountStat label="Resolved" value={ws.counts.resolved} />
+    <div className="flex flex-col gap-1.5">
+      <p className="rounded-md bg-teal-subtle px-2 py-1 text-[11px] font-medium text-teal-subtle-foreground">
+        Documents in context: <span className="tabular-nums">{docCount}</span>
+      </p>
+
+      <div className="flex flex-col">
+        {ws.selectedFolders.map((f) => (
+          <Row
+            key={f.id}
+            icon={Folder}
+            iconClass="text-teal"
+            name={f.name}
+            onRemove={() => ws.detach("folder", f.id)}
+          />
+        ))}
+        {folderDocs.map((d) => (
+          <Row key={d.id} icon={FileText} iconClass="ml-3 text-muted-foreground" name={d.title} sub="via folder" />
+        ))}
+        {ws.selectedDocs.map((d) => (
+          <Row
+            key={d.id}
+            icon={FileText}
+            iconClass="text-primary"
+            name={d.title}
+            onRemove={() => ws.detach("document", d.id)}
+          />
+        ))}
       </div>
 
-      {!ws.hasContext ? (
-        <EmptyState
-          icon={Layers}
-          title="No context selected"
-          description="Use the plus icon on a folder or document to attach it."
-          className="py-4"
-        />
-      ) : (
-        <>
-          <div className={cn("flex flex-col gap-0.5")}>
-            {ws.selectedFolders.map((f) => (
-              <ContextRow key={f.id} icon={Folder} name={f.name} onRemove={() => ws.detach("folder", f.id)} />
-            ))}
-            {ws.selectedDocs.map((d) => (
-              <ContextRow key={d.id} icon={FileStack} name={d.title} onRemove={() => ws.detach("document", d.id)} />
-            ))}
-          </div>
-          <Button variant="outline" size="xs" className="self-start" onClick={ws.clearSelection}>
-            Clear selection
-          </Button>
-        </>
-      )}
+      <Button variant="outline" size="xs" className="self-start" onClick={ws.clearSelection}>
+        Clear selection
+      </Button>
     </div>
   );
 }

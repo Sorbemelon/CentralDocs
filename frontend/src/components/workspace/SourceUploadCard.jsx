@@ -6,10 +6,17 @@ import { cn } from "@/lib/cn";
 import { UPLOAD_ALLOWED_LABEL, validateUploadFile } from "@/lib/workspaceData";
 import { UPLOAD_COPY } from "@/data/demoCopy";
 
+/** Tones for the inline operation status line (upload/retry live here, not in a right-panel card). */
+function operationTone(status) {
+  if (status === "failed") return "text-destructive";
+  if (status === "complete") return "text-success-subtle-foreground";
+  return "text-muted-foreground";
+}
+
 /**
- * Compact upload card (deliberately not a large dropzone). One file at a time,
- * validated client-side before Upload is enabled; backend re-validates.
- * States: idle / invalid / ready / uploading / complete / failed.
+ * Compact upload card pinned to the top of the left sidebar (deliberately not
+ * a large dropzone). One file at a time, validated client-side before Upload
+ * is enabled; backend re-validates. Shows the current upload/retry status.
  */
 function SourceUploadCard({ ws, className }) {
   const inputRef = useRef(null);
@@ -19,6 +26,8 @@ function SourceUploadCard({ ws, className }) {
   const [failed, setFailed] = useState(false);
 
   const offline = !ws.online;
+  const op = ws.operation;
+  const showOp = op && ["upload", "retry"].includes(op.kind);
 
   const pickFile = () => inputRef.current?.click();
 
@@ -49,12 +58,7 @@ function SourceUploadCard({ ws, className }) {
   const canUpload = Boolean(file && validation?.valid && !uploading && !offline);
 
   return (
-    <div
-      className={cn(
-        "flex flex-col gap-2 rounded-md border border-dashed border-border bg-card/60 p-2.5",
-        className,
-      )}
-    >
+    <div className={cn("flex flex-col gap-1.5 rounded-lg border border-border bg-card p-2 shadow-sm", className)}>
       <input
         ref={inputRef}
         type="file"
@@ -64,62 +68,70 @@ function SourceUploadCard({ ws, className }) {
       />
 
       <div className="flex items-center gap-2">
-        <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-          <Upload className="size-4" />
+        <span className="inline-flex size-6 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+          <Upload className="size-3.5" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-[12px] font-medium leading-tight text-foreground">Upload a document</p>
-          <p className="truncate text-[11px] text-muted-foreground">{UPLOAD_ALLOWED_LABEL} · one at a time</p>
+          <p className="text-[12px] font-semibold leading-tight text-foreground">Upload</p>
+          <p className="truncate text-[10px] leading-tight text-muted-foreground" title={UPLOAD_COPY.sizeCaps}>
+            {UPLOAD_ALLOWED_LABEL} · one at a time{offline ? " · needs backend" : ""}
+          </p>
         </div>
-        <Button size="xs" variant="secondary" onClick={pickFile} disabled={uploading}>
-          <Paperclip /> Choose
-        </Button>
+        {file ? (
+          <Button size="xs" onClick={handleUpload} disabled={!canUpload}>
+            {uploading ? <Loader2 className="animate-spin" /> : <Upload />}
+            {uploading ? "Uploading" : "Upload"}
+          </Button>
+        ) : (
+          <Button size="xs" variant="secondary" onClick={pickFile} disabled={uploading || offline} title={offline ? "Backend is offline" : undefined}>
+            <Paperclip /> Choose
+          </Button>
+        )}
       </div>
 
-      {!file && (
-        <p className="text-[10px] leading-tight text-muted-foreground">{UPLOAD_COPY.sizeCaps}</p>
-      )}
-
       {file && (
-        <div className="flex items-center gap-2 rounded-md border border-border bg-background px-2 py-1">
-          <span className="min-w-0 flex-1 truncate text-[12px] text-foreground">{file.name}</span>
+        <div className="flex items-center gap-1.5 rounded-md border border-border bg-background px-1.5 py-1">
+          <span className="min-w-0 flex-1 truncate text-[11px] text-foreground">{file.name}</span>
           {validation?.sizeLabel && (
-            <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">{validation.sizeLabel}</span>
+            <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">{validation.sizeLabel}</span>
           )}
-          {validation?.valid ? (
-            <Badge variant="success">Ready</Badge>
-          ) : (
-            <Badge variant="destructive">Invalid</Badge>
-          )}
+          <Badge variant={validation?.valid ? "success" : "destructive"} className="px-1 py-0 text-[10px]">
+            {validation?.valid ? "Ready" : "Invalid"}
+          </Badge>
           <button
             type="button"
             onClick={clearFile}
             aria-label="Clear selected file"
             className="rounded p-0.5 text-muted-foreground hover:text-foreground"
           >
-            <X className="size-3.5" />
+            <X className="size-3" />
           </button>
         </div>
       )}
 
       {file && !validation?.valid && validation?.error && (
-        <p className="flex items-start gap-1 text-[11px] text-destructive">
-          <AlertTriangle className="mt-0.5 size-3 shrink-0" />
+        <p className="flex items-start gap-1 text-[10px] leading-snug text-destructive">
+          <AlertTriangle className="mt-px size-3 shrink-0" />
           {validation.error}
         </p>
       )}
 
-      {failed && (
-        <p className="text-[11px] text-destructive">Upload failed. Review the file and try again.</p>
-      )}
+      {failed && <p className="text-[10px] text-destructive">Upload failed. Review the file and try again.</p>}
 
-      {offline ? (
-        <p className="text-[11px] text-muted-foreground">Backend required to upload — currently offline.</p>
-      ) : (
-        <Button size="sm" className="w-full" onClick={handleUpload} disabled={!canUpload}>
-          {uploading ? <Loader2 className="animate-spin" /> : <Upload />}
-          {uploading ? "Uploading…" : "Upload"}
-        </Button>
+      {showOp && (
+        <p className={cn("flex items-center gap-1.5 text-[10px] leading-tight", operationTone(op.status))}>
+          {op.status !== "complete" && op.status !== "failed" ? (
+            <Loader2 className="size-3 shrink-0 animate-spin" />
+          ) : (
+            <span
+              className={cn(
+                "size-1.5 shrink-0 rounded-full",
+                op.status === "failed" ? "bg-destructive" : "bg-success",
+              )}
+            />
+          )}
+          <span className="truncate">{op.label}</span>
+        </p>
       )}
     </div>
   );

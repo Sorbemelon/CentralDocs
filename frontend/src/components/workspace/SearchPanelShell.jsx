@@ -1,4 +1,4 @@
-import { CloudOff, Info, MessageSquarePlus, Plus, Search } from "lucide-react";
+import { Check, CloudOff, Info, MessagesSquare, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -97,8 +97,9 @@ function ResultRow({ ws, result }) {
             variant="ghost"
             onClick={() => ws.attach("document", result.id)}
             disabled={selected || notAttachable}
+            className={cn(selected && "text-teal")}
           >
-            <Plus /> Attach
+            <Check /> {selected ? "Attached" : "Attach"}
           </Button>
           <Button
             size="xs"
@@ -112,7 +113,7 @@ function ResultRow({ ws, result }) {
               ws.setActiveTab("chat");
             }}
           >
-            <MessageSquarePlus /> Ask
+            <MessagesSquare /> Ask
           </Button>
         </div>
       </div>

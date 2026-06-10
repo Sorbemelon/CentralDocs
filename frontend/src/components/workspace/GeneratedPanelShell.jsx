@@ -1,4 +1,4 @@
-import { Download, Eye, FolderInput, Plus, Sparkles, Trash2 } from "lucide-react";
+import { Check, Download, Eye, FolderInput, Sparkles, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DocStatusBadge } from "@/components/common/StatusBadge";
@@ -64,7 +64,13 @@ function GeneratedPanelShell({ ws }) {
                 <div className="flex shrink-0 items-center">
                   <IconButton icon={Eye} label="Preview" onClick={() => ws.openPreview(doc.id)} />
                   <IconButton icon={Download} label="Download" onClick={() => ws.downloadDocument(doc)} />
-                  <IconButton icon={Plus} label="Attach" onClick={() => ws.attach("document", doc.id)} disabled={ws.isSelected("document", doc.id) || doc.attachable === false} />
+                  <IconButton
+                    icon={Check}
+                    label={ws.isSelected("document", doc.id) ? "Attached" : "Attach to context"}
+                    onClick={() => ws.attach("document", doc.id)}
+                    disabled={ws.isSelected("document", doc.id) || doc.attachable === false}
+                    className={ws.isSelected("document", doc.id) ? "text-teal" : "hover:text-teal"}
+                  />
                   <IconButton icon={FolderInput} label="Move" onClick={() => ws.requestMove(doc)} />
                   <IconButton icon={Trash2} label="Delete" onClick={() => ws.requestDeleteDocument(doc)} className="hover:text-destructive" />
                 </div>

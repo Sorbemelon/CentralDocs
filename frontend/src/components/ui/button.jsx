@@ -23,6 +23,7 @@ const buttonVariants = cva(
         lg: "h-10 px-5 text-sm [&_svg]:size-4",
         icon: "h-9 w-9 [&_svg]:size-4",
         "icon-sm": "h-7 w-7 [&_svg]:size-4",
+        "icon-xs": "h-6 w-6 [&_svg]:size-3.5",
       },
     },
     defaultVariants: { variant: "default", size: "default" },

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { AlertTriangle, Download, FileText, FolderOpen, Plus, RefreshCw } from "lucide-react";
+import { AlertTriangle, Check, Download, FileText, FolderOpen, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DocStatusBadge } from "@/components/common/StatusBadge";
@@ -96,9 +96,9 @@ function PreviewPanelShell({ ws }) {
                 variant="ghost"
                 onClick={() => ws.attach("document", doc.id)}
                 disabled={ws.isSelected("document", doc.id)}
-                className="hover:text-teal"
+                className={ws.isSelected("document", doc.id) ? "text-teal" : "hover:text-teal"}
               >
-                <Plus /> Attach
+                <Check /> {ws.isSelected("document", doc.id) ? "Attached" : "Attach"}
               </Button>
             )}
             {retryAvailable && (

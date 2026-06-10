@@ -23,9 +23,9 @@ export const PROBLEM_SOLUTION = Object.freeze({
 export const ARCHITECTURE = Object.freeze([
   { label: "Vercel", role: "Frontend" },
   { label: "Render", role: "API" },
-  { label: "MongoDB", role: "Metadata" },
-  { label: "S3", role: "Files" },
-  { label: "Gemini", role: "AI / embeddings" },
+  { label: "MongoDB", role: "Vector search" },
+  { label: "S3", role: "Storage" },
+  { label: "Gemini", role: "AI" },
 ]);
 
 /** Core demo flow shown on the landing page and mirrored in the workspace guide. */
@@ -35,6 +35,22 @@ export const DEMO_FLOW = Object.freeze([
   "Expand references.",
   "Generate a document from the chat.",
   "Download the generated file.",
+]);
+
+/** Landing demo-flow steps with a one-line explanation each. */
+export const DEMO_FLOW_DETAILS = Object.freeze([
+  { step: "Select sources", detail: "Tick folders or documents to build the chat context." },
+  { step: "Ask a question", detail: "The AI answers only from what you selected." },
+  { step: "Expand references", detail: "Every answer cites the exact passages it used." },
+  { step: "Generate a document", detail: "Turn a useful chat into a saved .md or .txt file." },
+  { step: "Download the file", detail: "Generated documents are normal, reusable sources." },
+]);
+
+/** Exactly three simple workspace guide prompts (kept beginner-friendly). */
+export const GUIDE_QUESTIONS = Object.freeze([
+  "What is this project trying to improve?",
+  "What are the main risks or problems mentioned?",
+  "Summarize the selected documents in simple terms.",
 ]);
 
 export const SAMPLE_QUESTIONS = Object.freeze([
@@ -59,7 +75,8 @@ export const FALLBACK_CHAT_MESSAGES = Object.freeze([
     content: "What are the rollout risks?",
     status: "complete",
     createdAt: null,
-    attachedCounts: { folders: 1, documents: 5, resolved: 5 },
+    contextDocTitles: ["Digital Workspace Rollout Plan", "Rollout Risk Discussion Transcript"],
+    attachedFolderNames: ["Strategy & Rollout"],
     references: [],
     aiMeta: null,
   },
@@ -70,7 +87,8 @@ export const FALLBACK_CHAT_MESSAGES = Object.freeze([
       "Connect to the backend to get grounded answers. Live responses cite the attached sources with inline markers like [1].",
     status: "complete",
     createdAt: null,
-    attachedCounts: { folders: 0, documents: 0, resolved: 0 },
+    contextDocTitles: [],
+    attachedFolderNames: [],
     references: [],
     aiMeta: null,
   },

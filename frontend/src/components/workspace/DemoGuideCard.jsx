@@ -1,7 +1,7 @@
-import { MessageSquarePlus } from "lucide-react";
-import { DEMO_FLOW, SAMPLE_QUESTIONS } from "@/data/demoCopy";
+import { MessagesSquare } from "lucide-react";
+import { DEMO_FLOW, GUIDE_QUESTIONS } from "@/data/demoCopy";
 
-/** Compact demo instructions + sample questions that prefill the chat draft. */
+/** Compact demo steps + three simple prompts that prefill the chat draft. */
 function DemoGuideCard({ ws }) {
   const askInChat = (q) => {
     ws.chat.prefillDraftFromSearch(q);
@@ -9,11 +9,11 @@ function DemoGuideCard({ ws }) {
   };
 
   return (
-    <div className="flex flex-col gap-2.5">
-      <ol className="flex flex-col gap-1">
+    <div className="flex flex-col gap-2">
+      <ol className="flex flex-col gap-0.5">
         {DEMO_FLOW.map((step, i) => (
-          <li key={step} className="flex items-start gap-2 text-[12px] text-foreground">
-            <span className="mt-0.5 inline-flex size-4 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">
+          <li key={step} className="flex items-start gap-2 text-[11.5px] leading-snug text-foreground">
+            <span className="mt-px inline-flex size-4 shrink-0 items-center justify-center rounded-full bg-teal text-[9px] font-bold text-teal-foreground">
               {i + 1}
             </span>
             {step}
@@ -22,19 +22,19 @@ function DemoGuideCard({ ws }) {
       </ol>
 
       <div>
-        <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Sample questions · click to ask in chat
+        <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-teal-subtle-foreground">
+          Try asking · prefills the chat
         </p>
         <div className="flex flex-col gap-1">
-          {SAMPLE_QUESTIONS.map((q) => (
+          {GUIDE_QUESTIONS.map((q) => (
             <button
               key={q}
               type="button"
               onClick={() => askInChat(q)}
-              title="Prefill this question in the Chat tab"
-              className="group flex items-start gap-1.5 rounded-md border border-border bg-background px-2 py-1 text-left text-[12px] text-foreground transition-colors hover:border-teal/40 hover:bg-teal-subtle/40"
+              title="Prefill this prompt in the Chat tab"
+              className="group flex items-start gap-1.5 rounded-md border border-teal/30 bg-card px-2 py-1 text-left text-[12px] text-foreground shadow-sm transition-colors hover:border-teal hover:bg-teal-subtle/60"
             >
-              <MessageSquarePlus className="mt-0.5 size-3 shrink-0 text-muted-foreground group-hover:text-teal" />
+              <MessagesSquare className="mt-0.5 size-3 shrink-0 text-teal" />
               {q}
             </button>
           ))}

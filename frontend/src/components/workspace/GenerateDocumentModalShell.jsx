@@ -1,4 +1,4 @@
-import { AlertTriangle, Download, Eye, Info, Loader2, Plus, Sparkles } from "lucide-react";
+import { AlertTriangle, Check, Download, Eye, Info, Loader2, Sparkles } from "lucide-react";
 import {
   Dialog,
   DialogBody,
@@ -134,7 +134,7 @@ function GenerateDocumentModalShell({ ws, open, onOpenChange }) {
                 onClick={() => ws.attach("document", doc.id)}
                 disabled={attached || doc.attachable === false}
               >
-                <Plus /> {attached ? "Attached" : "Attach"}
+                <Check /> {attached ? "Attached" : "Attach"}
               </Button>
               <Button variant="teal" size="sm" onClick={() => onOpenChange(false)}>
                 Done

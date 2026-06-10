@@ -295,16 +295,23 @@ export default function CentralDocsWorkspace() {
     [online, notifyDeferred, wsData],
   );
 
-  const createFolder = useCallback(async () => {
-    if (!online) return notifyDeferred("Create folder");
-    try {
-      await apiCreateFolder({ name: "New folder" });
-      toast.success("Folder created");
-      wsData.reloadActive();
-    } catch {
-      toast.error("Couldn't create the folder");
-    }
-  }, [online, notifyDeferred, wsData]);
+  // Create a folder at the tree root or inside a user folder (parentFolderId).
+  const createFolder = useCallback(
+    async (parentFolderId) => {
+      if (!online) return notifyDeferred("Create folder");
+      try {
+        await apiCreateFolder({
+          name: "New folder",
+          ...(parentFolderId ? { parentFolderId } : {}),
+        });
+        toast.success("Folder created");
+        wsData.reloadActive();
+      } catch (err) {
+        toast.error(err?.message || "Couldn't create the folder");
+      }
+    },
+    [online, notifyDeferred, wsData],
+  );
 
   const restoreTrashItem = useCallback(
     async (item) => {
@@ -470,7 +477,8 @@ export default function CentralDocsWorkspace() {
     () => selection.docIds.map(getDocById).filter(Boolean),
     [selection.docIds, getDocById],
   );
-  const resolvedDocIds = useMemo(() => {
+  // All documents in context: directly selected + those inside selected folders.
+  const contextDocIds = useMemo(() => {
     const set = new Set(selection.docIds);
     documents.forEach((d) => {
       if (selection.folderIds.includes(d.folderId)) set.add(d.id);
@@ -482,9 +490,9 @@ export default function CentralDocsWorkspace() {
     () => ({
       folders: selection.folderIds.length,
       documents: selection.docIds.length,
-      resolved: resolvedDocIds.length,
+      contextDocs: contextDocIds.length,
     }),
-    [selection.folderIds, selection.docIds, resolvedDocIds],
+    [selection.folderIds, selection.docIds, contextDocIds],
   );
 
   const hasContext = counts.folders > 0 || counts.documents > 0;
@@ -512,7 +520,7 @@ export default function CentralDocsWorkspace() {
     clearSelection,
     selectedFolders,
     selectedDocs,
-    resolvedDocIds,
+    contextDocIds,
     counts,
     hasContext,
 

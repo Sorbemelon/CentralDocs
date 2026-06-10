@@ -1,98 +1,210 @@
-import { Folder, Lock, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { useState } from "react";
+import {
+  Check,
+  ChevronRight,
+  Download,
+  Eye,
+  Folder,
+  FolderInput,
+  FolderOpen,
+  FolderPlus,
+  Lock,
+  MoreHorizontal,
+  Pencil,
+  RefreshCw,
+  Trash2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { IconButton } from "@/components/common/IconButton";
 import { cn } from "@/lib/cn";
+import { DOC_STATUS, SOURCE_KIND } from "@/lib/constants";
+import { getFileIcon } from "./DocumentList";
 
-function FolderRow({ ws, folder, docCount }) {
-  const selected = ws.isSelected("folder", folder.id);
+/**
+ * Tick-style attach toggle, placed BEFORE the item icon (AutumData mechanic).
+ * Checked = in the current selected context; click toggles attach/detach.
+ */
+function AttachCheck({ selected, disabled, onToggle, label }) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      disabled={disabled}
+      aria-pressed={selected}
+      aria-label={label}
+      title={label}
+      className={cn(
+        "inline-flex size-4 shrink-0 items-center justify-center rounded border transition-colors",
+        selected
+          ? "border-teal bg-teal text-teal-foreground"
+          : "border-input bg-card text-transparent hover:border-teal/60 hover:text-teal/50",
+        disabled && "cursor-not-allowed opacity-40",
+      )}
+    >
+      <Check className="size-3" strokeWidth={3} />
+    </button>
+  );
+}
+
+const DOC_ICON_TONE = {
+  [SOURCE_KIND.mock]: "text-muted-foreground",
+  [SOURCE_KIND.uploaded]: "text-primary",
+  [SOURCE_KIND.generated]: "text-success",
+};
+
+function StatusDot({ status, statusMessage }) {
+  if (status === DOC_STATUS.processing) {
+    return <span title="Processing" className="size-1.5 shrink-0 animate-pulse rounded-full bg-warning" />;
+  }
+  if (status === DOC_STATUS.failed) {
+    return <span title={statusMessage || "Failed"} className="size-1.5 shrink-0 rounded-full bg-destructive" />;
+  }
+  return null;
+}
+
+function DocRow({ ws, doc, indent }) {
+  const Icon = getFileIcon(doc.type);
+  const selected = ws.isSelected("document", doc.id);
+  const attachLabel = selected
+    ? "Remove from context"
+    : doc.attachable === false
+      ? "Not ready to attach"
+      : "Attach to context";
+
   return (
     <div
       className={cn(
-        "group flex items-center gap-2 rounded-md border border-transparent px-2 py-1.5 transition-colors hover:bg-accent/60",
+        "group flex h-7 items-center gap-1.5 rounded-md border border-transparent pr-1 transition-colors hover:bg-accent/60",
+        indent ? "pl-6" : "pl-1.5",
         selected && "border-teal/35 bg-teal-subtle/60",
       )}
     >
-      <Folder className="size-4 shrink-0 text-primary/80" />
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-[13px] font-medium leading-tight text-foreground">{folder.name}</p>
-        <div className="mt-0.5 flex items-center gap-1">
-          {folder.readOnly ? (
-            <Badge variant="muted" className="gap-0.5 px-1 py-0 text-[10px]">
-              <Lock className="size-2.5" /> Read-only
-            </Badge>
-          ) : (
-            <Badge variant="teal" className="px-1 py-0 text-[10px]">Yours</Badge>
+      <AttachCheck
+        selected={selected}
+        disabled={!selected && doc.attachable === false}
+        onToggle={() => (selected ? ws.detach("document", doc.id) : ws.attach("document", doc.id))}
+        label={attachLabel}
+      />
+      <Icon className={cn("size-3.5 shrink-0", DOC_ICON_TONE[doc.source] || "text-muted-foreground")} />
+      <span className="min-w-0 flex-1 truncate text-[12.5px] leading-none text-foreground">{doc.title}</span>
+      <StatusDot status={doc.status} statusMessage={doc.statusMessage} />
+      <div className="flex shrink-0 items-center opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
+        <IconButton icon={Eye} label="Preview" size="icon-xs" onClick={() => ws.openPreview(doc.id)} />
+        <DropdownMenu
+          trigger={
+            <Button variant="ghost" size="icon-xs" aria-label="Document options">
+              <MoreHorizontal />
+            </Button>
+          }
+        >
+          <DropdownMenuItem onClick={() => ws.downloadDocument(doc)} disabled={doc.downloadAvailable === false}>
+            <Download /> Download
+          </DropdownMenuItem>
+          {doc.retryAvailable && (
+            <DropdownMenuItem onClick={() => ws.retryDocument(doc)}>
+              <RefreshCw /> Retry processing
+            </DropdownMenuItem>
           )}
-          <span className="text-[11px] text-muted-foreground">{docCount} docs</span>
-        </div>
+          {!doc.readOnly && (
+            <>
+              <DropdownMenuItem onClick={() => ws.requestMove(doc)}>
+                <FolderInput /> Move to folder
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem tone="destructive" onClick={() => ws.requestDeleteDocument(doc)}>
+                <Trash2 /> Delete
+              </DropdownMenuItem>
+            </>
+          )}
+        </DropdownMenu>
       </div>
+    </div>
+  );
+}
 
-      <div className="flex shrink-0 items-center opacity-70 transition-opacity group-hover:opacity-100">
-        <IconButton
-          icon={Plus}
-          label={selected ? "In context" : "Attach folder to context"}
-          onClick={() => ws.attach("folder", folder.id)}
-          disabled={selected}
-          className={cn("hover:text-teal", selected && "text-teal")}
+function FolderRow({ ws, folder, docs }) {
+  const [open, setOpen] = useState(true);
+  const selected = ws.isSelected("folder", folder.id);
+  const FolderIcon = open ? FolderOpen : Folder;
+
+  return (
+    <div className="flex flex-col">
+      <div
+        className={cn(
+          "group flex h-7 items-center gap-1.5 rounded-md border border-transparent pl-0.5 pr-1 transition-colors hover:bg-accent/60",
+          selected && "border-teal/35 bg-teal-subtle/60",
+        )}
+      >
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-label={open ? `Collapse ${folder.name}` : `Expand ${folder.name}`}
+          aria-expanded={open}
+          className="inline-flex size-4 shrink-0 items-center justify-center rounded text-muted-foreground hover:text-foreground"
+        >
+          <ChevronRight className={cn("size-3.5 transition-transform", open && "rotate-90")} />
+        </button>
+        <AttachCheck
+          selected={selected}
+          onToggle={() => (selected ? ws.detach("folder", folder.id) : ws.attach("folder", folder.id))}
+          label={selected ? "Remove folder from context" : "Attach folder to context"}
         />
-        {folder.readOnly ? (
-          <IconButton icon={Trash2} label="Read-only (mock cannot be deleted)" disabled className="opacity-40" />
-        ) : (
-          <DropdownMenu
-            trigger={
-              <Button variant="ghost" size="icon-sm" aria-label="Folder options">
-                <MoreHorizontal />
-              </Button>
-            }
-          >
-            <DropdownMenuItem onClick={() => ws.requestRename({ kind: "folder", folder, title: folder.name })}>
-              <Pencil /> Rename
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem tone="destructive" onClick={() => ws.requestDeleteFolder(folder)}>
-              <Trash2 /> Delete
-            </DropdownMenuItem>
-          </DropdownMenu>
+        <FolderIcon className={cn("size-3.5 shrink-0", folder.readOnly ? "text-primary/70" : "text-teal")} />
+        <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium leading-none text-foreground">
+          {folder.name}
+        </span>
+        {folder.readOnly && <Lock className="size-3 shrink-0 text-muted-foreground/70" title="Read-only demo folder" />}
+        <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">{docs.length}</span>
+        {!folder.readOnly && (
+          <div className="flex shrink-0 items-center opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
+            <IconButton
+              icon={FolderPlus}
+              label="New folder inside"
+              size="icon-xs"
+              onClick={() => ws.createFolder(folder.id)}
+            />
+            <DropdownMenu
+              trigger={
+                <Button variant="ghost" size="icon-xs" aria-label="Folder options">
+                  <MoreHorizontal />
+                </Button>
+              }
+            >
+              <DropdownMenuItem onClick={() => ws.requestRename({ kind: "folder", folder, title: folder.name })}>
+                <Pencil /> Rename
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem tone="destructive" onClick={() => ws.requestDeleteFolder(folder)}>
+                <Trash2 /> Delete
+              </DropdownMenuItem>
+            </DropdownMenu>
+          </div>
         )}
       </div>
+      {open && docs.map((d) => <DocRow key={d.id} ws={ws} doc={d} indent />)}
     </div>
   );
 }
 
-function Group({ label, children }) {
-  return (
-    <div className="flex flex-col gap-0.5">
-      <p className="px-2 pb-0.5 pt-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-        {label}
-      </p>
-      {children}
-    </div>
-  );
-}
-
-/** Demo (read-only) folders above user folders. Plus = attach, trash = delete (mock disabled). */
+/**
+ * Unified source tree (AutumData-style): folders with their documents nested,
+ * unfoldered documents at the root. Tick before the icon attaches to context.
+ */
 function FolderTree({ ws }) {
   const { folders, documents } = ws.data;
-  const countFor = (id) => documents.filter((d) => d.folderId === id).length;
-  const demo = folders.filter((f) => f.group === "demo");
-  const user = folders.filter((f) => f.group === "user");
+  const folderIds = new Set(folders.map((f) => f.id));
+  const docsFor = (id) => documents.filter((d) => d.folderId === id);
+  const rootDocs = documents.filter((d) => !d.folderId || !folderIds.has(d.folderId));
 
   return (
-    <div className="flex flex-col gap-1.5">
-      <Group label="Demo Workspace">
-        {demo.map((f) => (
-          <FolderRow key={f.id} ws={ws} folder={f} docCount={countFor(f.id)} />
-        ))}
-      </Group>
-      <Group label="My Workspace">
-        {user.length ? (
-          user.map((f) => <FolderRow key={f.id} ws={ws} folder={f} docCount={countFor(f.id)} />)
-        ) : (
-          <p className="px-2 py-1 text-[11px] text-muted-foreground">No folders yet.</p>
-        )}
-      </Group>
+    <div className="flex flex-col gap-px">
+      {folders.map((f) => (
+        <FolderRow key={f.id} ws={ws} folder={f} docs={docsFor(f.id)} />
+      ))}
+      {rootDocs.map((d) => (
+        <DocRow key={d.id} ws={ws} doc={d} />
+      ))}
     </div>
   );
 }

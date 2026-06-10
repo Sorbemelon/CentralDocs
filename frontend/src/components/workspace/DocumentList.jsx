@@ -1,25 +1,13 @@
 import {
-  Download,
-  Eye,
   File,
   FileAudio,
   FileImage,
   FileSpreadsheet,
   FileText,
   FileVideo,
-  FolderInput,
-  MoreHorizontal,
-  Plus,
   Presentation,
-  RefreshCw,
-  Trash2,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { DocStatusBadge } from "@/components/common/StatusBadge";
-import { IconButton } from "@/components/common/IconButton";
-import { cn } from "@/lib/cn";
 import { SOURCE_KIND } from "@/lib/constants";
 
 /** Map a short type code to a lucide file icon. */
@@ -66,91 +54,3 @@ export function SourceBadge({ source, className }) {
     </Badge>
   );
 }
-
-/** A single compact document row with attach/preview/download/delete actions. */
-export function DocumentRow({ ws, doc }) {
-  const Icon = getFileIcon(doc.type);
-  const selected = ws.isSelected("document", doc.id);
-
-  return (
-    <div
-      className={cn(
-        "group flex items-center gap-2 rounded-md border border-transparent px-2 py-1.5 transition-colors hover:bg-accent/60",
-        selected && "border-teal/35 bg-teal-subtle/60",
-      )}
-    >
-      <Icon className="size-4 shrink-0 text-muted-foreground" />
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-[13px] font-medium leading-tight text-foreground">{doc.title}</p>
-        <div className="mt-0.5 flex flex-wrap items-center gap-1">
-          <Badge variant="outline" className="px-1 py-0 text-[10px]">{doc.type}</Badge>
-          <SourceBadge source={doc.source} />
-          <DocStatusBadge status={doc.status} />
-        </div>
-      </div>
-
-      <div className="flex shrink-0 items-center opacity-70 transition-opacity group-hover:opacity-100">
-        <IconButton
-          icon={Plus}
-          label={
-            selected
-              ? "In context"
-              : doc.attachable === false
-                ? "Not ready to attach"
-                : "Attach to context"
-          }
-          onClick={() => ws.attach("document", doc.id)}
-          disabled={selected || doc.attachable === false}
-          className={cn("hover:text-teal", selected && "text-teal")}
-        />
-        <IconButton icon={Eye} label="Preview" onClick={() => ws.openPreview(doc.id)} />
-        {doc.retryAvailable && (
-          <IconButton icon={RefreshCw} label="Retry processing" onClick={() => ws.retryDocument(doc)} className="hover:text-teal" />
-        )}
-        <IconButton
-          icon={Download}
-          label="Download"
-          onClick={() => ws.downloadDocument(doc)}
-          disabled={doc.downloadAvailable === false}
-        />
-        {doc.readOnly ? (
-          <IconButton
-            icon={Trash2}
-            label="Read-only (mock cannot be deleted)"
-            disabled
-            className="opacity-40"
-          />
-        ) : (
-          <DropdownMenu
-            trigger={
-              <Button variant="ghost" size="icon-sm" aria-label="Document options">
-                <MoreHorizontal />
-              </Button>
-            }
-          >
-            <DropdownMenuItem onClick={() => ws.requestMove(doc)}>
-              <FolderInput /> Move to folder
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem tone="destructive" onClick={() => ws.requestDeleteDocument(doc)}>
-              <Trash2 /> Delete
-            </DropdownMenuItem>
-          </DropdownMenu>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/** Compact list of documents. */
-function DocumentList({ ws, documents }) {
-  return (
-    <div className="flex flex-col gap-0.5">
-      {documents.map((doc) => (
-        <DocumentRow key={doc.id} ws={ws} doc={doc} />
-      ))}
-    </div>
-  );
-}
-
-export { DocumentList };

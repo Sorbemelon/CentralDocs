@@ -4,8 +4,8 @@ function UsageRow({ label, used, limit, unit = "" }) {
   const ratio = limit > 0 ? used / limit : 0;
   const tone = ratio >= 1 ? "destructive" : ratio >= 0.8 ? "warning" : "primary";
   return (
-    <div className="flex flex-col gap-1">
-      <div className="flex items-center justify-between text-[12px]">
+    <div className="flex flex-col gap-0.5">
+      <div className="flex items-center justify-between text-[11px]">
         <span className="text-muted-foreground">{label}</span>
         <span className="font-medium tabular-nums text-foreground">
           {used}
@@ -13,16 +13,16 @@ function UsageRow({ label, used, limit, unit = "" }) {
           {unit}
         </span>
       </div>
-      <Progress value={used} max={limit} tone={tone} />
+      <Progress value={used} max={limit} tone={tone} className="h-1" />
     </div>
   );
 }
 
-/** Compact usage/limit rows. */
+/** Compact usage/limit rows (the only place limits are shown in the workspace). */
 function UsageCard({ ws }) {
   const u = ws.data.usage;
   return (
-    <div className="flex flex-col gap-2.5">
+    <div className="flex flex-col gap-1.5">
       <UsageRow label="Uploads" used={u.uploads.used} limit={u.uploads.limit} />
       <UsageRow label="Chats" used={u.chats.used} limit={u.chats.limit} />
       <UsageRow label="Prompts" used={u.prompts.used} limit={u.prompts.limit} />
