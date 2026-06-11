@@ -25,13 +25,22 @@ test("AI model lane matches locked Gemini model decisions", () => {
     "gemini-3-flash-preview",
     "gemini-2.5-flash",
   ]);
+  assert.deepEqual(lane.liveRuntime, {
+    enabled: false,
+    reason: "missing_api_key",
+  });
+  assert.equal(lane.keyRotation.strategy, "round_robin_with_rate_limit_fallback");
 });
 
-test("Gemini client factory reports no live calls in Phase 1B", () => {
+test("Gemini client factory reports runtime readiness without exposing keys", () => {
   const status = getGeminiClientStatus();
 
   assert.equal(status.provider, "gemini");
   assert.equal(status.status, "not_configured");
+  assert.equal(status.configured, false);
   assert.equal(status.keyCount, 0);
-  assert.equal(status.liveCallsEnabled, false);
+  assert.deepEqual(status.liveRuntime, {
+    enabled: false,
+    reason: "missing_api_key",
+  });
 });

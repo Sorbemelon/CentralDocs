@@ -12,6 +12,10 @@ process.env.GEMINI_EMBEDDING_DIMENSIONS = "384";
 process.env.GEMINI_GENERATION_PRIMARY_MODEL = "custom-generation-primary";
 process.env.GEMINI_GENERATION_FALLBACK_MODEL_1 = "custom-generation-fallback-a";
 process.env.GEMINI_GENERATION_FALLBACK_MODEL_2 = "custom-generation-fallback-b";
+process.env.GEMINI_API_KEY_1 = "";
+process.env.GEMINI_API_KEY_2 = "";
+process.env.GEMINI_API_KEY_3 = "";
+process.env.GEMINI_API_KEYS = "";
 
 const {
   env,
@@ -50,6 +54,11 @@ test("custom env model and vector settings are read safely", () => {
   assert.deepEqual(summary.vectorSearch, {
     indexName: "custom_chunks_vector_index",
     path: "embedding.values",
+    dimensions: 384,
+  });
+  assert.deepEqual(summary.ai.liveRuntime, {
+    enabled: false,
+    reason: "missing_api_key",
   });
   assert.equal(serialized.includes("db_password"), false);
   assert.equal(serialized.includes("hidden-host.example"), false);

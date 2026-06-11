@@ -89,7 +89,7 @@ export async function updateUploadDocumentStatus({ documentId, demoSessionId, pa
   return Document.findOneAndUpdate(
     { _id: documentId, demoSessionId },
     { $set: patch },
-    { new: true, lean: true },
+    { returnDocument: "after", lean: true },
   );
 }
 

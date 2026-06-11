@@ -120,7 +120,7 @@ export async function updateGeneratedDocumentIndexingFields({
   return Document.findOneAndUpdate(
     { _id: documentId, demoSessionId },
     { $set: patch },
-    { new: true, lean: true },
+    { returnDocument: "after", lean: true },
   );
 }
 

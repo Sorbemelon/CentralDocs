@@ -56,9 +56,6 @@ const aiRoutingAttemptSchema = new mongoose.Schema(
 );
 
 aiRoutingAttemptSchema.index({ demoSessionId: 1, createdAt: 1 });
-aiRoutingAttemptSchema.index({ actionType: 1 });
-aiRoutingAttemptSchema.index({ model: 1 });
-aiRoutingAttemptSchema.index({ isRateLimit: 1 });
 
 export const AiRoutingAttempt =
   mongoose.models.AiRoutingAttempt ||

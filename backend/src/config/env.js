@@ -246,6 +246,8 @@ export function getVectorPath() {
 }
 
 export function getSafeConfigSummary() {
+  const aiConfigured = env.geminiKeyCount > 0;
+
   return {
     nodeEnv: env.NODE_ENV,
     port: env.PORT,
@@ -256,12 +258,32 @@ export function getSafeConfigSummary() {
     s3: env.s3Presence,
     aiProvider: rawEnv.AI_PROVIDER,
     geminiKeyCount: env.geminiKeyCount,
+    ai: {
+      provider: rawEnv.AI_PROVIDER,
+      configured: aiConfigured,
+      keyCount: env.geminiKeyCount,
+      embedding: {
+        model: env.embeddingModel,
+        dimensions: env.embeddingDimensions,
+        configured: aiConfigured,
+      },
+      generation: {
+        primaryModel: rawEnv.GEMINI_GENERATION_PRIMARY_MODEL,
+        fallbackModels: [...generationFallbackModels],
+        configured: aiConfigured,
+      },
+      liveRuntime: {
+        enabled: aiConfigured,
+        reason: aiConfigured ? "configured" : "missing_api_key",
+      },
+    },
     generationModelLane: env.generationModelLane,
     embeddingModel: env.embeddingModel,
     embeddingDimensions: env.embeddingDimensions,
     vectorSearch: {
       indexName: env.vectorIndexName,
       path: env.vectorPath,
+      dimensions: env.embeddingDimensions,
     },
   };
 }

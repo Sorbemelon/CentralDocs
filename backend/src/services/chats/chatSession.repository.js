@@ -91,7 +91,7 @@ export async function updateChatSession({ chatId, demoSessionId, patch = {} } = 
   return ChatSession.findOneAndUpdate(
     { _id: chatId, demoSessionId, lifecycleStatus: LIFECYCLE_STATUS.ACTIVE },
     { $set: patch },
-    { new: true, lean: true },
+    { returnDocument: "after", lean: true },
   );
 }
 
@@ -104,7 +104,7 @@ export async function softDeleteChatSession({ chatId, demoSessionId } = {}) {
   return ChatSession.findOneAndUpdate(
     { _id: chatId, demoSessionId, lifecycleStatus: LIFECYCLE_STATUS.ACTIVE },
     { $set: { lifecycleStatus: LIFECYCLE_STATUS.TRASHED } },
-    { new: true, lean: true },
+    { returnDocument: "after", lean: true },
   );
 }
 
@@ -127,7 +127,7 @@ export async function updateSelection({
         currentSelectedFolderIds: selectedFolderIds,
       },
     },
-    { new: true, lean: true },
+    { returnDocument: "after", lean: true },
   );
 }
 
@@ -148,7 +148,7 @@ export async function incrementMessageCount({
       $inc: { messageCount: delta },
       $set: { lastMessageAt: at },
     },
-    { new: true, lean: true },
+    { returnDocument: "after", lean: true },
   );
 }
 
@@ -169,7 +169,7 @@ export async function incrementAiPromptCount({
       $inc: { aiPromptCount: delta },
       $set: { updatedAt: at },
     },
-    { new: true, lean: true },
+    { returnDocument: "after", lean: true },
   );
 }
 

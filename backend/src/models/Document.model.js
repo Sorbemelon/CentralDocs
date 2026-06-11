@@ -220,7 +220,6 @@ documentSchema.index({ demoSessionId: 1, lifecycleStatus: 1 });
 documentSchema.index({ folderId: 1, lifecycleStatus: 1 });
 documentSchema.index({ scope: 1, lifecycleStatus: 1 });
 documentSchema.index({ sourceType: 1, lifecycleStatus: 1 });
-documentSchema.index({ status: 1 });
 documentSchema.index({ fileKind: 1 });
 documentSchema.index({ createdAt: -1 });
 documentSchema.index({ mockId: 1, scope: 1 }, { unique: true, sparse: true });

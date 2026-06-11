@@ -37,7 +37,7 @@ export function buildMockFolderUpsertPayloads(manifest = {}) {
         lifecycleStatus: LIFECYCLE_STATUS.ACTIVE,
       },
     },
-    options: { upsert: true, new: true, lean: true },
+    options: { upsert: true, returnDocument: "after", lean: true },
   }));
 }
 
@@ -87,7 +87,7 @@ export function buildMockDocumentUpsertPayloads({ manifest = {}, assets = [], fo
           expiresAt: null,
         },
       },
-      options: { upsert: true, new: true, lean: true },
+      options: { upsert: true, returnDocument: "after", lean: true },
     };
   });
 }

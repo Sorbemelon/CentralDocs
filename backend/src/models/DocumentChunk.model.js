@@ -120,7 +120,6 @@ const documentChunkSchema = new mongoose.Schema(
   },
 );
 
-documentChunkSchema.index({ documentId: 1 });
 documentChunkSchema.index({ demoSessionId: 1, lifecycleStatus: 1 });
 documentChunkSchema.index({ folderId: 1, lifecycleStatus: 1 });
 documentChunkSchema.index({ scope: 1, lifecycleStatus: 1 });

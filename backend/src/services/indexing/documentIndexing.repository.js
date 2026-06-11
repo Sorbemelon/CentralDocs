@@ -63,7 +63,7 @@ export async function updateDocumentIndexingStatus({ documentId, patch = {} } = 
   return Document.findByIdAndUpdate(
     documentId,
     { $set: patch },
-    { new: true, lean: true },
+    { returnDocument: "after", lean: true },
   );
 }
 
@@ -73,6 +73,6 @@ export async function updateDocumentMediaMeta({ documentId, mediaMeta = {} } = {
   return Document.findByIdAndUpdate(
     documentId,
     { $set: { mediaMeta } },
-    { new: true, lean: true },
+    { returnDocument: "after", lean: true },
   );
 }

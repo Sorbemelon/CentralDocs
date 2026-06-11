@@ -66,6 +66,28 @@ test("safe config summary does not expose sensitive values", () => {
   });
   assert.equal(summary.aiProvider, "gemini");
   assert.equal(summary.geminiKeyCount, 1);
+  assert.deepEqual(summary.ai, {
+    provider: "gemini",
+    configured: true,
+    keyCount: 1,
+    embedding: {
+      model: "gemini-embedding-2",
+      dimensions: 768,
+      configured: true,
+    },
+    generation: {
+      primaryModel: "gemini-3.5-flash",
+      fallbackModels: [
+        "gemini-3-flash-preview",
+        "gemini-2.5-flash",
+      ],
+      configured: true,
+    },
+    liveRuntime: {
+      enabled: true,
+      reason: "configured",
+    },
+  });
   assert.deepEqual(summary.generationModelLane, [
     "gemini-3.5-flash",
     "gemini-3-flash-preview",
@@ -76,6 +98,7 @@ test("safe config summary does not expose sensitive values", () => {
   assert.deepEqual(summary.vectorSearch, {
     indexName: "document_chunks_vector_index",
     path: "embedding",
+    dimensions: 768,
   });
   assert.equal(serialized.includes("hidden-host.example"), false);
   assert.equal(serialized.includes("safe-summary-access-token"), false);

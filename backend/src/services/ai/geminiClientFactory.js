@@ -3,12 +3,17 @@ import { getGeminiApiKeys } from "../../config/env.js";
 
 export function getGeminiClientStatus() {
   const keyCount = getGeminiApiKeys().length;
+  const configured = keyCount > 0;
 
   return {
     provider: "gemini",
-    status: keyCount > 0 ? "configured" : "not_configured",
+    status: configured ? "configured" : "not_configured",
+    configured,
     keyCount,
-    liveCallsEnabled: false,
+    liveRuntime: {
+      enabled: configured,
+      reason: configured ? "configured" : "missing_api_key",
+    },
   };
 }
 

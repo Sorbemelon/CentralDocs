@@ -47,7 +47,7 @@ export async function updateLastActive(sessionId, lastActiveAt) {
   return DemoSession.findOneAndUpdate(
     { sessionId },
     { $set: { lastActiveAt } },
-    { new: true, lean: true },
+    { returnDocument: "after", lean: true },
   );
 }
 
@@ -59,7 +59,7 @@ export async function updateUsage(sessionId, usage) {
   return DemoSession.findOneAndUpdate(
     { sessionId },
     { $set: { usage, lastActiveAt: new Date() } },
-    { new: true, lean: true },
+    { returnDocument: "after", lean: true },
   );
 }
 
@@ -77,7 +77,7 @@ export async function markExpired(sessionId, expiredAt = new Date()) {
         lastActiveAt: expiredAt,
       },
     },
-    { new: true, lean: true },
+    { returnDocument: "after", lean: true },
   );
 }
 
@@ -89,7 +89,7 @@ export async function updateCleanupStatus(sessionId, cleanupStatus) {
   return DemoSession.findOneAndUpdate(
     { sessionId },
     { $set: { cleanupStatus, lastActiveAt: new Date() } },
-    { new: true, lean: true },
+    { returnDocument: "after", lean: true },
   );
 }
 

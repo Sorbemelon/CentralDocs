@@ -57,8 +57,43 @@ test("GET /api/health/dependencies returns safe dependency statuses", async () =
     credentialsConfigured: true,
   });
   assert.match(response.body.dependencies.gemini, /configured|not_configured/);
+  assert.deepEqual(response.body.dependencies.ai, {
+    provider: "gemini",
+    configured: true,
+    keyCount: 1,
+    embedding: {
+      model: "gemini-embedding-2",
+      dimensions: 768,
+      configured: true,
+    },
+    generation: {
+      primaryModel: "gemini-3.5-flash",
+      fallbackModels: [
+        "gemini-3-flash-preview",
+        "gemini-2.5-flash",
+      ],
+      configured: true,
+    },
+    liveRuntime: {
+      enabled: true,
+      reason: "configured",
+    },
+    keyRotation: {
+      strategy: "round_robin_with_rate_limit_fallback",
+      configuredKeyCount: 1,
+    },
+  });
+  assert.deepEqual(response.body.dependencies.vectorSearch, {
+    indexName: "document_chunks_vector_index",
+    path: "embedding",
+    dimensions: 768,
+  });
   assert.equal(response.body.config.geminiKeyCount, 1);
   assert.equal(response.body.config.aiProvider, "gemini");
+  assert.deepEqual(response.body.config.ai.liveRuntime, {
+    enabled: true,
+    reason: "configured",
+  });
   assert.equal(response.body.config.embeddingModel, "gemini-embedding-2");
   assert.equal(response.body.config.embeddingDimensions, 768);
   assert.deepEqual(response.body.config.generationModelLane, [
@@ -69,7 +104,14 @@ test("GET /api/health/dependencies returns safe dependency statuses", async () =
   assert.deepEqual(response.body.config.vectorSearch, {
     indexName: "document_chunks_vector_index",
     path: "embedding",
+    dimensions: 768,
   });
+  assert.deepEqual(response.body.aiModelLane.liveRuntime, {
+    enabled: true,
+    reason: "configured",
+  });
+  const legacyLiveFlag = ["live", "Calls", "Enabled"].join("");
+  assert.equal(legacyLiveFlag in response.body.aiModelLane, false);
   assert.equal(response.body.config.mongodbDatabaseWarning, null);
   assert.deepEqual(response.body.config.s3, {
     configured: true,

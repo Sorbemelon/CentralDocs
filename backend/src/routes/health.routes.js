@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { env, getSafeConfigSummary } from "../config/env.js";
 import { getMongoStatus } from "../db/connectMongo.js";
-import { getAiModelLane, getGeminiStatus } from "../services/ai/aiModelLane.js";
+import { getAiDependencyStatus, getAiModelLane, getGeminiStatus } from "../services/ai/aiModelLane.js";
 import { getStorageStatus } from "../services/storage/s3Storage.service.js";
 import { nowIso } from "../utils/time.js";
 
@@ -36,6 +36,12 @@ healthRouter.get("/dependencies", (req, res) => {
       mongodb: getMongoStatus(),
       s3: getStorageStatus(),
       gemini: getGeminiStatus(),
+      ai: getAiDependencyStatus(),
+      vectorSearch: {
+        indexName: env.vectorIndexName,
+        path: env.vectorPath,
+        dimensions: env.embeddingDimensions,
+      },
     },
     config: getSafeConfigSummary(),
     aiModelLane: getAiModelLane(),

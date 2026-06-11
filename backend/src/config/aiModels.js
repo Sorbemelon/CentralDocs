@@ -24,11 +24,10 @@ export const GENERATION_MODEL_LANE = Object.freeze([
 
 export const AI_ROUTING_DESIGN = Object.freeze({
   provider: getAiProvider(),
-  liveCallsEnabled: false,
-  keyRotation: "planned_round_robin_with_failure_fallback",
+  keyRotation: "round_robin_with_rate_limit_fallback",
   notes: [
-    "Phase 1A defines model lanes only; no Gemini network calls are made.",
-    "Future routing should rotate across configured keys before falling back models.",
-    "Future live-call failures should be recorded without logging API keys or prompt bodies.",
+    "Runtime services may call configured Gemini clients outside tests.",
+    "Tests continue to use dependency injection and fake clients.",
+    "Provider failures are classified without logging API keys or prompt bodies.",
   ],
 });
