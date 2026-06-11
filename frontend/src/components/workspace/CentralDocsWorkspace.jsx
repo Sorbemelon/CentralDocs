@@ -125,6 +125,18 @@ export default function CentralDocsWorkspace() {
   const getDocById = useCallback((id) => documents.find((d) => d.id === id) || null, [documents]);
   const getFolderById = useCallback((id) => folders.find((f) => f.id === id) || null, [folders]);
 
+  // Folder hierarchy (children grouped by parent id; unknown parents go to root).
+  const folderChildren = useMemo(() => {
+    const ids = new Set(folders.map((f) => f.id));
+    const map = new Map();
+    folders.forEach((f) => {
+      const key = f.parentFolderId && ids.has(f.parentFolderId) ? f.parentFolderId : null;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(f);
+    });
+    return map;
+  }, [folders]);
+
   // --- selection wrappers (toast + local/remote handled by the hook) ---
   const attach = useCallback(
     (kind, id) => {
@@ -502,18 +514,6 @@ export default function CentralDocsWorkspace() {
     () => selection.docIds.map(getDocById).filter(Boolean),
     [selection.docIds, getDocById],
   );
-  // Folder hierarchy (children grouped by parent id; unknown parents go to root).
-  const folderChildren = useMemo(() => {
-    const ids = new Set(folders.map((f) => f.id));
-    const map = new Map();
-    folders.forEach((f) => {
-      const key = f.parentFolderId && ids.has(f.parentFolderId) ? f.parentFolderId : null;
-      if (!map.has(key)) map.set(key, []);
-      map.get(key).push(f);
-    });
-    return map;
-  }, [folders]);
-
   // Selecting a folder cascades to all descendant folders (display + context).
   const effectiveFolderIds = useMemo(() => {
     const set = new Set(selection.folderIds);
