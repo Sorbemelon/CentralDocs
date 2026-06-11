@@ -75,6 +75,32 @@ test("document DTO hides storage internals", () => {
   assert.ok(!("_id" in dto));
 });
 
+test("document DTO exposes stable mock folder ID for seeded mock documents", () => {
+  const dto = toDocumentDto({
+    _id: "document_1",
+    mockId: "mock_doc",
+    title: "Seeded Mock",
+    originalFilename: "brief.md",
+    downloadFilename: "brief.md",
+    fileExtension: "md",
+    mimeType: "text/markdown",
+    fileKind: "markdown",
+    folderId: "507f1f77bcf86cd799439011",
+    folderMockId: "mock_folder_strategy",
+    scope: "mock",
+    sourceType: "mock",
+    readOnly: true,
+    status: "ready",
+    lifecycleStatus: "active",
+    sizeBytes: 12,
+    contentStats: { chunkCount: 1 },
+  });
+
+  assert.equal(dto.id, "mock_doc");
+  assert.equal(dto.folderId, "mock_folder_strategy");
+  assert.equal(dto.searchable, true);
+});
+
 test("document DTO marks uploaded failed documents downloadable but not attachable", () => {
   const dto = toDocumentDto({
     _id: "upload_1",

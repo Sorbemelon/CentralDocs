@@ -81,6 +81,7 @@ test("mock seed repository builds read-only mock document upsert payloads", () =
   assert.equal(update.storageProvider, "s3");
   assert.equal(update.objectKey, fixtureAsset.objectKey);
   assert.equal(update.folderId, "folder_object_id");
+  assert.equal(update.folderMockId, fixtureAsset.folderMockId);
   assert.deepEqual(update.demoQuestions, ["What is the brief?"]);
 });
 

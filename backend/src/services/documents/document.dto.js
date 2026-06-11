@@ -61,6 +61,10 @@ function isReadyActive(raw = {}) {
   return raw.status === "ready" && raw.lifecycleStatus === "active";
 }
 
+function publicFolderId(raw = {}) {
+  return serializeId(raw.folderMockId || raw.folderId);
+}
+
 export function toDocumentDto(document, { includePreview = false } = {}) {
   const raw = document?.toObject ? document.toObject() : document;
   const contentStats = toContentStats(raw.contentStats);
@@ -73,7 +77,7 @@ export function toDocumentDto(document, { includePreview = false } = {}) {
     fileExtension: raw.fileExtension,
     mimeType: raw.mimeType,
     fileKind: raw.fileKind,
-    folderId: serializeId(raw.folderId),
+    folderId: publicFolderId(raw),
     folderName: raw.folderName || null,
     scope: raw.scope,
     sourceType: raw.sourceType,

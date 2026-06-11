@@ -57,6 +57,7 @@ export function buildMockDocumentUpsertPayloads({ manifest = {}, assets = [], fo
           mockId,
           manifestPath: asset?.manifestPath || document.relativePath,
           folderId: folderIdByMockId.get(asset?.folderMockId) || null,
+          folderMockId: asset?.folderMockId || null,
           scope: DOCUMENT_SCOPE.MOCK,
           sourceType: SOURCE_TYPE.MOCK,
           title: document.title,

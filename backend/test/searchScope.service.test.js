@@ -11,7 +11,8 @@ const docs = [
     _id: "mock_object",
     id: "mock_public",
     mockId: "mock_public",
-    folderId: "folder_mock",
+    folderId: "507f1f77bcf86cd799439011",
+    folderMockId: "folder_mock",
     folderName: "Mock Folder",
     scope: "mock",
     sourceType: "mock",
@@ -142,6 +143,20 @@ test("search scope resolves selected documents and folders as a deduped union", 
   });
 
   assert.deepEqual(scope.resolvedDocumentIds, ["mock_object", "user_doc", "generated_doc"]);
+});
+
+test("search scope resolves seeded mock documents by public folder ID", async () => {
+  const scope = await resolveSearchScope({
+    request: request({
+      selectedFolderIds: ["folder_mock"],
+      scope: "mock",
+    }),
+    demoSessionId: "demo_123",
+    repositories: repository(),
+  });
+
+  assert.deepEqual(scope.resolvedDocumentIds, ["mock_object"]);
+  assert.equal(scope.documents[0].folderId, "folder_mock");
 });
 
 test("search scope filters file kinds and excludes trashed, failed, and not-ready docs", async () => {

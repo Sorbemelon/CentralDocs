@@ -14,6 +14,10 @@ function publicFolderId(folder = {}) {
   return serializeId(folder.id || folder.mockId || folder._id);
 }
 
+function publicDocumentFolderId(document = {}) {
+  return serializeId(document.folderMockId || document.publicFolderId || document.folderId);
+}
+
 export function toAttachedDocumentSnapshot(document = {}) {
   return {
     id: publicDocumentId(document),
@@ -21,7 +25,7 @@ export function toAttachedDocumentSnapshot(document = {}) {
     fileKind: document.fileKind || null,
     sourceType: document.sourceType || null,
     scope: document.scope || null,
-    folderId: serializeId(document.folderId),
+    folderId: publicDocumentFolderId(document),
     folderName: document.folderName || null,
     status: document.status || null,
     lifecycleStatus: document.lifecycleStatus || null,

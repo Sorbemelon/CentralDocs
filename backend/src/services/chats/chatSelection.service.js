@@ -103,9 +103,13 @@ function isDocumentSelected(document, selectedDocumentIds) {
   return selectedDocumentIds.some((id) => ids.has(id));
 }
 
+function publicDocumentFolderId(document = {}) {
+  return serializeId(document.folderMockId || document.publicFolderId || document.folderId);
+}
+
 function resolvedFromFolderIds(document, selectedFolderIds) {
   const existing = (document.resolvedFromFolderIds || []).map((id) => serializeId(id)).filter(Boolean);
-  const folderId = serializeId(document.folderId);
+  const folderId = publicDocumentFolderId(document);
   const matched = [];
 
   for (const selectedFolderId of selectedFolderIds) {
@@ -118,7 +122,7 @@ function resolvedFromFolderIds(document, selectedFolderIds) {
 }
 
 function enrichDocument(document = {}, folderById = new Map(), selectedFolderIds = []) {
-  const folderId = serializeId(document.folderId);
+  const folderId = publicDocumentFolderId(document);
   const folder = folderById.get(folderId);
 
   return {

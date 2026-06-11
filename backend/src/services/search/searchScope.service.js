@@ -59,7 +59,13 @@ function matchesSelectedFolder(document = {}, selectedFolderIds = []) {
     return false;
   }
 
-  return selectedFolderIds.includes(serializeId(document.folderId));
+  const ids = new Set([
+    serializeId(document.folderMockId),
+    serializeId(document.publicFolderId),
+    serializeId(document.folderId),
+  ].filter(Boolean));
+
+  return selectedFolderIds.some((selectedId) => ids.has(selectedId));
 }
 
 function isSearchableDocument(document = {}, { allowedScopes, fileKinds = [] } = {}) {
@@ -84,7 +90,7 @@ function toDocumentMetadata(document = {}) {
     id: documentPublicId(document),
     vectorDocumentId: documentChunkId(document),
     mockId: document.mockId || null,
-    folderId: serializeId(document.folderId),
+    folderId: serializeId(document.folderMockId || document.publicFolderId || document.folderId),
     folderName: document.folderName || document.folder?.name || null,
     title: document.title || null,
     fileKind: document.fileKind || null,

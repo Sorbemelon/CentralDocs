@@ -142,10 +142,25 @@ function matchesLifecycle(entity, filters = {}) {
   return filters.includeTrash === "true" || entity.lifecycleStatus === LIFECYCLE_STATUS.ACTIVE;
 }
 
+function serializeId(value) {
+  if (!value) {
+    return null;
+  }
+
+  return String(value);
+}
+
 function buildPersistentWorkspace(seedRecords) {
   const folders = toFolderDtos(seedRecords.folders);
+  const folderByDatabaseId = new Map(
+    seedRecords.folders
+      .map((folder, index) => [serializeId(folder._id || folder.id), folders[index]])
+      .filter(([id]) => Boolean(id)),
+  );
   const documents = toDocumentDtos(seedRecords.documents).map((document) => ({
     ...document,
+    folderId: folderByDatabaseId.get(document.folderId)?.id || document.folderId,
+    folderName: document.folderName || folderByDatabaseId.get(document.folderId)?.name || null,
     attachable: true,
     downloadAvailable: true,
     seeded: true,

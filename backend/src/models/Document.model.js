@@ -70,6 +70,11 @@ const documentSchema = new mongoose.Schema(
       ref: "Folder",
       default: null,
     },
+    folderMockId: {
+      type: String,
+      default: null,
+      index: true,
+    },
     scope: {
       type: String,
       enum: DOCUMENT_SCOPES,

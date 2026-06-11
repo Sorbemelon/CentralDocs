@@ -41,6 +41,7 @@ test("Document schema has required paths, enums, defaults, and indexes", () => {
   assert.equal(Document.schema.path("title").isRequired, true);
   assert.equal(Document.schema.path("objectKey").isRequired, true);
   assert.equal(Document.schema.path("mockId").instance, "String");
+  assert.equal(Document.schema.path("folderMockId").instance, "String");
   assert.equal(Document.schema.path("manifestPath").instance, "String");
   assert.equal(Document.schema.path("description").instance, "String");
   assert.equal(Document.schema.path("demoQuestions").instance, "Array");
@@ -68,6 +69,7 @@ test("Document schema has required paths, enums, defaults, and indexes", () => {
   assert.equal(hasIndex(Document.schema, { fileKind: 1 }), true);
   assert.equal(hasIndex(Document.schema, { createdAt: -1 }), true);
   assert.equal(hasIndex(Document.schema, { mockId: 1, scope: 1 }), true);
+  assert.equal(hasIndex(Document.schema, { folderMockId: 1 }), true);
 });
 
 test("Document generated and media metadata fields exist", () => {

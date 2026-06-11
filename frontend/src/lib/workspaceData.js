@@ -417,9 +417,9 @@ export function normalizeChatMessage(dto = {}) {
   };
 }
 
-/** Local (not-yet-persisted) chats use a `local-` id prefix. */
+/** Local/fallback chats are not persisted and should never be fetched by id. */
 export function isLocalChatId(id) {
-  return typeof id === "string" && id.startsWith("local-");
+  return typeof id === "string" && (id.startsWith("local-") || /^chat-\d+$/.test(id));
 }
 
 function relativeTime(value) {

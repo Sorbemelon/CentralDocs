@@ -10,7 +10,8 @@ const documents = [
     fileKind: "markdown",
     sourceType: "mock",
     scope: "mock",
-    folderId: "mock_folder",
+    folderId: "507f1f77bcf86cd799439011",
+    folderMockId: "mock_folder",
     folderName: "Mock Folder",
     status: "ready",
     lifecycleStatus: "active",
@@ -101,7 +102,7 @@ function repositories() {
           const visible = document.scope === "mock" || document.demoSessionId === demoSessionId;
           const selectedDirectly = selectedDocumentIds.includes(document.id);
           const resolvedFromFolder =
-            selectedFolderIds.includes(document.folderId) &&
+            selectedFolderIds.includes(document.folderMockId || document.folderId) &&
             document.status === "ready" &&
             document.lifecycleStatus === "active";
           return (
@@ -133,6 +134,7 @@ test("chat selection dedupes selected IDs and accepts mock/current-session docum
   assert.equal(selection.attachedDocuments.length, 2);
   assert.equal(selection.attachedFolders[0].scope, "mock");
   assert.equal(selection.snapshots.attachedDocumentSnapshot[0].id, "mock_doc");
+  assert.equal(selection.snapshots.resolvedDocumentSnapshot[0].folderId, "mock_folder");
 });
 
 test("chat selection resolves folders to active ready document snapshots and dedupes mixed input", async () => {

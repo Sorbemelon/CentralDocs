@@ -372,6 +372,9 @@ export async function listSearchableDocumentsForSemanticSearch({
     const folderIds = [...folderObjectIds];
     const folderMockIds = selectedFolderIds.filter((id) => !mongoose.Types.ObjectId.isValid(id));
     if (folderMockIds.length > 0) {
+      selectionFilters.push({ folderMockId: { $in: folderMockIds } });
+    }
+    if (folderMockIds.length > 0) {
       const mockFolders = await Folder.find({
         mockId: { $in: folderMockIds },
         lifecycleStatus: LIFECYCLE_STATUS.ACTIVE,
@@ -420,6 +423,9 @@ export async function listAttachableDocumentsForChatSelection({
 
   const folderIds = selectedFolderIds.filter((id) => mongoose.Types.ObjectId.isValid(id));
   const folderMockIds = selectedFolderIds.filter((id) => !mongoose.Types.ObjectId.isValid(id));
+  if (folderMockIds.length > 0) {
+    selectionFilters.push({ folderMockId: { $in: folderMockIds } });
+  }
   if (folderMockIds.length > 0) {
     const mockFolders = await Folder.find({
       mockId: { $in: folderMockIds },
