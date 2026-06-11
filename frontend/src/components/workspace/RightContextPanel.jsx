@@ -26,14 +26,14 @@ function CollapsibleCard({ icon: Icon, iconClass, title, defaultOpen = true, cla
   );
 }
 
-/** Right = supporting context/guide/usage on a teal-slate surface (references live under answers). */
+/** Right = supporting context, guide, and usage on a teal-slate surface. */
 function RightContextPanel({ ws, className }) {
   return (
     <aside className={cn("flex min-h-0 flex-col border-l border-panel-border bg-panel", className)}>
       <div className="flex h-10.5 shrink-0 items-center px-3">
         <h2 className="text-sm font-semibold tracking-tight">Context</h2>
       </div>
-      <ScrollArea className="flex-1 px-2.5 pb-3">
+      <ScrollArea className="flex-1 px-2.5 pb-2">
         <div className="flex flex-col gap-2.5">
           <CollapsibleCard icon={Layers} iconClass="text-teal" title="Current Selected Context">
             <CurrentContextCard ws={ws} />
@@ -42,7 +42,7 @@ function RightContextPanel({ ws, className }) {
             icon={Compass}
             iconClass="text-teal-subtle-foreground"
             title="Demo Guide"
-            className="border-teal/35 bg-teal-subtle/45"
+            className="border-teal/55 bg-card"
           >
             <DemoGuideCard ws={ws} />
           </CollapsibleCard>

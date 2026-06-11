@@ -92,21 +92,27 @@ function ChatRow({ ws, chat }) {
 }
 
 /**
- * Chat sessions — always BELOW Sources, collapsible (expanded by default).
- * When collapsed, only the header band stays, anchored to the sidebar bottom.
+ * Chat sessions, collapsible and reusable in the sidebar or right context panel.
  */
-function ChatSessionList({ ws, className }) {
+function ChatSessionList({ ws, className, variant = "sidebar" }) {
   const [open, setOpen] = useState(true);
+  const isPanel = variant === "panel";
 
   return (
     <section
       className={cn(
-        "flex flex-col border-t border-sidebar-border",
-        open ? "min-h-0 flex-2 max-h-[44%]" : "mt-auto shrink-0",
+        "flex flex-col",
+        isPanel ? "rounded-lg border border-border bg-card shadow-sm" : "border-t border-sidebar-border bg-sidebar-accent/80",
+        open ? "h-72 min-h-0 shrink-0" : (isPanel ? "shrink-0" : "mt-auto shrink-0"),
         className,
       )}
     >
-      <div className="mx-2 my-1.5 flex items-center justify-between gap-2 rounded-md bg-sidebar-accent px-2 py-1">
+      <div
+        className={cn(
+          "mx-2 my-1.5 flex items-center justify-between gap-2 rounded-md border px-2 py-1",
+          isPanel ? "border-border bg-muted/60" : "border-sidebar-border bg-sidebar",
+        )}
+      >
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
@@ -124,7 +130,7 @@ function ChatSessionList({ ws, className }) {
         </Button>
       </div>
       {open && (
-        <ScrollArea className="flex-1 px-1.5 pb-2">
+        <ScrollArea className="min-h-0 flex-1 px-1.5 pb-2">
           {ws.loading?.chats ? (
             <LoadingState rows={3} />
           ) : ws.chats.length ? (

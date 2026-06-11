@@ -1,7 +1,9 @@
+import { useRef, useState } from "react";
 import { FileText, Folder, Loader2, MessagesSquare, Quote, Send, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { EmptyState } from "@/components/common/EmptyState";
 import { LoadingState } from "@/components/common/LoadingState";
 import { cn } from "@/lib/cn";
@@ -28,14 +30,14 @@ function UserMessage({ message }) {
 
   return (
     <div className="flex flex-col items-end gap-1">
-      <div className="max-w-[80%] whitespace-pre-wrap rounded-lg rounded-br-sm bg-primary px-3 py-2 text-sm text-primary-foreground">
+      <div className="max-w-[80%] whitespace-pre-wrap rounded-lg rounded-br-sm bg-teal px-3 py-2 text-sm text-teal-foreground">
         {message.content}
       </div>
       {(docs.length > 0 || folders.length > 0) && (
-        <Accordion type="single" className="max-w-[80%]">
-          <AccordionItem value="ctx">
-            <AccordionTrigger className="text-[11px] text-muted-foreground">
-              Documents used: {docs.length}
+        <Accordion type="single" className="max-w-[80%] items-end">
+          <AccordionItem value="ctx" className="flex flex-col items-end">
+            <AccordionTrigger className="w-auto justify-end gap-1 text-[11px] text-muted-foreground">
+              Selected documents: {docs.length}
             </AccordionTrigger>
             <AccordionContent className="flex flex-col gap-0.5 rounded-md border border-border bg-card p-2 text-[12px]">
               {[...grouped.entries()].map(([folderName, titles]) => (
@@ -66,7 +68,7 @@ function UserMessage({ message }) {
   );
 }
 
-function AssistantMessage({ message, selected, onSelect }) {
+function LegacyAssistantMessage({ message, selected, onSelect }) {
   const refs = message.references || [];
   const meta = message.aiMeta;
   return (
@@ -75,8 +77,8 @@ function AssistantMessage({ message, selected, onSelect }) {
         type="button"
         onClick={onSelect}
         className={cn(
-          "max-w-[80%] whitespace-pre-wrap rounded-lg rounded-bl-sm border bg-card px-3 py-2 text-left text-sm text-card-foreground shadow-sm transition-colors",
-          selected ? "border-primary/50 ring-1 ring-primary/20" : "border-border hover:border-primary/30",
+          "max-w-[80%] whitespace-pre-wrap rounded-lg rounded-bl-sm bg-primary px-3 py-2 text-left text-sm text-primary-foreground shadow-sm transition-colors hover:bg-primary/90",
+          selected && "ring-2 ring-primary/25 ring-offset-1 ring-offset-background",
         )}
       >
         {message.content}
@@ -112,6 +114,140 @@ function AssistantMessage({ message, selected, onSelect }) {
   );
 }
 
+function AnswerContent({ content, refs, onCitationClick }) {
+  const refNumbers = new Set(refs.map((r) => Number(r.number)).filter((n) => Number.isFinite(n)));
+  const parts = [];
+  const citationPattern = /\[(\d+)\]/g;
+  let lastIndex = 0;
+  let match;
+
+  while ((match = citationPattern.exec(content)) !== null) {
+    const citationText = match[0];
+    const citationNumber = Number(match[1]);
+    if (match.index > lastIndex) parts.push(content.slice(lastIndex, match.index));
+    parts.push({ citationText, citationNumber, linked: refNumbers.has(citationNumber) });
+    lastIndex = match.index + citationText.length;
+  }
+
+  if (lastIndex < content.length) parts.push(content.slice(lastIndex));
+
+  return parts.map((part, index) => {
+    if (typeof part === "string") return <span key={`text-${index}`}>{part}</span>;
+    if (!part.linked) return <span key={`cite-${index}`}>{part.citationText}</span>;
+    return (
+      <button
+        key={`cite-${index}`}
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onCitationClick(part.citationNumber);
+        }}
+        className="mx-0.5 inline-flex translate-y-[-1px] rounded border border-background/80 bg-background px-1 py-0 text-[11px] font-bold leading-4 text-primary shadow-sm transition-colors hover:bg-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-background"
+        title={`Show reference ${part.citationNumber}`}
+      >
+        {part.citationNumber}
+      </button>
+    );
+  });
+}
+
+function formatReferenceFilename(ref) {
+  const title = ref.title || "Untitled";
+  const ext = String(ref.fileType || "").replace(/^\./, "").toLowerCase();
+  if (!ext || title.toLowerCase().endsWith(`.${ext}`)) return title;
+  return `${title}.${ext}`;
+}
+
+function formatReferencePath(ref) {
+  return [ref.folderName, formatReferenceFilename(ref)].filter(Boolean).join(" / ");
+}
+
+function AssistantMessage({ message, selected, onSelect }) {
+  const refs = message.references || [];
+  const meta = message.aiMeta;
+  const [refsOpen, setRefsOpen] = useState("");
+  const [focusedRefNumber, setFocusedRefNumber] = useState(null);
+  const refNodes = useRef(new Map());
+
+  const focusReference = (number) => {
+    setRefsOpen("refs");
+    setFocusedRefNumber(number);
+    window.requestAnimationFrame(() => {
+      refNodes.current.get(number)?.scrollIntoView({ block: "nearest" });
+    });
+  };
+
+  const onBubbleKeyDown = (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onSelect();
+    }
+  };
+
+  return (
+    <div className="flex flex-col items-start gap-1">
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={onSelect}
+        onKeyDown={onBubbleKeyDown}
+        className={cn(
+          "max-w-[80%] whitespace-pre-wrap rounded-lg rounded-bl-sm bg-primary px-3 py-2 text-left text-sm text-primary-foreground shadow-sm transition-colors hover:bg-primary/90",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          selected && "ring-2 ring-primary/25 ring-offset-1 ring-offset-background",
+        )}
+      >
+        <AnswerContent content={message.content} refs={refs} onCitationClick={focusReference} />
+      </div>
+      {(refs.length > 0 || meta) && (
+        <Accordion type="single" value={refsOpen} onValueChange={setRefsOpen} className="max-w-[80%] items-start">
+          <AccordionItem value="refs" className="flex flex-col items-start">
+            <AccordionTrigger className="w-auto justify-start gap-1 text-[11px] text-muted-foreground">
+              References used: {refs.length}
+            </AccordionTrigger>
+            <AccordionContent className="flex flex-col gap-0.5 py-1 text-[12px]">
+              {refs.map((r) => (
+                <div
+                  key={`${r.number}-${r.documentId}`}
+                  id={`assistant-ref-${message.id}-${r.number}`}
+                  ref={(node) => {
+                    const key = Number(r.number);
+                    if (node) refNodes.current.set(key, node);
+                    else refNodes.current.delete(key);
+                  }}
+                  className={cn(
+                    "px-1.5 py-0.5 text-muted-foreground transition-colors",
+                    focusedRefNumber === Number(r.number) && "text-primary",
+                  )}
+                >
+                  <div className="flex items-start gap-1.5">
+                    <span className="mt-0.5 shrink-0 font-mono text-[10px] font-semibold text-primary">
+                      {r.number}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="flex min-w-0 items-center gap-1.5 text-foreground">
+                        <FileText className="size-3 shrink-0 text-primary" />
+                        <span className="min-w-0 truncate">{formatReferencePath(r)}</span>
+                      </span>
+                    </span>
+                  </div>
+                </div>
+              ))}
+              {meta && (
+                <p className="pt-1 text-[10px] text-muted-foreground">
+                  {[meta.model, meta.latencyMs != null ? `${meta.latencyMs} ms` : null, meta.fallbackUsed ? "fallback" : null]
+                    .filter(Boolean)
+                    .join(" - ")}
+                </p>
+              )}
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
+      )}
+    </div>
+  );
+}
+
 function PendingAssistant({ step }) {
   return (
     <div className="flex flex-col items-start gap-1">
@@ -122,7 +258,7 @@ function PendingAssistant({ step }) {
   );
 }
 
-/** Chat tab — saved messages above a sticky prompt box (messages scroll behind it). */
+/** Chat tab — saved messages scroll above a bottom composer. */
 function ChatPanelShell({ ws }) {
   const chat = ws.chat;
   const offline = !ws.online;
@@ -149,64 +285,65 @@ function ChatPanelShell({ ws }) {
   };
 
   return (
-    <div className="flex flex-col gap-2.5">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+    <div className="flex min-h-0 flex-1 flex-col gap-2.5">
+      <div className="shrink-0 flex flex-wrap items-center justify-between gap-2">
         <h3 className="min-w-0 truncate text-sm font-semibold">{ws.activeChat?.title || "New chat"}</h3>
         <Button size="sm" variant="teal" onClick={ws.openGenerateModal} disabled={!canGenerate} title={generateReason}>
           <Sparkles /> Generate Document
         </Button>
       </div>
 
-      <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-3 shadow-sm">
-        {chat.isLoadingMessages ? (
-          <LoadingState rows={3} />
-        ) : chat.messages.length ? (
-          <>
-            {chat.messages.map((m) =>
-              m.role === "user" ? (
-                <UserMessage key={m.id} message={m} />
-              ) : (
-                <AssistantMessage
-                  key={m.id}
-                  message={m}
-                  selected={m.id === chat.selectedAssistantMessageId}
-                  onSelect={() => chat.selectAssistantMessage(m.id)}
-                />
-              ),
-            )}
-            {chat.isSending && <PendingAssistant step={chat.pendingStep} />}
-          </>
-        ) : chat.isSending ? (
-          <PendingAssistant step={chat.pendingStep} />
-        ) : (
-          <EmptyState
-            icon={MessagesSquare}
-            title="Ask about your sources"
-            description="Answers are grounded in the documents you tick in the source tree, with references."
-            action={
-              <div className="flex flex-col gap-1">
-                {CHAT_SAMPLE_QUESTIONS.slice(0, 4).map((q) => (
-                  <button
-                    key={q}
-                    type="button"
-                    onClick={() => chat.setDraft(q)}
-                    className="rounded-md border border-border bg-card/60 px-2 py-1 text-left text-[12px] text-foreground transition-colors hover:border-primary/40 hover:bg-accent/60"
-                  >
-                    {q}
-                  </button>
-                ))}
-              </div>
-            }
-          />
-        )}
-      </div>
+      <ScrollArea className="min-h-0 flex-1 rounded-lg border border-border bg-card shadow-sm">
+        <div className="flex min-h-full flex-col gap-3 p-3">
+          {chat.isLoadingMessages ? (
+            <LoadingState rows={3} />
+          ) : chat.messages.length ? (
+            <>
+              {chat.messages.map((m) =>
+                m.role === "user" ? (
+                  <UserMessage key={m.id} message={m} />
+                ) : (
+                  <AssistantMessage
+                    key={m.id}
+                    message={m}
+                    selected={m.id === chat.selectedAssistantMessageId}
+                    onSelect={() => chat.selectAssistantMessage(m.id)}
+                  />
+                ),
+              )}
+              {chat.isSending && <PendingAssistant step={chat.pendingStep} />}
+            </>
+          ) : chat.isSending ? (
+            <PendingAssistant step={chat.pendingStep} />
+          ) : (
+            <EmptyState
+              icon={MessagesSquare}
+              title="Ask about your sources"
+              description="Answers are grounded in the documents you tick in the source tree, with references."
+              action={
+                <div className="flex flex-col gap-1">
+                  {CHAT_SAMPLE_QUESTIONS.slice(0, 4).map((q) => (
+                    <button
+                      key={q}
+                      type="button"
+                      onClick={() => chat.setDraft(q)}
+                      className="rounded-md border border-border bg-card/60 px-2 py-1 text-left text-[12px] text-foreground transition-colors hover:border-primary/40 hover:bg-accent/60"
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              }
+            />
+          )}
+        </div>
+      </ScrollArea>
 
       {chat.sendError && (
         <p className="text-[12px] text-destructive">Couldn’t generate an answer. Your prompt was kept — try again.</p>
       )}
 
-      {/* Sticky prompt box: messages scroll behind it, ChatGPT-style. */}
-      <div className="sticky bottom-0 z-10 -mx-1 bg-background px-1 pb-1 pt-1.5">
+      <div className="-mx-1 shrink-0 bg-background px-1 pb-1 pt-1">
         <div className={cn("rounded-lg border border-input bg-card p-2 shadow-sm", !ws.hasContext && "opacity-90")}>
           <Textarea
             rows={2}
@@ -234,6 +371,7 @@ function ChatPanelShell({ ws }) {
               )}
               <Button
                 size="sm"
+                variant="teal"
                 onClick={() => chat.sendMessage()}
                 disabled={!canSend}
                 title={offline ? "Backend is offline" : undefined}

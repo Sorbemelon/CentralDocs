@@ -7,6 +7,7 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { DOC_STATUS } from "@/lib/constants";
 import { normalizeDocument } from "@/lib/workspaceData";
 import { getDocument, getDocumentStatus, previewDocument } from "@/services/documentApi";
+import { FileExtensionTag } from "./FileExtensionTag";
 import { getFileIcon, SourceBadge } from "./DocumentList";
 
 function FlagChip({ on, label }) {
@@ -80,7 +81,7 @@ function PreviewPanelShell({ ws }) {
             <div className="min-w-0">
               <h3 className="truncate text-sm font-semibold">{doc.title}</h3>
               <div className="mt-1 flex flex-wrap items-center gap-1">
-                <Badge variant="outline">{doc.type}</Badge>
+                <FileExtensionTag type={doc.type} className="px-1.5 py-0.5 leading-tight" />
                 <SourceBadge source={doc.source} />
                 <DocStatusBadge status={doc.status} />
               </div>

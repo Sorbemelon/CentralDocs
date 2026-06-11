@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { getChat, sendChatMessage } from "@/services/chatApi";
-import { isLocalChatId, normalizeChatMessage } from "./workspaceData";
+import { isLocalChatId, normalizeChatMessage, normalizeReference } from "./workspaceData";
 import { DEMO_LIMITS } from "./constants";
 import { FALLBACK_CHAT_MESSAGES } from "@/data/demoCopy";
 
@@ -78,6 +78,9 @@ export function useChatMessages({
   const applyChatResponse = useCallback((res) => {
     const user = res?.userMessage ? normalizeChatMessage(res.userMessage) : null;
     const assistant = res?.assistantMessage ? normalizeChatMessage(res.assistantMessage) : null;
+    if (assistant && !assistant.references.length && Array.isArray(res?.references) && res.references.length) {
+      assistant.references = res.references.map(normalizeReference);
+    }
     setMessages((prev) => [...prev, user, assistant].filter(Boolean));
     if (assistant) setSelectedAssistantMessageId(assistant.id);
     const { onChatUpdated: onChat, onPromptUsage: onUsage } = ref.current;

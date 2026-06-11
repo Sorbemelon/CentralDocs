@@ -10,6 +10,7 @@ import { cn } from "@/lib/cn";
 import { scoreToPercent } from "@/lib/workspaceData";
 import { SEARCH_SCOPE_OPTIONS } from "@/lib/useSemanticSearch";
 import { SEARCH_SAMPLE_QUESTIONS } from "@/data/demoCopy";
+import { FileExtensionTag } from "./FileExtensionTag";
 import { getFileIcon, SourceBadge } from "./DocumentList";
 
 function ScopeChips({ scope, onChange }) {
@@ -73,9 +74,7 @@ function ResultRow({ ws, result }) {
       </div>
 
       <div className="mt-1 flex flex-wrap items-center gap-1">
-        {(doc?.type || result.fileKind) && (
-          <Badge variant="outline" className="px-1 py-0 text-[10px]">{(doc?.type || result.fileKind).toUpperCase()}</Badge>
-        )}
+        <FileExtensionTag type={doc?.type || result.fileKind} />
         {doc && <SourceBadge source={doc.source} />}
         {doc && <DocStatusBadge status={doc.status} />}
       </div>

@@ -5,18 +5,24 @@ import { cn } from "@/lib/cn";
 const AccordionContext = createContext(null);
 const ItemContext = createContext(null);
 
+function toOpenArray(value) {
+  return Array.isArray(value) ? value : value ? [value] : [];
+}
+
 /** Lightweight collapsible accordion (type: "single" | "multiple"). */
-function Accordion({ type = "multiple", defaultValue = [], className, children, ...props }) {
-  const [open, setOpen] = useState(() =>
-    Array.isArray(defaultValue) ? defaultValue : defaultValue ? [defaultValue] : [],
-  );
+function Accordion({ type = "multiple", defaultValue = [], value, onValueChange, className, children, ...props }) {
+  const controlled = value !== undefined;
+  const [internalOpen, setInternalOpen] = useState(() => toOpenArray(defaultValue));
+  const open = controlled ? toOpenArray(value) : internalOpen;
+
+  const updateOpen = (next) => {
+    if (!controlled) setInternalOpen(next);
+    if (onValueChange) onValueChange(type === "single" ? next[0] || "" : next);
+  };
 
   const toggle = (value) => {
-    setOpen((prev) => {
-      const isOpen = prev.includes(value);
-      if (type === "single") return isOpen ? [] : [value];
-      return isOpen ? prev.filter((v) => v !== value) : [...prev, value];
-    });
+    const isOpen = open.includes(value);
+    updateOpen(type === "single" ? (isOpen ? [] : [value]) : isOpen ? open.filter((v) => v !== value) : [...open, value]);
   };
 
   return (

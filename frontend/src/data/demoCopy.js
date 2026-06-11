@@ -92,7 +92,19 @@ export const FALLBACK_CHAT_MESSAGES = Object.freeze([
     createdAt: null,
     contextDocs: [],
     attachedFolderNames: [],
-    references: [],
+    references: [
+      {
+        number: 1,
+        documentId: "fallback-reference-1",
+        title: "Digital Workspace Rollout Plan",
+        fileType: "md",
+        folderName: "Strategy & Rollout",
+        locator: "rollout risks",
+        excerpt: "",
+        score: null,
+        usedFor: "demo preview",
+      },
+    ],
     aiMeta: null,
   },
 ]);

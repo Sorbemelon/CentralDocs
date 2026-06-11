@@ -1,6 +1,9 @@
+import { useState } from "react";
 import { FileText, Folder, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/common/EmptyState";
+import { cn } from "@/lib/cn";
+import { FileExtensionTag } from "./FileExtensionTag";
 
 function RemoveAction({ onRemove }) {
   return (
@@ -14,14 +17,26 @@ function RemoveAction({ onRemove }) {
   );
 }
 
-function DocLine({ title }) {
+function DocLine({ doc, onRemove }) {
+  const [expanded, setExpanded] = useState(false);
+
   return (
-    <p className="flex items-center gap-1.5 truncate text-[12px] text-foreground">
-      <FileText className="size-3 shrink-0 text-primary" />
-      <span className="min-w-0 truncate" title={title}>
-        {title}
-      </span>
-    </p>
+    <div className={cn("group flex gap-1.5 rounded-md px-1 py-0.5 hover:bg-accent/60", expanded ? "items-start" : "items-center")}>
+      <FileText className={cn("size-3 shrink-0 text-primary", expanded && "mt-0.5")} />
+      <button
+        type="button"
+        onClick={() => setExpanded((value) => !value)}
+        title={expanded ? "Collapse file name" : doc.title}
+        className={cn(
+          "min-w-0 flex-1 rounded-sm p-0 text-left text-[12px] text-foreground hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          expanded ? "whitespace-normal break-words leading-snug" : "truncate leading-none",
+        )}
+      >
+        {doc.title}
+      </button>
+      <FileExtensionTag type={doc.type} />
+      {onRemove && <RemoveAction onRemove={onRemove} />}
+    </div>
   );
 }
 
@@ -44,7 +59,7 @@ function FolderSubtree({ ws, folder, depth, onRemove }) {
             <FolderSubtree key={child.id} ws={ws} folder={child} depth={depth + 1} />
           ))}
           {docs.map((d) => (
-            <DocLine key={d.id} title={d.title} />
+            <DocLine key={d.id} doc={d} />
           ))}
         </div>
       )}
@@ -93,13 +108,7 @@ function CurrentContextCard({ ws }) {
               </p>
             )}
             {looseDocs.map((d) => (
-              <div key={d.id} className="group flex items-center gap-1.5 rounded-md px-1 py-0.5 hover:bg-accent/60">
-                <FileText className="size-3 shrink-0 text-primary" />
-                <span className="min-w-0 flex-1 truncate text-[12px] text-foreground" title={d.title}>
-                  {d.title}
-                </span>
-                <RemoveAction onRemove={() => ws.detach("document", d.id)} />
-              </div>
+              <DocLine key={d.id} doc={d} onRemove={() => ws.detach("document", d.id)} />
             ))}
           </div>
         )}

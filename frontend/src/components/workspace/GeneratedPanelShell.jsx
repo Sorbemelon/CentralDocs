@@ -1,11 +1,11 @@
 import { Check, Download, Eye, FolderInput, Sparkles, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { DocStatusBadge } from "@/components/common/StatusBadge";
 import { EmptyState } from "@/components/common/EmptyState";
 import { IconButton } from "@/components/common/IconButton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Info } from "lucide-react";
+import { FileExtensionTag } from "./FileExtensionTag";
 import { getFileIcon } from "./DocumentList";
 
 /** Generated documents tab shell. Generated docs are normal documents too. */
@@ -56,7 +56,7 @@ function GeneratedPanelShell({ ws }) {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[13px] font-medium">{doc.title}</p>
                   <div className="mt-0.5 flex items-center gap-1">
-                    <Badge variant="outline">{doc.type}</Badge>
+                    <FileExtensionTag type={doc.type} />
                     <DocStatusBadge status={doc.status} />
                     <span className="text-[11px] text-muted-foreground">{doc.createdAt}</span>
                   </div>

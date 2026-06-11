@@ -20,6 +20,7 @@ import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/compone
 import { IconButton } from "@/components/common/IconButton";
 import { cn } from "@/lib/cn";
 import { DOC_STATUS, SOURCE_KIND } from "@/lib/constants";
+import { FileExtensionTag } from "./FileExtensionTag";
 import { getFileIcon } from "./DocumentList";
 
 /**
@@ -72,6 +73,7 @@ const viaFolderNotice = () =>
 
 function DocRow({ ws, doc }) {
   const Icon = getFileIcon(doc.type);
+  const [expanded, setExpanded] = useState(false);
   const direct = ws.isSelected("document", doc.id);
   const effective = ws.isEffectivelySelected("document", doc.id);
   const via = effective && !direct;
@@ -92,7 +94,8 @@ function DocRow({ ws, doc }) {
   return (
     <div
       className={cn(
-        "group flex h-7 items-center gap-1.5 rounded-md border border-transparent pl-1.5 pr-1 transition-colors hover:bg-accent/60",
+        "group flex gap-1.5 rounded-md border border-transparent pl-1.5 pr-1 transition-colors hover:bg-accent/60",
+        expanded ? "min-h-7 items-start py-1" : "h-7 items-center",
         effective && "border-teal/35 bg-teal-subtle/60",
       )}
     >
@@ -103,8 +106,19 @@ function DocRow({ ws, doc }) {
         onToggle={onToggle}
         label={attachLabel}
       />
-      <Icon className={cn("size-3.5 shrink-0", DOC_ICON_TONE[doc.source] || "text-muted-foreground")} />
-      <span className="min-w-0 flex-1 truncate text-[12.5px] leading-none text-foreground">{doc.title}</span>
+      <Icon className={cn("size-3.5 shrink-0", expanded && "mt-0.5", DOC_ICON_TONE[doc.source] || "text-muted-foreground")} />
+      <button
+        type="button"
+        onClick={() => setExpanded((value) => !value)}
+        title={expanded ? "Collapse file name" : doc.title}
+        className={cn(
+          "min-w-0 flex-1 rounded-sm p-0 text-left text-[12.5px] text-foreground hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          expanded ? "whitespace-normal break-words leading-snug" : "truncate leading-none",
+        )}
+      >
+        {doc.title}
+      </button>
+      <FileExtensionTag type={doc.type} />
       <StatusDot status={doc.status} statusMessage={doc.statusMessage} />
       <div className="flex shrink-0 items-center opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
         <IconButton icon={Eye} label="Preview" size="icon-xs" onClick={() => ws.openPreview(doc.id)} />
@@ -141,7 +155,7 @@ function DocRow({ ws, doc }) {
 }
 
 function FolderNode({ ws, folder, depth }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   const direct = ws.isSelected("folder", folder.id);
   const effective = ws.isEffectivelySelected("folder", folder.id);
   const via = effective && !direct;
@@ -220,7 +234,7 @@ function FolderNode({ ws, folder, depth }) {
       </div>
 
       {open && (childFolders.length > 0 || docs.length > 0) && (
-        <div className={cn("ml-3.5 flex flex-col gap-px border-l border-sidebar-border/80 pl-1.5", depth >= 3 && "ml-2.5")}>
+        <div className={cn("ml-5 flex flex-col gap-px border-l border-sidebar-border/80 pl-2.5", depth >= 3 && "ml-4")}>
           {childFolders.map((child) => (
             <FolderNode key={child.id} ws={ws} folder={child} depth={depth + 1} />
           ))}

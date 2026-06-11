@@ -1,10 +1,9 @@
 import { useRef, useState } from "react";
-import { AlertTriangle, Loader2, Paperclip, Upload, X } from "lucide-react";
+import { AlertTriangle, Loader2, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/cn";
-import { UPLOAD_ALLOWED_LABEL, validateUploadFile } from "@/lib/workspaceData";
-import { UPLOAD_COPY } from "@/data/demoCopy";
+import { validateUploadFile } from "@/lib/workspaceData";
 
 /** Tones for the inline operation status line (upload/retry live here, not in a right-panel card). */
 function operationTone(status) {
@@ -56,9 +55,25 @@ function SourceUploadCard({ ws, className }) {
   };
 
   const canUpload = Boolean(file && validation?.valid && !uploading && !offline);
+  const uploadAction = file ? (
+    <Button
+      size="xs"
+      onClick={handleUpload}
+      disabled={!canUpload}
+      title={offline ? "Backend is offline" : undefined}
+      className="h-10 w-full"
+    >
+      {uploading ? <Loader2 className="animate-spin" /> : <Upload />}
+      {uploading ? "Uploading" : "Upload"}
+    </Button>
+  ) : (
+    <Button size="xs" variant="secondary" onClick={pickFile} disabled={uploading} className="h-10 w-full">
+      <Upload /> Upload File
+    </Button>
+  );
 
   return (
-    <div className={cn("flex flex-col gap-1.5 rounded-lg border border-border bg-card p-2 shadow-sm", className)}>
+    <div className={cn("flex flex-col gap-1.5 rounded-lg border border-border bg-card px-2.5 py-2 shadow-sm", className)}>
       <input
         ref={inputRef}
         type="file"
@@ -67,31 +82,11 @@ function SourceUploadCard({ ws, className }) {
         onChange={onFileChange}
       />
 
-      <div className="flex items-start gap-2">
-        <span className="mt-0.5 inline-flex size-6 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-          <Upload className="size-3.5" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-[12px] font-semibold leading-tight text-foreground">Upload File</p>
-          <p className="text-[10px] leading-snug text-muted-foreground">
-            {UPLOAD_ALLOWED_LABEL} · one at a time · {UPLOAD_COPY.sizeCaps}
-          </p>
-        </div>
-        {file ? (
-          <Button
-            size="xs"
-            onClick={handleUpload}
-            disabled={!canUpload}
-            title={offline ? "Backend is offline" : undefined}
-          >
-            {uploading ? <Loader2 className="animate-spin" /> : <Upload />}
-            {uploading ? "Uploading" : "Upload"}
-          </Button>
-        ) : (
-          <Button size="xs" variant="secondary" onClick={pickFile} disabled={uploading}>
-            <Paperclip /> Browse
-          </Button>
-        )}
+      <div className="grid grid-cols-[minmax(0,1.25fr)_minmax(0,0.75fr)] items-center gap-2">
+        {uploadAction}
+        <p className="min-w-0 whitespace-pre-line text-left text-[10px] leading-snug text-muted-foreground">
+          {"txt/md/csv/tsv \u2264 500 KB\ndocx \u2264 1 MB\npdf \u2264 2 MB"}
+        </p>
       </div>
 
       {file && (
