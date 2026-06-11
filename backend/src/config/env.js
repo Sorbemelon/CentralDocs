@@ -1,6 +1,5 @@
 import dotenv from "dotenv";
 import { z } from "zod";
-import { AI_MODELS, GENERATION_MODEL_LANE } from "./aiModels.js";
 
 dotenv.config({ quiet: true });
 
@@ -9,19 +8,69 @@ const DEFAULT_CLIENT_ORIGINS = [
   "http://127.0.0.1:5173",
 ];
 
+export const DEFAULT_AI_PROVIDER = "gemini";
+export const DEFAULT_GEMINI_EMBEDDING_MODEL = "gemini-embedding-2";
+export const DEFAULT_GEMINI_EMBEDDING_DIMENSIONS = 768;
+export const DEFAULT_GEMINI_GENERATION_PRIMARY_MODEL = "gemini-3.5-flash";
+export const DEFAULT_GEMINI_GENERATION_FALLBACK_MODELS = Object.freeze([
+  "gemini-3-flash-preview",
+  "gemini-2.5-flash",
+]);
+export const DEFAULT_MONGODB_VECTOR_INDEX_NAME = "document_chunks_vector_index";
+export const DEFAULT_MONGODB_VECTOR_PATH = "embedding";
+
+const emptyToUndefined = (value) => {
+  if (typeof value === "string" && value.trim() === "") {
+    return undefined;
+  }
+  return value;
+};
+
+const optionalTrimmedString = () => z.preprocess(
+  emptyToUndefined,
+  z.string().trim().optional(),
+);
+
+const defaultedTrimmedString = (defaultValue) => z.preprocess(
+  emptyToUndefined,
+  z.string().trim().default(defaultValue),
+);
+
+const safeMongoDatabaseName = z.preprocess(
+  emptyToUndefined,
+  z.string()
+    .trim()
+    .regex(/^[^/\\.$"*\s<>:|?]+$/, "MongoDB database name contains unsupported characters.")
+    .optional(),
+);
+
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().positive().default(8080),
-  CLIENT_ORIGINS: z.string().optional(),
-  MONGODB_URI: z.string().trim().optional(),
-  AWS_REGION: z.string().trim().optional(),
-  AWS_S3_BUCKET: z.string().trim().optional(),
-  AWS_ACCESS_KEY_ID: z.string().trim().optional(),
-  AWS_SECRET_ACCESS_KEY: z.string().trim().optional(),
-  GEMINI_API_KEY_1: z.string().trim().optional(),
-  GEMINI_API_KEY_2: z.string().trim().optional(),
-  GEMINI_API_KEY_3: z.string().trim().optional(),
-  GEMINI_API_KEYS: z.string().trim().optional(),
+  CLIENT_ORIGINS: optionalTrimmedString(),
+  MONGODB_URI: optionalTrimmedString(),
+  MONGODB_DATABASE_NAME: safeMongoDatabaseName,
+  MONGODB_VECTOR_INDEX_NAME: defaultedTrimmedString(DEFAULT_MONGODB_VECTOR_INDEX_NAME)
+    .pipe(z.string().regex(/^[A-Za-z0-9_-]+$/, "MongoDB vector index name must be a safe identifier.")),
+  MONGODB_VECTOR_PATH: defaultedTrimmedString(DEFAULT_MONGODB_VECTOR_PATH)
+    .pipe(z.string().regex(/^[A-Za-z0-9_.]+$/, "MongoDB vector path must be a safe dot path.")),
+  AI_PROVIDER: defaultedTrimmedString(DEFAULT_AI_PROVIDER).pipe(z.enum(["gemini"])),
+  GEMINI_EMBEDDING_MODEL: defaultedTrimmedString(DEFAULT_GEMINI_EMBEDDING_MODEL),
+  GEMINI_EMBEDDING_DIMENSIONS: z.preprocess(
+    emptyToUndefined,
+    z.coerce.number().int().positive().default(DEFAULT_GEMINI_EMBEDDING_DIMENSIONS),
+  ),
+  GEMINI_GENERATION_PRIMARY_MODEL: defaultedTrimmedString(DEFAULT_GEMINI_GENERATION_PRIMARY_MODEL),
+  GEMINI_GENERATION_FALLBACK_MODEL_1: defaultedTrimmedString(DEFAULT_GEMINI_GENERATION_FALLBACK_MODELS[0]),
+  GEMINI_GENERATION_FALLBACK_MODEL_2: defaultedTrimmedString(DEFAULT_GEMINI_GENERATION_FALLBACK_MODELS[1]),
+  AWS_REGION: optionalTrimmedString(),
+  AWS_S3_BUCKET: optionalTrimmedString(),
+  AWS_ACCESS_KEY_ID: optionalTrimmedString(),
+  AWS_SECRET_ACCESS_KEY: optionalTrimmedString(),
+  GEMINI_API_KEY_1: optionalTrimmedString(),
+  GEMINI_API_KEY_2: optionalTrimmedString(),
+  GEMINI_API_KEY_3: optionalTrimmedString(),
+  GEMINI_API_KEYS: optionalTrimmedString(),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -35,6 +84,14 @@ if (!parsed.success) {
 }
 
 const rawEnv = parsed.data;
+const generationFallbackModels = [
+  rawEnv.GEMINI_GENERATION_FALLBACK_MODEL_1,
+  rawEnv.GEMINI_GENERATION_FALLBACK_MODEL_2,
+].filter(Boolean);
+const generationModelLane = [
+  rawEnv.GEMINI_GENERATION_PRIMARY_MODEL,
+  ...generationFallbackModels,
+].filter(Boolean);
 
 function parseOrigins(value) {
   if (!value) {
@@ -65,11 +122,28 @@ function collectGeminiKeys() {
 
 const geminiApiKeys = collectGeminiKeys();
 
+function getMongoDatabasePathFromUri(uri) {
+  if (!uri) {
+    return null;
+  }
+
+  try {
+    const parsedUri = new URL(uri);
+    const databasePath = decodeURIComponent((parsedUri.pathname || "").replace(/^\/+/, ""));
+    return databasePath || null;
+  } catch {
+    return null;
+  }
+}
+
+const mongoDatabasePath = getMongoDatabasePathFromUri(rawEnv.MONGODB_URI);
+
 export const env = Object.freeze({
   NODE_ENV: rawEnv.NODE_ENV,
   PORT: rawEnv.PORT,
   CLIENT_ORIGINS: parseOrigins(rawEnv.CLIENT_ORIGINS),
   isMongoConfigured: Boolean(rawEnv.MONGODB_URI),
+  mongoDatabaseName: mongoDatabasePath || rawEnv.MONGODB_DATABASE_NAME || null,
   isS3Configured: Boolean(
     rawEnv.AWS_REGION &&
       rawEnv.AWS_S3_BUCKET &&
@@ -88,13 +162,40 @@ export const env = Object.freeze({
     credentialsConfigured: Boolean(rawEnv.AWS_ACCESS_KEY_ID && rawEnv.AWS_SECRET_ACCESS_KEY),
   }),
   geminiKeyCount: geminiApiKeys.length,
-  generationModelLane: GENERATION_MODEL_LANE,
-  embeddingModel: AI_MODELS.embedding.model,
-  embeddingDimensions: AI_MODELS.embedding.dimensions,
+  aiProvider: rawEnv.AI_PROVIDER,
+  generationModelLane,
+  embeddingModel: rawEnv.GEMINI_EMBEDDING_MODEL,
+  embeddingDimensions: rawEnv.GEMINI_EMBEDDING_DIMENSIONS,
+  vectorIndexName: rawEnv.MONGODB_VECTOR_INDEX_NAME,
+  vectorPath: rawEnv.MONGODB_VECTOR_PATH,
 });
 
 export function getMongoUri() {
   return rawEnv.MONGODB_URI || null;
+}
+
+export function getMongoDatabaseName() {
+  return env.mongoDatabaseName;
+}
+
+export function getMongoConnectionOptions() {
+  if (mongoDatabasePath || !rawEnv.MONGODB_DATABASE_NAME) {
+    return {};
+  }
+
+  return { dbName: rawEnv.MONGODB_DATABASE_NAME };
+}
+
+export function getMongoDatabaseWarning() {
+  if (!rawEnv.MONGODB_URI || mongoDatabasePath) {
+    return null;
+  }
+
+  if (rawEnv.MONGODB_DATABASE_NAME) {
+    return "MONGODB_URI has no database path; using MONGODB_DATABASE_NAME as a fallback. Prefer adding /centraldocs before query parameters.";
+  }
+
+  return "MONGODB_URI has no database path; add /centraldocs before query parameters to avoid using the default database.";
 }
 
 export function getS3Config() {
@@ -116,16 +217,51 @@ export function getGeminiApiKeys() {
   return [...geminiApiKeys];
 }
 
+export function getAiProvider() {
+  return rawEnv.AI_PROVIDER;
+}
+
+export function getEmbeddingModel() {
+  return rawEnv.GEMINI_EMBEDDING_MODEL;
+}
+
+export function getEmbeddingDimensions() {
+  return rawEnv.GEMINI_EMBEDDING_DIMENSIONS;
+}
+
+export function getGenerationPrimaryModel() {
+  return rawEnv.GEMINI_GENERATION_PRIMARY_MODEL;
+}
+
+export function getGenerationFallbackModels() {
+  return [...generationFallbackModels];
+}
+
+export function getVectorIndexName() {
+  return rawEnv.MONGODB_VECTOR_INDEX_NAME;
+}
+
+export function getVectorPath() {
+  return rawEnv.MONGODB_VECTOR_PATH;
+}
+
 export function getSafeConfigSummary() {
   return {
     nodeEnv: env.NODE_ENV,
     port: env.PORT,
     clientOrigins: env.CLIENT_ORIGINS,
-  mongodb: env.isMongoConfigured ? "configured" : "not_configured",
+    mongodb: env.isMongoConfigured ? "configured" : "not_configured",
+    mongodbDatabaseConfigured: Boolean(env.mongoDatabaseName),
+    mongodbDatabaseWarning: getMongoDatabaseWarning(),
     s3: env.s3Presence,
+    aiProvider: rawEnv.AI_PROVIDER,
     geminiKeyCount: env.geminiKeyCount,
     generationModelLane: env.generationModelLane,
     embeddingModel: env.embeddingModel,
     embeddingDimensions: env.embeddingDimensions,
+    vectorSearch: {
+      indexName: env.vectorIndexName,
+      path: env.vectorPath,
+    },
   };
 }

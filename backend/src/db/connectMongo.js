@@ -1,5 +1,10 @@
 import mongoose from "mongoose";
-import { env, getMongoUri } from "../config/env.js";
+import {
+  env,
+  getMongoConnectionOptions,
+  getMongoDatabaseWarning,
+  getMongoUri,
+} from "../config/env.js";
 
 const READY_STATES = Object.freeze({
   0: "disconnected",
@@ -38,17 +43,20 @@ export async function connectMongo() {
   try {
     await mongoose.connect(getMongoUri(), {
       serverSelectionTimeoutMS: 5000,
+      ...getMongoConnectionOptions(),
     });
 
     return {
       status: "connected",
       connected: true,
+      warning: getMongoDatabaseWarning(),
     };
   } catch (error) {
     return {
       status: "disconnected",
       connected: false,
       reason: "connection_failed",
+      warning: getMongoDatabaseWarning(),
     };
   }
 }

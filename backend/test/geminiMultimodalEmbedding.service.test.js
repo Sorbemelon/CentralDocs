@@ -3,10 +3,10 @@ import assert from "node:assert/strict";
 import path from "node:path";
 
 process.env.NODE_ENV = "test";
-delete process.env.GEMINI_API_KEY_1;
-delete process.env.GEMINI_API_KEY_2;
-delete process.env.GEMINI_API_KEY_3;
-delete process.env.GEMINI_API_KEYS;
+process.env.GEMINI_API_KEY_1 = "";
+process.env.GEMINI_API_KEY_2 = "";
+process.env.GEMINI_API_KEY_3 = "";
+process.env.GEMINI_API_KEYS = "";
 
 const {
   assertMultimodalEmbeddingConfigured,

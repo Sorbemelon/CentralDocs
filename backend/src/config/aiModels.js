@@ -1,11 +1,19 @@
+import {
+  getAiProvider,
+  getEmbeddingDimensions,
+  getEmbeddingModel,
+  getGenerationFallbackModels,
+  getGenerationPrimaryModel,
+} from "./env.js";
+
 export const AI_MODELS = Object.freeze({
   embedding: {
-    model: "gemini-embedding-2",
-    dimensions: 768,
+    model: getEmbeddingModel(),
+    dimensions: getEmbeddingDimensions(),
   },
   generation: {
-    primary: "gemini-3.5-flash",
-    fallbacks: ["gemini-3-flash-preview", "gemini-2.5-flash"],
+    primary: getGenerationPrimaryModel(),
+    fallbacks: getGenerationFallbackModels(),
   },
 });
 
@@ -15,7 +23,7 @@ export const GENERATION_MODEL_LANE = Object.freeze([
 ]);
 
 export const AI_ROUTING_DESIGN = Object.freeze({
-  provider: "gemini",
+  provider: getAiProvider(),
   liveCallsEnabled: false,
   keyRotation: "planned_round_robin_with_failure_fallback",
   notes: [

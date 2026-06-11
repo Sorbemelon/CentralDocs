@@ -2,11 +2,11 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 process.env.NODE_ENV = "test";
-delete process.env.MONGODB_URI;
-delete process.env.AWS_REGION;
-delete process.env.AWS_S3_BUCKET;
-delete process.env.AWS_ACCESS_KEY_ID;
-delete process.env.AWS_SECRET_ACCESS_KEY;
+process.env.MONGODB_URI = "";
+process.env.AWS_REGION = "";
+process.env.AWS_S3_BUCKET = "";
+process.env.AWS_ACCESS_KEY_ID = "";
+process.env.AWS_SECRET_ACCESS_KEY = "";
 
 const { seedMockWorkspace } = await import("../src/services/mockData/mockSeed.service.js");
 const { validateMockAssets } = await import("../src/services/mockData/mockAsset.service.js");

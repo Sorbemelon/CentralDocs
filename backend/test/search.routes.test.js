@@ -3,11 +3,11 @@ import assert from "node:assert/strict";
 import request from "supertest";
 
 process.env.NODE_ENV = "test";
-delete process.env.GEMINI_API_KEY_1;
-delete process.env.GEMINI_API_KEY_2;
-delete process.env.GEMINI_API_KEY_3;
-delete process.env.GEMINI_API_KEYS;
-delete process.env.MONGODB_URI;
+process.env.GEMINI_API_KEY_1 = "";
+process.env.GEMINI_API_KEY_2 = "";
+process.env.GEMINI_API_KEY_3 = "";
+process.env.GEMINI_API_KEYS = "";
+process.env.MONGODB_URI = "";
 
 const { app } = await import("../src/app.js");
 const {

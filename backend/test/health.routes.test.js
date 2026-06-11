@@ -8,7 +8,18 @@ process.env.AWS_REGION = "ap-southeast-1";
 process.env.AWS_S3_BUCKET = "centraldocs-test-bucket";
 process.env.AWS_ACCESS_KEY_ID = "health-test-access-token";
 process.env.AWS_SECRET_ACCESS_KEY = "health-test-sensitive-token";
+process.env.AI_PROVIDER = "gemini";
+process.env.GEMINI_EMBEDDING_MODEL = "gemini-embedding-2";
+process.env.GEMINI_EMBEDDING_DIMENSIONS = "768";
+process.env.GEMINI_GENERATION_PRIMARY_MODEL = "gemini-3.5-flash";
+process.env.GEMINI_GENERATION_FALLBACK_MODEL_1 = "gemini-3-flash-preview";
+process.env.GEMINI_GENERATION_FALLBACK_MODEL_2 = "gemini-2.5-flash";
+process.env.MONGODB_VECTOR_INDEX_NAME = "document_chunks_vector_index";
+process.env.MONGODB_VECTOR_PATH = "embedding";
 process.env.GEMINI_API_KEY_1 = "health-test-gemini-token";
+process.env.GEMINI_API_KEY_2 = "";
+process.env.GEMINI_API_KEY_3 = "";
+process.env.GEMINI_API_KEYS = "";
 
 const { app } = await import("../src/app.js");
 
@@ -47,6 +58,19 @@ test("GET /api/health/dependencies returns safe dependency statuses", async () =
   });
   assert.match(response.body.dependencies.gemini, /configured|not_configured/);
   assert.equal(response.body.config.geminiKeyCount, 1);
+  assert.equal(response.body.config.aiProvider, "gemini");
+  assert.equal(response.body.config.embeddingModel, "gemini-embedding-2");
+  assert.equal(response.body.config.embeddingDimensions, 768);
+  assert.deepEqual(response.body.config.generationModelLane, [
+    "gemini-3.5-flash",
+    "gemini-3-flash-preview",
+    "gemini-2.5-flash",
+  ]);
+  assert.deepEqual(response.body.config.vectorSearch, {
+    indexName: "document_chunks_vector_index",
+    path: "embedding",
+  });
+  assert.equal(response.body.config.mongodbDatabaseWarning, null);
   assert.deepEqual(response.body.config.s3, {
     configured: true,
     regionConfigured: true,

@@ -1,4 +1,5 @@
 import { DEMO_LIMITS } from "../config/limits.js";
+import { getVectorIndexName, getVectorPath } from "../config/env.js";
 import { EMBEDDING_DIMENSIONS, EMBEDDING_MODEL, EMBEDDING_PROVIDER } from "./embedding.constants.js";
 
 export const SEARCH_SCOPE = Object.freeze({
@@ -18,8 +19,8 @@ export const SEARCH_LIMITS = Object.freeze({
 });
 
 export const VECTOR_SEARCH = Object.freeze({
-  indexName: "document_chunks_vector_index",
-  path: "embedding",
+  indexName: getVectorIndexName(),
+  path: getVectorPath(),
   numCandidatesMultiplier: 20,
   minNumCandidates: 100,
   chunkKinds: ["text", "media_direct"],

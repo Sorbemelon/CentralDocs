@@ -3,15 +3,15 @@ import assert from "node:assert/strict";
 import request from "supertest";
 
 process.env.NODE_ENV = "test";
-delete process.env.MONGODB_URI;
-delete process.env.AWS_REGION;
-delete process.env.AWS_S3_BUCKET;
-delete process.env.AWS_ACCESS_KEY_ID;
-delete process.env.AWS_SECRET_ACCESS_KEY;
-delete process.env.GEMINI_API_KEY_1;
-delete process.env.GEMINI_API_KEY_2;
-delete process.env.GEMINI_API_KEY_3;
-delete process.env.GEMINI_API_KEYS;
+process.env.MONGODB_URI = "";
+process.env.AWS_REGION = "";
+process.env.AWS_S3_BUCKET = "";
+process.env.AWS_ACCESS_KEY_ID = "";
+process.env.AWS_SECRET_ACCESS_KEY = "";
+process.env.GEMINI_API_KEY_1 = "";
+process.env.GEMINI_API_KEY_2 = "";
+process.env.GEMINI_API_KEY_3 = "";
+process.env.GEMINI_API_KEYS = "";
 
 const { app } = await import("../src/app.js");
 

@@ -2,10 +2,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 process.env.NODE_ENV = "test";
-delete process.env.GEMINI_API_KEY_1;
-delete process.env.GEMINI_API_KEY_2;
-delete process.env.GEMINI_API_KEY_3;
-delete process.env.GEMINI_API_KEYS;
+process.env.GEMINI_API_KEY_1 = "";
+process.env.GEMINI_API_KEY_2 = "";
+process.env.GEMINI_API_KEY_3 = "";
+process.env.GEMINI_API_KEYS = "";
 
 const { getAiModelLane } = await import("../src/services/ai/aiModelLane.js");
 const { getGeminiClientStatus } = await import("../src/services/ai/geminiClientFactory.js");

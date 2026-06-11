@@ -12,6 +12,9 @@ async function startServer() {
   } else {
     console.warn("MongoDB configured but not connected; starting in degraded demo-foundation mode.");
   }
+  if (mongoResult.warning) {
+    console.warn(mongoResult.warning);
+  }
 
   const server = app.listen(env.PORT, () => {
     const safeConfig = getSafeConfigSummary();

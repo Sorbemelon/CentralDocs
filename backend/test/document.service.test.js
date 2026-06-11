@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 process.env.NODE_ENV = "test";
-delete process.env.MONGODB_URI;
+process.env.MONGODB_URI = "";
 
 const {
   getDocumentById,
