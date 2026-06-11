@@ -41,10 +41,9 @@ import { RightContextPanel } from "./RightContextPanel";
 import { GenerateDocumentModalShell } from "./GenerateDocumentModalShell";
 
 /**
- * One compact workspace route. Phase 7B wires Sources + Chat Sessions to the
- * backend (folders/documents/trash/chats + demo session/bootstrap) and persists
- * the selected context onto the active chat, while degrading gracefully to the
- * offline fallback. Upload/search/chat-send/generate remain deferred shells.
+ * One compact workspace route. Wires backend folders/documents/trash/chats,
+ * demo session/bootstrap, upload, search, RAG chat, generated documents, and
+ * management actions while degrading gracefully to the offline fallback.
  */
 export default function CentralDocsWorkspace() {
   const demo = useDemoSession();
@@ -157,13 +156,13 @@ export default function CentralDocsWorkspace() {
     }
   }, [online]);
 
-  const notifyDeferred = useCallback((action = "This action") => {
-    toast(`${action} is not wired yet`, {
-      description: "This comes in a later frontend phase.",
+  const notifyBackendRequired = useCallback((action = "This action") => {
+    toast.error(`${action} needs the backend.`, {
+      description: "The demo is currently running with local fallback data.",
     });
   }, []);
 
-  // Online-only management actions degrade to a clear offline note (not "deferred").
+  // Online-only management actions degrade to a clear offline note.
   const notifyOffline = useCallback(() => {
     toast.error("This action needs the backend — you're offline.");
   }, []);
@@ -181,11 +180,20 @@ export default function CentralDocsWorkspace() {
     [chats],
   );
 
+  const newChat = useCallback(
+    () =>
+      chats.newChat({
+        selectedDocumentIds: selection.docIds,
+        selectedFolderIds: selection.folderIds,
+      }),
+    [chats, selection.docIds, selection.folderIds],
+  );
+
   // --- source actions (wired when online + reversible; toast otherwise) ---
   const deleteDocument = useCallback(
     async (doc) => {
       if (doc.readOnly) return;
-      if (!online) return notifyDeferred("Delete document");
+      if (!online) return notifyBackendRequired("Delete document");
       try {
         await apiDeleteDocument(doc.id);
         selection.detach("document", doc.id);
@@ -197,16 +205,33 @@ export default function CentralDocsWorkspace() {
         toast.error("Couldn't delete the document");
       }
     },
-    [online, notifyDeferred, selection, wsData, sourceFilter, refreshUsage],
+    [online, notifyBackendRequired, selection, wsData, sourceFilter, refreshUsage],
   );
 
   const deleteFolder = useCallback(
     async (folder) => {
       if (folder.readOnly) return;
-      if (!online) return notifyDeferred("Delete folder");
+      if (!online) return notifyBackendRequired("Delete folder");
       try {
         await apiDeleteFolder(folder.id);
-        selection.detach("folder", folder.id);
+        const folderIdsToDetach = new Set([folder.id]);
+        const collectDescendantFolders = (folderId) => {
+          (folderChildren.get(folderId) || []).forEach((child) => {
+            folderIdsToDetach.add(child.id);
+            collectDescendantFolders(child.id);
+          });
+        };
+        collectDescendantFolders(folder.id);
+        const docIdsToDetach = new Set(
+          documents.filter((doc) => folderIdsToDetach.has(doc.folderId)).map((doc) => doc.id),
+        );
+        const nextFolderIds = selection.folderIds.filter((folderId) => !folderIdsToDetach.has(folderId));
+        const nextDocIds = selection.docIds.filter((docId) => !docIdsToDetach.has(docId));
+        selection.setFromChat({
+          selectedDocumentIds: nextDocIds,
+          selectedFolderIds: nextFolderIds,
+        });
+        persistSelection(nextDocIds, nextFolderIds);
         toast.success("Folder moved to Trash");
         wsData.reloadActive();
         refreshUsage();
@@ -214,12 +239,12 @@ export default function CentralDocsWorkspace() {
         toast.error("Couldn't delete the folder");
       }
     },
-    [online, notifyDeferred, selection, wsData, refreshUsage],
+    [online, notifyBackendRequired, selection, persistSelection, wsData, refreshUsage, folderChildren, documents],
   );
 
   const downloadDocument = useCallback(
     async (doc) => {
-      if (!online) return notifyDeferred("Download");
+      if (!online) return notifyBackendRequired("Download");
       if (doc.downloadAvailable === false) {
         toast.error("This document isn't available to download.");
         return;
@@ -233,14 +258,14 @@ export default function CentralDocsWorkspace() {
         toast.error("Couldn't create a download link");
       }
     },
-    [online, notifyDeferred],
+    [online, notifyBackendRequired],
   );
 
   // --- upload + retry ---
   const uploadDocument = useCallback(
     async (file) => {
       if (!online) {
-        notifyDeferred("Upload");
+        notifyBackendRequired("Upload");
         return { ok: false };
       }
       setOperation({ kind: "upload", status: "uploading", label: `Uploading ${file.name}` });
@@ -267,12 +292,12 @@ export default function CentralDocsWorkspace() {
         return { ok: false, error: err };
       }
     },
-    [online, notifyDeferred, wsData],
+    [online, notifyBackendRequired, wsData],
   );
 
   const retryDocument = useCallback(
     async (doc) => {
-      if (!online) return notifyDeferred("Retry");
+      if (!online) return notifyBackendRequired("Retry");
       setOperation({ kind: "retry", status: "processing", label: `Retrying ${doc.title}` });
       try {
         const res = await apiRetryDocument(doc.id);
@@ -292,13 +317,13 @@ export default function CentralDocsWorkspace() {
         toast.error(err?.message || "Couldn't retry processing");
       }
     },
-    [online, notifyDeferred, wsData],
+    [online, notifyBackendRequired, wsData],
   );
 
   // Create a folder at the tree root or inside a user folder (parentFolderId).
   const createFolder = useCallback(
     async (parentFolderId) => {
-      if (!online) return notifyDeferred("Create folder");
+      if (!online) return notifyBackendRequired("Create folder");
       try {
         await apiCreateFolder({
           name: "New folder",
@@ -310,12 +335,12 @@ export default function CentralDocsWorkspace() {
         toast.error(err?.message || "Couldn't create the folder");
       }
     },
-    [online, notifyDeferred, wsData],
+    [online, notifyBackendRequired, wsData],
   );
 
   const restoreTrashItem = useCallback(
     async (item) => {
-      if (!online) return notifyDeferred("Restore");
+      if (!online) return notifyBackendRequired("Restore");
       try {
         if (item.kind === "folder") await apiRestoreFolder(item.id);
         else await apiRestoreDocument(item.id);
@@ -327,7 +352,7 @@ export default function CentralDocsWorkspace() {
         toast.error("Couldn't restore the item");
       }
     },
-    [online, notifyDeferred, wsData, refreshUsage],
+    [online, notifyBackendRequired, wsData, refreshUsage],
   );
 
   const removeChat = useCallback(
@@ -358,7 +383,7 @@ export default function CentralDocsWorkspace() {
         toast.error(err?.message || "Couldn't rename the folder");
       }
     },
-    [online, notifyDeferred, wsData],
+    [online, notifyBackendRequired, wsData],
   );
 
   const moveDocument = useCallback(
@@ -377,7 +402,7 @@ export default function CentralDocsWorkspace() {
         toast.error(err?.message || "Couldn't move the document");
       }
     },
-    [online, notifyDeferred, wsData],
+    [online, notifyBackendRequired, wsData],
   );
 
   const renameChat = useCallback(
@@ -572,7 +597,7 @@ export default function CentralDocsWorkspace() {
     activeChat: chats.activeChat,
     activeChatId: chats.activeChatId,
     setActiveChat,
-    newChat: chats.newChat,
+    newChat,
     removeChat,
 
     sourceFilter,
@@ -610,7 +635,7 @@ export default function CentralDocsWorkspace() {
     confirmAction,
 
     openGenerateModal: generate.openGenerateModal,
-    notifyDeferred,
+    notifyBackendRequired,
   };
 
   // Move-to-folder options: user folders only (mock excluded), + root when foldered.

@@ -112,10 +112,10 @@ export function useChatSessions({ online }) {
 
   const setActiveChat = useCallback((id) => setActiveChatId(id), []);
 
-  const newChat = useCallback(async () => {
+  const newChat = useCallback(async ({ selectedDocumentIds = [], selectedFolderIds = [] } = {}) => {
     if (online) {
       try {
-        const res = await createChat({ title: "New chat" });
+        const res = await createChat({ title: "New chat", selectedDocumentIds, selectedFolderIds });
         const chat = normalizeChat(res.chat);
         setChats((prev) => [chat, ...prev]);
         setActiveChatId(chat.id);
@@ -127,12 +127,12 @@ export function useChatSessions({ online }) {
     const localChat = {
       id: `local-${Date.now()}`,
       title: "New chat",
-      contextCount: 0,
-      docCount: 0,
-      folderCount: 0,
+      contextCount: selectedDocumentIds.length + selectedFolderIds.length,
+      docCount: selectedDocumentIds.length,
+      folderCount: selectedFolderIds.length,
       messageCount: 0,
-      selectedDocumentIds: [],
-      selectedFolderIds: [],
+      selectedDocumentIds,
+      selectedFolderIds,
       local: true,
     };
     setChats((prev) => [localChat, ...prev]);
