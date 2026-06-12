@@ -295,6 +295,8 @@ Do not commit real environment files or credentials.
 | MongoDB Atlas | external | Create the database and Atlas Vector Search index. |
 | AWS S3 | external | Keep objects private and use backend-authorized downloads. |
 
+See the deployment preparation checklist: [docs/deployment/CENTRALDOCS_DEPLOYMENT_CHECKLIST.md](docs/deployment/CENTRALDOCS_DEPLOYMENT_CHECKLIST.md).
+
 Deployment smoke should verify health, warm-up, dependencies, demo session/bootstrap, seeded mock data, semantic search, RAG chat, generated documents, upload/preview/download, and clear-session cleanup.
 
 ## Safety And Boundaries
