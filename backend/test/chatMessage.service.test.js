@@ -10,6 +10,7 @@ const { createMemoryChatMessageRepository } = await import(
 const { createMemoryChatSessionRepository } = await import(
   "../src/services/chats/chatSession.repository.js"
 );
+const { createHttpError } = await import("../src/utils/httpError.js");
 
 const documents = [
   {
@@ -277,6 +278,40 @@ test("RAG chat message creation blocks hidden IP prompt quota before saving mess
   });
   assert.equal(generatorCalled, false);
   assert.equal(storedMessages.length, 0);
+});
+
+test("RAG chat message creation rolls back user message on transient provider failure", async () => {
+  const deps = dependencies();
+
+  await assert.rejects(
+    () =>
+      createChatMessageWithRagAnswer({
+        chatId: "chat_1",
+        demoSessionId: "demo_123",
+        body: { content: "What are the rollout risks?" },
+        dependencies: {
+          ...deps,
+          generator: async () => {
+            throw createHttpError(
+              503,
+              "The AI generation provider is temporarily unavailable. Please try again.",
+              "GENERATION_PROVIDER_UNAVAILABLE",
+            );
+          },
+        },
+      }),
+    { code: "GENERATION_PROVIDER_UNAVAILABLE" },
+  );
+
+  const storedMessages = await deps.chatMessageRepository.listMessagesByChatSession({
+    chatSessionId: "chat_1",
+    demoSessionId: "demo_123",
+  });
+  const chat = deps.chatSessionRepository._unsafeSnapshot()[0];
+
+  assert.equal(storedMessages.length, 0);
+  assert.equal(chat.messageCount, 0);
+  assert.equal(chat.aiPromptCount, 0);
 });
 
 test("RAG chat message creation rejects no context before provider call", async () => {

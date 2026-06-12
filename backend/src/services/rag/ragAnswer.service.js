@@ -163,6 +163,32 @@ async function recordAiPromptUsage({ deps, demoSessionId, quotaIdentity } = {}) 
   return session;
 }
 
+async function recordHiddenAiPromptUsage({ deps, quotaIdentity } = {}) {
+  try {
+    await deps.hiddenQuotaUsageUpdater?.({
+      quotaIdentity,
+      delta: { aiPrompts: 1 },
+      repository: deps.hiddenQuotaRepository,
+    });
+  } catch {
+    /* Preserve the provider failure as the user-facing cause. */
+  }
+}
+
+function shouldRecordHiddenProviderAttempt(error) {
+  if (!(error instanceof HttpError)) {
+    return true;
+  }
+
+  return [
+    CHAT_SESSION_ERROR_CODE.GENERATION_PROVIDER_UNAVAILABLE,
+    CHAT_SESSION_ERROR_CODE.GENERATION_PROVIDER_ERROR,
+    CHAT_SESSION_ERROR_CODE.GENERATION_RATE_LIMITED,
+    CHAT_SESSION_ERROR_CODE.AI_RATE_LIMIT_EXHAUSTED,
+    CHAT_SESSION_ERROR_CODE.RAG_ANSWER_FAILED,
+  ].includes(error.code);
+}
+
 export async function answerChatMessageWithRag({
   chatId,
   demoSessionId,
@@ -253,12 +279,9 @@ export async function answerChatMessageWithRag({
       options: deps.generationOptions || {},
     });
   } catch (error) {
-    await deps.chatSessionRepository.incrementAiPromptCount({
-      chatId,
-      demoSessionId,
-      at: deps.now(),
-    });
-    await recordAiPromptUsage({ deps, demoSessionId, quotaIdentity });
+    if (shouldRecordHiddenProviderAttempt(error)) {
+      await recordHiddenAiPromptUsage({ deps, quotaIdentity });
+    }
     await rollbackAcceptedUserMessage({ deps, chatId, demoSessionId, userMessage });
 
     if (error instanceof HttpError) {

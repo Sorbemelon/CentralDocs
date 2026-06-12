@@ -8,6 +8,7 @@ const { createMemoryChatMessageRepository } = await import(
 const { createMemoryChatSessionRepository } = await import(
   "../src/services/chats/chatSession.repository.js"
 );
+const { createHttpError } = await import("../src/utils/httpError.js");
 
 function baseContext({ references = true } = {}) {
   return {
@@ -192,7 +193,57 @@ test("RAG answer service rolls back accepted user message on provider failure", 
 
   assert.equal(messages.length, 0);
   assert.equal(chat.messageCount, 0);
-  assert.equal(chat.aiPromptCount, 1);
+  assert.equal(chat.aiPromptCount, 0);
+  assert.deepEqual(hiddenUsageUpdates, [
+    {
+      quotaIdentity: { enabled: true, identityHash: "safe_hash" },
+      delta: { aiPrompts: 1 },
+    },
+  ]);
+});
+
+test("RAG answer service returns transient provider errors without visible prompt usage", async () => {
+  const deps = dependencies();
+  const hiddenUsageUpdates = [];
+
+  await assert.rejects(
+    () =>
+      answerChatMessageWithRag({
+        chatId: "chat_1",
+        demoSessionId: "demo_123",
+        content: "Question",
+        userMessage: { _id: "message_user", chatSessionId: "chat_1", demoSessionId: "demo_123", role: "user", content: "Question", status: "complete" },
+        chatSession: { _id: "chat_1", demoSessionId: "demo_123", currentSelectedDocumentIds: ["doc_1"], aiPromptCount: 0, messageCount: 1 },
+        ragContext: baseContext(),
+        dependencies: {
+          ...deps,
+          historyLoader: async () => ({ rollingSummary: null, recentMessages: [] }),
+          quotaIdentity: { enabled: true, identityHash: "safe_hash" },
+          hiddenQuotaUsageUpdater: async ({ quotaIdentity, delta }) => {
+            hiddenUsageUpdates.push({ quotaIdentity, delta });
+            return { status: "updated" };
+          },
+          generator: async () => {
+            throw createHttpError(
+              503,
+              "The AI generation provider is temporarily unavailable. Please try again.",
+              "GENERATION_PROVIDER_UNAVAILABLE",
+            );
+          },
+        },
+      }),
+    { code: "GENERATION_PROVIDER_UNAVAILABLE" },
+  );
+
+  const messages = await deps.chatMessageRepository.listMessagesByChatSession({
+    chatSessionId: "chat_1",
+    demoSessionId: "demo_123",
+  });
+  const chat = deps.chatSessionRepository._unsafeSnapshot()[0];
+
+  assert.equal(messages.length, 0);
+  assert.equal(chat.messageCount, 0);
+  assert.equal(chat.aiPromptCount, 0);
   assert.deepEqual(hiddenUsageUpdates, [
     {
       quotaIdentity: { enabled: true, identityHash: "safe_hash" },

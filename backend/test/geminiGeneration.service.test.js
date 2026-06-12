@@ -79,6 +79,69 @@ test("Gemini generation service rotates key slots before fallback model", async 
   assert.equal(result.fallbackLevel, 1);
 });
 
+test("Gemini generation service retries transient provider errors across keys and fallback models", async () => {
+  const calls = [];
+  const result = await generateTextWithLane({
+    prompt: "Question",
+    keySlots: [0, 1],
+    models: ["gemini-3.5-flash", "gemini-3-flash-preview"],
+    clientFactory: (slot) => ({
+      models: {
+        generateContent: async (payload) => {
+          calls.push({ slot, model: payload.model });
+          if (calls.length < 4) {
+            const error = new Error("service unavailable");
+            error.status = 503;
+            throw error;
+          }
+          return { text: "Recovered answer [1]" };
+        },
+      },
+    }),
+  });
+
+  assert.deepEqual(calls, [
+    { slot: 0, model: "gemini-3.5-flash" },
+    { slot: 1, model: "gemini-3.5-flash" },
+    { slot: 0, model: "gemini-3-flash-preview" },
+    { slot: 1, model: "gemini-3-flash-preview" },
+  ]);
+  assert.equal(result.text, "Recovered answer [1]");
+  assert.equal(result.model, "gemini-3-flash-preview");
+  assert.equal(result.fallbackUsed, true);
+  assert.equal(result.aiRouting.slice(0, 3).every((attempt) => attempt.isTransient), true);
+});
+
+test("Gemini generation service does not retry non-retryable provider errors", async () => {
+  const calls = [];
+
+  await assert.rejects(
+    () =>
+      generateTextWithLane({
+        prompt: "Question",
+        keySlots: [0, 1],
+        models: ["gemini-3.5-flash", "gemini-3-flash-preview"],
+        clientFactory: (slot) => ({
+          models: {
+            generateContent: async (payload) => {
+              calls.push({ slot, model: payload.model });
+              const error = new Error("invalid argument SECRET_KEY");
+              error.status = 400;
+              throw error;
+            },
+          },
+        }),
+      }),
+    (error) => {
+      assert.equal(error.code, "GENERATION_PROVIDER_ERROR");
+      assert.equal(JSON.stringify(error).includes("SECRET_KEY"), false);
+      return true;
+    },
+  );
+
+  assert.deepEqual(calls, [{ slot: 0, model: "gemini-3.5-flash" }]);
+});
+
 test("Gemini generation service reports exhaustion and provider errors safely", async () => {
   await assert.rejects(
     () =>
@@ -98,6 +161,32 @@ test("Gemini generation service reports exhaustion and provider errors safely", 
       }),
     (error) => {
       assert.equal(error.code, "AI_RATE_LIMIT_EXHAUSTED");
+      assert.equal(JSON.stringify(error).includes("SECRET_KEY"), false);
+      return true;
+    },
+  );
+
+  await assert.rejects(
+    () =>
+      generateTextWithLane({
+        prompt: "Question",
+        keySlots: [0, 1],
+        models: ["gemini-3.5-flash"],
+        clientFactory: () => ({
+          models: {
+            generateContent: async () => {
+              const error = new Error("temporarily unavailable SECRET_KEY");
+              error.status = 503;
+              throw error;
+            },
+          },
+        }),
+      }),
+    (error) => {
+      assert.equal(error.code, "GENERATION_PROVIDER_UNAVAILABLE");
+      assert.equal(error.statusCode, 503);
+      assert.equal(error.details.aiRouting.length, 2);
+      assert.equal(error.details.aiRouting.every((attempt) => attempt.isTransient), true);
       assert.equal(JSON.stringify(error).includes("SECRET_KEY"), false);
       return true;
     },

@@ -6,6 +6,31 @@ import { DEMO_LIMITS } from "./constants";
 
 const PENDING_STEPS = ["Resolving context", "Retrieving references", "Generating answer", "Saving response"];
 const PENDING_CHAT_KEY_PREFIX = "centraldocs.pendingChat.";
+const PENDING_CHAT_STALE_MS = 150000;
+const TEMPORARY_GENERATION_MESSAGE = "AI generation is temporarily unavailable. Please try again.";
+
+function isPendingStale(pending) {
+  const startedAt = pending?.startedAt ? Date.parse(pending.startedAt) : NaN;
+  return !Number.isFinite(startedAt) || Date.now() - startedAt > PENDING_CHAT_STALE_MS;
+}
+
+function chatErrorMessage(error) {
+  const code = error?.code || error?.error?.code;
+  const status = error?.status || error?.statusCode;
+  if (
+    code === "GENERATION_PROVIDER_UNAVAILABLE" ||
+    code === "GENERATION_PROVIDER_ERROR" ||
+    code === "RAG_ANSWER_FAILED" ||
+    status === 502 ||
+    status === 503
+  ) {
+    return TEMPORARY_GENERATION_MESSAGE;
+  }
+  if (error?.offline || /timed out|timeout/i.test(error?.message || "")) {
+    return "AI generation is taking too long. Please try again.";
+  }
+  return error?.message || "Couldn't generate an answer. Your prompt was kept.";
+}
 
 function createOptimisticUserMessage({ id, content, createdAt }) {
   return {
@@ -110,33 +135,45 @@ export function useChatMessages({
       let list = (res.messages || []).map(normalizeChatMessage);
       const pending = readPending(chatId);
       if (pending) {
-        const pendingUserIndex = list.findLastIndex?.(
-          (message) => message.role === "user" && message.content === pending.content,
-        ) ?? -1;
-        const hasAssistantAfterPending =
-          pendingUserIndex >= 0 && list.slice(pendingUserIndex + 1).some((message) => message.role === "assistant");
-        if (hasAssistantAfterPending) {
+        if (isPendingStale(pending)) {
           clearPending(chatId);
+          if (stepTimer.current) {
+            clearInterval(stepTimer.current);
+            stepTimer.current = null;
+          }
           setIsSending(false);
           setPendingStep(null);
+          setDraft((current) => current || pending.content || "");
+          setSendError({ message: TEMPORARY_GENERATION_MESSAGE });
         } else {
-          if (pendingUserIndex < 0) {
-            list = [
-              ...list,
-              createOptimisticUserMessage({
-                id: `pending-user-${chatId}`,
-                content: pending.content,
-                createdAt: pending.startedAt,
-              }),
-            ];
-          }
-          setIsSending(true);
-          setPendingStep("Generating answer");
-          window.setTimeout(() => {
-            if (mounted.current && ref.current.activeChatId === chatId) {
-              loadMessagesForChat(chatId);
+          const pendingUserIndex = list.findLastIndex?.(
+            (message) => message.role === "user" && message.content === pending.content,
+          ) ?? -1;
+          const hasAssistantAfterPending =
+            pendingUserIndex >= 0 && list.slice(pendingUserIndex + 1).some((message) => message.role === "assistant");
+          if (hasAssistantAfterPending) {
+            clearPending(chatId);
+            setIsSending(false);
+            setPendingStep(null);
+          } else {
+            if (pendingUserIndex < 0) {
+              list = [
+                ...list,
+                createOptimisticUserMessage({
+                  id: `pending-user-${chatId}`,
+                  content: pending.content,
+                  createdAt: pending.startedAt,
+                }),
+              ];
             }
-          }, 5000);
+            setIsSending(true);
+            setPendingStep("Generating answer");
+            window.setTimeout(() => {
+              if (mounted.current && ref.current.activeChatId === chatId) {
+                loadMessagesForChat(chatId);
+              }
+            }, 5000);
+          }
         }
       }
       setMessages(list);
@@ -249,11 +286,12 @@ export function useChatMessages({
     } catch (err) {
       clearPending(chatId);
       if (mounted.current) {
-        setSendError(err);
+        const message = chatErrorMessage(err);
+        setSendError({ message, code: err?.code, status: err?.status || err?.statusCode });
         setMessages((prev) => prev.filter((message) => message.id !== optimisticId));
         await loadMessagesForChat(chatId);
       }
-      toast.error(err?.message || "Couldn't generate an answer. Your prompt was kept.");
+      toast.error(chatErrorMessage(err));
     } finally {
       if (mounted.current) {
         stopStepCycler();

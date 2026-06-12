@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 const {
+  assertGenerationLaneExhaustion,
   buildGenerationRoutePlan,
   getGenerationModelLane,
 } = await import("../src/services/ai/generationModelLane.service.js");
@@ -30,4 +31,19 @@ test("generation route plan rotates keys before fallback model", () => {
     { model: "gemini-3-flash-preview", fallbackLevel: 1, keySlot: 0 },
     { model: "gemini-3-flash-preview", fallbackLevel: 1, keySlot: 1 },
   ]);
+});
+
+test("generation lane exhaustion distinguishes transient and non-retryable errors", () => {
+  assert.throws(
+    () => assertGenerationLaneExhaustion(Object.assign(new Error("service unavailable"), { status: 503 })),
+    { statusCode: 503, code: "GENERATION_PROVIDER_UNAVAILABLE" },
+  );
+  assert.throws(
+    () => assertGenerationLaneExhaustion(Object.assign(new Error("quota exceeded"), { status: 429 })),
+    { statusCode: 429, code: "AI_RATE_LIMIT_EXHAUSTED" },
+  );
+  assert.throws(
+    () => assertGenerationLaneExhaustion(Object.assign(new Error("invalid argument"), { status: 400 })),
+    /invalid argument/,
+  );
 });

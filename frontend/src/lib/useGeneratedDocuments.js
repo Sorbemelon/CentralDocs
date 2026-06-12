@@ -11,6 +11,25 @@ import {
 } from "./workspaceData";
 import { GENERATED_DEFAULT_FILENAME, GENERATED_DOC_STEPS } from "@/data/demoCopy";
 
+const TEMPORARY_GENERATION_MESSAGE = "AI generation is temporarily unavailable. Please try again.";
+
+function generationErrorMessage(error) {
+  const code = error?.code || error?.error?.code;
+  const status = error?.status || error?.statusCode;
+  if (
+    code === "GENERATION_PROVIDER_UNAVAILABLE" ||
+    code === "GENERATION_PROVIDER_ERROR" ||
+    status === 502 ||
+    status === 503
+  ) {
+    return TEMPORARY_GENERATION_MESSAGE;
+  }
+  if (error?.offline || /timed out|timeout/i.test(error?.message || "")) {
+    return "AI generation is taking too long. Please try again.";
+  }
+  return error?.message || "Couldn't generate the document.";
+}
+
 /**
  * Generate Document state for the active chat. Owns the modal form and submits
  * to POST /chats/:id/generated-documents. Online/chat/inputs are read from a ref
@@ -164,8 +183,9 @@ export function useGeneratedDocuments({
       }
       toast.success(`Generated ${doc.title}`);
     } catch (err) {
-      if (mounted.current) setGenerationError(err?.message || "Couldn't generate the document.");
-      toast.error(err?.message || "Couldn't generate the document.");
+      const message = generationErrorMessage(err);
+      if (mounted.current) setGenerationError(message);
+      toast.error(message);
     } finally {
       if (mounted.current) {
         stopSteps();

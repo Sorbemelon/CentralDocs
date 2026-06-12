@@ -402,7 +402,12 @@ function ChatPanelShell({ ws }) {
       </ScrollArea>
 
       {chat.sendError && (
-        <p className="text-[12px] text-destructive">Couldn’t generate an answer. Your prompt was kept — try again.</p>
+        <div className="flex items-center justify-between gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-2.5 py-2 text-[12px] text-destructive">
+          <span>{chat.sendError.message || "AI generation is temporarily unavailable. Please try again."}</span>
+          <Button size="sm" variant="outline" onClick={() => chat.sendMessage()} disabled={!canSend}>
+            Retry
+          </Button>
+        </div>
       )}
 
       <div className="-mx-1 shrink-0 bg-background px-1 pb-1 pt-1">

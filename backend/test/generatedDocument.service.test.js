@@ -14,6 +14,7 @@ const { createMemoryChatSessionRepository } = await import(
   "../src/services/chats/chatSession.repository.js"
 );
 const { applyUsageDelta } = await import("../src/services/demo/demoUsage.service.js");
+const { createHttpError } = await import("../src/utils/httpError.js");
 
 function baseMessages() {
   return [
@@ -423,4 +424,30 @@ test("generated document service handles provider, storage, and indexing failure
   assert.deepEqual(savedWithWarning.generation.warnings, ["GENERATED_DOCUMENT_INDEXING_FAILED"]);
   assert.equal(savedWithWarning.document.statusMessage.includes("indexing"), true);
   assert.equal(indexingThrow.generatedDocumentRepository._unsafeSnapshot().length, 1);
+});
+
+test("generated document service returns transient generation errors without saving a document", async () => {
+  const providerUnavailable = dependencies({
+    generator: async () => {
+      throw createHttpError(
+        503,
+        "The AI generation provider is temporarily unavailable. Please try again.",
+        "GENERATION_PROVIDER_UNAVAILABLE",
+      );
+    },
+  });
+
+  await assert.rejects(
+    () =>
+      generateDocumentFromChat({
+        chatId: "chat_1",
+        demoSessionId: "demo_123",
+        body: { instruction: "", filename: "summary.md" },
+        dependencies: providerUnavailable.deps,
+      }),
+    { code: "GENERATION_PROVIDER_UNAVAILABLE" },
+  );
+
+  assert.equal(providerUnavailable.generatedDocumentRepository._unsafeSnapshot().length, 0);
+  assert.equal(providerUnavailable.usageUpdates.length, 0);
 });

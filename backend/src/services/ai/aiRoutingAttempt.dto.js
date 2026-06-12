@@ -8,6 +8,8 @@ export function toAiRoutingAttemptDto({
   status = AI_ROUTING_STATUS.FAILED,
   errorType = null,
   isRateLimit = false,
+  isTransient = false,
+  isRetryable = false,
   fallbackLevel = 0,
 } = {}) {
   return {
@@ -17,6 +19,8 @@ export function toAiRoutingAttemptDto({
     status,
     errorType,
     isRateLimit: Boolean(isRateLimit),
+    isTransient: Boolean(isTransient),
+    isRetryable: Boolean(isRetryable),
     fallbackLevel,
   };
 }

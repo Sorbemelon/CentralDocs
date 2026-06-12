@@ -43,6 +43,14 @@ const aiRoutingAttemptSchema = new mongoose.Schema(
       default: false,
       index: true,
     },
+    isTransient: {
+      type: Boolean,
+      default: false,
+    },
+    isRetryable: {
+      type: Boolean,
+      default: false,
+    },
     fallbackLevel: {
       type: Number,
       default: 0,

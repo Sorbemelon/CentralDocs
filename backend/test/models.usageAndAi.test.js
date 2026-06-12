@@ -37,6 +37,8 @@ test("AiRoutingAttempt schema has enums, defaults, and indexes", () => {
   assert.equal(attempt.status, AI_ROUTING_STATUS.FAILED);
   assert.equal(attempt.keySlot, null);
   assert.equal(attempt.isRateLimit, false);
+  assert.equal(attempt.isTransient, false);
+  assert.equal(attempt.isRetryable, false);
   assert.equal(attempt.fallbackLevel, 0);
   assert.equal(attempt.validateSync(), undefined);
 

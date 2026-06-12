@@ -1,10 +1,9 @@
 import { GENERATION_MODEL_LANE } from "../../config/aiModels.js";
 import { AI_ACTION_TYPE, AI_ROUTING_STATUS } from "../../constants/ai.constants.js";
 import { CHAT_SESSION_ERROR_CODE } from "../../constants/chatSession.constants.js";
-import { createHttpError } from "../../utils/httpError.js";
+import { createHttpError, HttpError } from "../../utils/httpError.js";
 import {
   classifyAiProviderError,
-  isRateLimitError,
   toSafeAiError,
 } from "./aiErrorClassifier.service.js";
 import { toAiRoutingAttemptDto } from "./aiRoutingAttempt.dto.js";
@@ -83,6 +82,16 @@ async function callGenerationClient(client, { model, prompt, systemInstruction, 
 }
 
 function safeProviderError(error) {
+  if (
+    error instanceof HttpError &&
+    [
+      CHAT_SESSION_ERROR_CODE.GENERATION_NOT_CONFIGURED,
+      CHAT_SESSION_ERROR_CODE.INVALID_REQUEST,
+    ].includes(error.code)
+  ) {
+    return error;
+  }
+
   const safe = toSafeAiError(error);
   if (safe.isRateLimit) {
     return createHttpError(
@@ -92,12 +101,65 @@ function safeProviderError(error) {
       { errorType: safe.errorType, isRateLimit: true },
     );
   }
+  if (safe.isTransient) {
+    return createHttpError(
+      503,
+      "The AI generation provider is temporarily unavailable. Please try again.",
+      CHAT_SESSION_ERROR_CODE.GENERATION_PROVIDER_UNAVAILABLE,
+      {
+        errorType: safe.errorType,
+        isRateLimit: false,
+        isTransient: true,
+        isRetryable: true,
+      },
+    );
+  }
 
   return createHttpError(
     502,
     "The AI generation provider returned an unavailable response.",
     CHAT_SESSION_ERROR_CODE.GENERATION_PROVIDER_ERROR,
-    { errorType: safe.errorType, isRateLimit: false },
+    {
+      errorType: safe.errorType,
+      isRateLimit: false,
+      isTransient: false,
+      isRetryable: false,
+    },
+  );
+}
+
+function laneExhaustedError(attempts = []) {
+  const hasTransient = attempts.some((attempt) => attempt.isTransient);
+  const hasRateLimit = attempts.some((attempt) => attempt.isRateLimit);
+
+  if (hasTransient) {
+    return createHttpError(
+      503,
+      "The AI generation provider is temporarily unavailable. Please try again.",
+      CHAT_SESSION_ERROR_CODE.GENERATION_PROVIDER_UNAVAILABLE,
+      {
+        aiRouting: attempts,
+        errorType: "transient_provider_error",
+        isTransient: true,
+        isRetryable: true,
+      },
+    );
+  }
+
+  if (hasRateLimit) {
+    return createHttpError(
+      429,
+      "All generation model/key slots are rate limited.",
+      CHAT_SESSION_ERROR_CODE.AI_RATE_LIMIT_EXHAUSTED,
+      { aiRouting: attempts, errorType: "rate_limit", isRateLimit: true },
+    );
+  }
+
+  return createHttpError(
+    502,
+    "The AI generation provider returned an unavailable response.",
+    CHAT_SESSION_ERROR_CODE.GENERATION_PROVIDER_ERROR,
+    { aiRouting: attempts, errorType: "provider_error" },
   );
 }
 
@@ -227,10 +289,12 @@ export async function generateTextWithLane({
             status: AI_ROUTING_STATUS.FAILED,
             errorType: classified.errorType,
             isRateLimit: classified.isRateLimit,
+            isTransient: classified.isTransient,
+            isRetryable: classified.isRetryable,
             fallbackLevel,
           }),
         );
-        if (!isRateLimitError(error)) {
+        if (!classified.isRetryable) {
           throw safeProviderError(error);
         }
         continue;
@@ -256,10 +320,5 @@ export async function generateTextWithLane({
     }
   }
 
-  throw createHttpError(
-    429,
-    "All generation model/key slots are rate limited.",
-    CHAT_SESSION_ERROR_CODE.AI_RATE_LIMIT_EXHAUSTED,
-    { aiRouting: attempts },
-  );
+  throw laneExhaustedError(attempts);
 }

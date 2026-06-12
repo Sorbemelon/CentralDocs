@@ -1,7 +1,7 @@
 import { AI_MODELS, GENERATION_MODEL_LANE } from "../../config/aiModels.js";
 import { CHAT_SESSION_ERROR_CODE } from "../../constants/chatSession.constants.js";
 import { createHttpError } from "../../utils/httpError.js";
-import { isRateLimitError } from "./aiErrorClassifier.service.js";
+import { classifyAiProviderError } from "./aiErrorClassifier.service.js";
 
 export const GENERATION_PROVIDER = "gemini";
 
@@ -30,8 +30,18 @@ export function buildGenerationRoutePlan({ models = GENERATION_MODEL_LANE, keySl
 }
 
 export function assertGenerationLaneExhaustion(error) {
-  if (!isRateLimitError(error)) {
+  const classified = classifyAiProviderError(error);
+
+  if (!classified.isRetryable) {
     throw error;
+  }
+
+  if (classified.isTransient) {
+    throw createHttpError(
+      503,
+      "The AI generation provider is temporarily unavailable. Please try again.",
+      CHAT_SESSION_ERROR_CODE.GENERATION_PROVIDER_UNAVAILABLE,
+    );
   }
 
   throw createHttpError(
