@@ -1,11 +1,12 @@
 import { EXTRACTION_LIMITS } from "../constants/extraction.constants.js";
 import { CHUNKING_LIMITS } from "../constants/chunking.constants.js";
+import { getDemoQuotaWindowDays } from "./env.js";
 
 const MB = 1024 * 1024;
 const KB = 1024;
 
 export const DEMO_LIMITS = Object.freeze({
-  sessionLifetimeDays: 3,
+  sessionLifetimeDays: getDemoQuotaWindowDays(),
   maxUploadedFiles: 5,
   maxChatSessions: 5,
   maxAiPrompts: 10,

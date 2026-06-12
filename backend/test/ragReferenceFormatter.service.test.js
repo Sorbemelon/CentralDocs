@@ -80,6 +80,50 @@ test("RAG reference formatter dedupes and preserves grouped citation metadata", 
   assert.deepEqual(grouped.map((ref) => ref.documentId), ["doc_1", "doc_2", "doc_3"]);
 });
 
+test("RAG reference formatter assigns one citation number per source document", () => {
+  const refs = [
+    {
+      citationNumber: 1,
+      documentId: "doc_1",
+      documentTitle: "Customer Notes",
+      fileType: "md",
+      folderName: "Mock Workspace",
+      chunkId: "chunk_1",
+      excerptPreview: "Customers cannot find policy updates.",
+      similarityScore: 0.72,
+    },
+    {
+      citationNumber: 2,
+      documentId: "doc_2",
+      documentTitle: "Rollout Plan",
+      fileType: "pdf",
+      folderName: "Mock Workspace",
+      chunkId: "chunk_2",
+      excerptPreview: "Rollout decisions are tracked weekly.",
+      similarityScore: 0.81,
+    },
+    {
+      citationNumber: 3,
+      documentId: "doc_1",
+      documentTitle: "Customer Notes",
+      fileType: "md",
+      folderName: "Mock Workspace",
+      chunkId: "chunk_3",
+      excerptPreview: "Customers also miss escalation paths.",
+      similarityScore: 0.91,
+    },
+  ];
+
+  const formatted = formatReferencesForChatAnswer({ references: refs });
+
+  assert.deepEqual(formatted.map((ref) => ref.citationNumber), [1, 2]);
+  assert.deepEqual(formatted.map((ref) => ref.documentId), ["doc_1", "doc_2"]);
+  assert.equal(formatted[0].chunkId, "chunk_1");
+  assert.equal(formatted[0].similarityScore, 0.91);
+  assert.match(formatted[0].excerptPreview, /policy updates/);
+  assert.match(formatted[0].excerptPreview, /escalation paths/);
+});
+
 test("RAG reference formatter fills uncited evidence up to the visible limit", () => {
   const refs = Array.from({ length: 12 }, (_, index) => ({
     citationNumber: index + 1,

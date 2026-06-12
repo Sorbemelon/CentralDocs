@@ -12,6 +12,7 @@ process.env.GEMINI_API_KEY_1 = "";
 process.env.GEMINI_API_KEY_2 = "";
 process.env.GEMINI_API_KEY_3 = "";
 process.env.GEMINI_API_KEYS = "";
+process.env.DEMO_CLEAR_RESETS_USAGE = "";
 
 const { app } = await import("../src/app.js");
 
@@ -62,6 +63,10 @@ test("POST /api/demo/clear returns cleared foundation response", async () => {
   assert.equal(response.body.session.remaining.storageBytes, 20 * 1024 * 1024);
   assert.equal(response.body.cleanup.mongo, "skipped_not_configured");
   assert.equal(response.body.cleanup.s3, "skipped_not_configured");
+  assert.deepEqual(response.body.clearPolicy, {
+    usageReset: true,
+    reason: "development_mode",
+  });
 });
 
 test("GET /api/demo/guide returns guide counts from manifest", async () => {

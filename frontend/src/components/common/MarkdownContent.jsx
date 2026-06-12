@@ -31,6 +31,14 @@ function linkCitationMarkers(markdown = "", referenceNumbers = new Set()) {
   });
 }
 
+function normalizeMarkdownSpacing(markdown = "") {
+  return String(markdown || "")
+    .replace(/\r\n?/g, "\n")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 const markdownComponents = {
   p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
   ul: ({ children }) => <ul className="mb-2 list-disc space-y-1 pl-4 last:mb-0">{children}</ul>,
@@ -92,7 +100,7 @@ function CitationLink({ href = "", children, onCitationClick }) {
 
 export function MarkdownContent({ content, references = [], onCitationClick, className }) {
   const referenceNumbers = new Set(references.map((ref) => Number(ref.number)).filter(Number.isFinite));
-  const linked = linkCitationMarkers(content, referenceNumbers);
+  const linked = linkCitationMarkers(normalizeMarkdownSpacing(content), referenceNumbers);
   const components = {
     ...markdownComponents,
     a: ({ href, children }) => (

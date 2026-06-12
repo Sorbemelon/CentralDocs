@@ -18,6 +18,7 @@ export const DEFAULT_GEMINI_GENERATION_FALLBACK_MODELS = Object.freeze([
 ]);
 export const DEFAULT_MONGODB_VECTOR_INDEX_NAME = "document_chunks_vector_index";
 export const DEFAULT_MONGODB_VECTOR_PATH = "embedding";
+export const DEFAULT_DEMO_QUOTA_WINDOW_DAYS = 3;
 
 const emptyToUndefined = (value) => {
   if (typeof value === "string" && value.trim() === "") {
@@ -34,6 +35,19 @@ const optionalTrimmedString = () => z.preprocess(
 const defaultedTrimmedString = (defaultValue) => z.preprocess(
   emptyToUndefined,
   z.string().trim().default(defaultValue),
+);
+
+const optionalBoolean = () => z.preprocess(
+  (value) => {
+    const normalized = emptyToUndefined(value);
+    if (typeof normalized === "string") {
+      const lowered = normalized.trim().toLowerCase();
+      if (lowered === "true") return true;
+      if (lowered === "false") return false;
+    }
+    return normalized;
+  },
+  z.boolean().optional(),
 );
 
 const safeMongoDatabaseName = z.preprocess(
@@ -63,6 +77,11 @@ const envSchema = z.object({
   GEMINI_GENERATION_PRIMARY_MODEL: defaultedTrimmedString(DEFAULT_GEMINI_GENERATION_PRIMARY_MODEL),
   GEMINI_GENERATION_FALLBACK_MODEL_1: defaultedTrimmedString(DEFAULT_GEMINI_GENERATION_FALLBACK_MODELS[0]),
   GEMINI_GENERATION_FALLBACK_MODEL_2: defaultedTrimmedString(DEFAULT_GEMINI_GENERATION_FALLBACK_MODELS[1]),
+  DEMO_CLEAR_RESETS_USAGE: optionalBoolean(),
+  DEMO_QUOTA_WINDOW_DAYS: z.preprocess(
+    emptyToUndefined,
+    z.coerce.number().int().positive().default(DEFAULT_DEMO_QUOTA_WINDOW_DAYS),
+  ),
   AWS_REGION: optionalTrimmedString(),
   AWS_S3_BUCKET: optionalTrimmedString(),
   AWS_ACCESS_KEY_ID: optionalTrimmedString(),
@@ -92,6 +111,12 @@ const generationModelLane = [
   rawEnv.GEMINI_GENERATION_PRIMARY_MODEL,
   ...generationFallbackModels,
 ].filter(Boolean);
+const demoClearResetsUsage = rawEnv.DEMO_CLEAR_RESETS_USAGE ?? rawEnv.NODE_ENV !== "production";
+const demoClearUsagePolicyReason = rawEnv.DEMO_CLEAR_RESETS_USAGE !== undefined
+  ? "env_override"
+  : demoClearResetsUsage
+    ? "development_mode"
+    : "production_quota_window";
 
 function parseOrigins(value) {
   if (!value) {
@@ -168,6 +193,9 @@ export const env = Object.freeze({
   embeddingDimensions: rawEnv.GEMINI_EMBEDDING_DIMENSIONS,
   vectorIndexName: rawEnv.MONGODB_VECTOR_INDEX_NAME,
   vectorPath: rawEnv.MONGODB_VECTOR_PATH,
+  demoClearResetsUsage,
+  demoClearUsagePolicyReason,
+  demoQuotaWindowDays: rawEnv.DEMO_QUOTA_WINDOW_DAYS,
 });
 
 export function getMongoUri() {
@@ -245,6 +273,21 @@ export function getVectorPath() {
   return rawEnv.MONGODB_VECTOR_PATH;
 }
 
+export function getDemoClearResetsUsage() {
+  return env.demoClearResetsUsage;
+}
+
+export function getDemoClearUsagePolicy() {
+  return {
+    usageReset: env.demoClearResetsUsage,
+    reason: env.demoClearUsagePolicyReason,
+  };
+}
+
+export function getDemoQuotaWindowDays() {
+  return env.demoQuotaWindowDays;
+}
+
 export function getSafeConfigSummary() {
   const aiConfigured = env.geminiKeyCount > 0;
 
@@ -284,6 +327,10 @@ export function getSafeConfigSummary() {
       indexName: env.vectorIndexName,
       path: env.vectorPath,
       dimensions: env.embeddingDimensions,
+    },
+    demo: {
+      clearPolicy: getDemoClearUsagePolicy(),
+      quotaWindowDays: env.demoQuotaWindowDays,
     },
   };
 }

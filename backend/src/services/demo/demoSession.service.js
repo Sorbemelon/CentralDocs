@@ -1,4 +1,5 @@
 import { nanoid } from "nanoid";
+import { getDemoClearUsagePolicy } from "../../config/env.js";
 import { DEMO_LIMITS, EMPTY_DEMO_USAGE } from "../../config/limits.js";
 import { CLEANUP_STATUS, DEMO_SESSION_STATUS } from "../../constants/lifecycle.constants.js";
 import { addDays, now } from "../../utils/time.js";
@@ -20,16 +21,20 @@ function createSessionId() {
   return `demo_${nanoid(18)}`;
 }
 
-export function createSessionRecord(sessionId = createSessionId(), createdAt = now()) {
+export function createSessionRecord(sessionId = createSessionId(), createdAt = now(), options = {}) {
+  const recordCreatedAt = options.createdAt || createdAt;
+
   return {
     sessionId,
     status: DEMO_SESSION_STATUS.ACTIVE,
-    createdAt,
-    lastActiveAt: createdAt,
-    expiresAt: addDays(createdAt, DEMO_LIMITS.sessionLifetimeDays),
-    limits: { ...DEMO_LIMITS },
-    usage: { ...EMPTY_DEMO_USAGE },
-    cleanupStatus: CLEANUP_STATUS.NOT_STARTED,
+    createdAt: recordCreatedAt,
+    lastActiveAt: options.lastActiveAt || recordCreatedAt,
+    expiresAt: options.expiresAt || addDays(recordCreatedAt, DEMO_LIMITS.sessionLifetimeDays),
+    limits: { ...DEMO_LIMITS, ...(options.limits || {}) },
+    usage: options.usage
+      ? getUsageSnapshot({ usage: options.usage })
+      : { ...EMPTY_DEMO_USAGE },
+    cleanupStatus: options.cleanupStatus || CLEANUP_STATUS.NOT_STARTED,
   };
 }
 
@@ -75,8 +80,8 @@ function updateMemorySession(session) {
   return session;
 }
 
-async function createPersistentOrMemorySession(persistenceAvailable) {
-  const record = createSessionRecord();
+async function createPersistentOrMemorySession(persistenceAvailable, options = {}) {
+  const record = createSessionRecord(options.sessionId, options.createdAt || now(), options);
 
   if (persistenceAvailable) {
     return toPublicSession(await createPersistentSession(record), "mongodb");
@@ -125,6 +130,13 @@ export async function createOrResumeDemoSession(requestedSessionId) {
   }
 
   return createOrResumeMemorySession(requestedSessionId);
+}
+
+function normalizeClearPolicy(policy = getDemoClearUsagePolicy()) {
+  return {
+    usageReset: policy?.usageReset !== false,
+    reason: policy?.reason || (policy?.usageReset === false ? "production_quota_window" : "development_mode"),
+  };
 }
 
 export async function getDemoSession(requestedSessionId) {
@@ -182,9 +194,28 @@ export async function applyDemoSessionUsageDelta(sessionId, delta) {
   return toPublicSession(existing, "memory");
 }
 
-export async function clearDemoSession(requestedSessionId) {
+export async function clearDemoSession(requestedSessionId, options = {}) {
   const persistenceAvailable = isDemoSessionPersistenceAvailable();
   const previousSessionId = requestedSessionId || null;
+  const clearPolicy = normalizeClearPolicy(options.clearPolicy);
+  const previousSession = previousSessionId ? await getDemoSession(previousSessionId) : null;
+  const canCarryUsage = clearPolicy.usageReset === false &&
+    previousSession?.status === DEMO_SESSION_STATUS.ACTIVE;
+  const carriedUsage = canCarryUsage
+    ? {
+        ...getUsageSnapshot(previousSession),
+        chatSessions: 0,
+      }
+    : null;
+  const carriedSessionOptions = canCarryUsage
+    ? {
+        usage: carriedUsage,
+        limits: previousSession.limits,
+        createdAt: previousSession.createdAt ? new Date(previousSession.createdAt) : now(),
+        lastActiveAt: now(),
+        expiresAt: previousSession.expiresAt ? new Date(previousSession.expiresAt) : undefined,
+      }
+    : {};
   const cleanup = previousSessionId
     ? await cleanupDemoSessionData(previousSessionId, { persistenceAvailable })
     : {
@@ -196,12 +227,13 @@ export async function clearDemoSession(requestedSessionId) {
     inMemorySessions.delete(previousSessionId);
   }
 
-  const session = await createPersistentOrMemorySession(persistenceAvailable);
+  const session = await createPersistentOrMemorySession(persistenceAvailable, carriedSessionOptions);
 
   return {
     status: "cleared",
     previousSessionId,
     session,
+    clearPolicy,
     cleanup: {
       mongo: cleanup.mongo?.status || "skipped_not_configured",
       s3: cleanup.s3?.status || "skipped_not_configured",

@@ -18,8 +18,8 @@ export function getDemoSession() {
 
 /**
  * POST /demo/clear — clear this demo session's uploads, generated docs, chats,
- * and user folders. Mock demo data remains. The backend rotates the session id,
- * so persist the new one (like createOrResumeSession) for subsequent requests.
+ * and user folders. Mock demo data remains. The backend may preserve usage
+ * quota in production, so persist the returned session id for subsequent calls.
  */
 export async function clearDemoSession(options) {
   const data = await apiClient.post("/demo/clear", undefined, options);

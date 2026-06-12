@@ -78,7 +78,7 @@ function LegacyAssistantMessage({ message, selected, onSelect }) {
         type="button"
         onClick={onSelect}
         className={cn(
-          "max-w-[80%] whitespace-pre-wrap rounded-lg rounded-bl-sm bg-primary px-3 py-2 text-left text-sm text-primary-foreground shadow-sm transition-colors hover:bg-primary/90",
+          "max-w-[80%] rounded-lg rounded-bl-sm bg-primary px-3 py-2 text-left text-sm text-primary-foreground shadow-sm transition-colors hover:bg-primary/90",
           selected && "ring-2 ring-primary/25 ring-offset-1 ring-offset-background",
         )}
       >
@@ -212,7 +212,7 @@ function AssistantMessage({ message, selected, onSelect }) {
         onClick={onSelect}
         onKeyDown={onBubbleKeyDown}
         className={cn(
-          "max-w-[80%] whitespace-pre-wrap rounded-lg rounded-bl-sm bg-primary px-3 py-2 text-left text-sm text-primary-foreground shadow-sm transition-colors hover:bg-primary/90",
+          "max-w-[80%] rounded-lg rounded-bl-sm bg-primary px-3 py-2 text-left text-sm text-primary-foreground shadow-sm transition-colors hover:bg-primary/90",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
           selected && "ring-2 ring-primary/25 ring-offset-1 ring-offset-background",
         )}

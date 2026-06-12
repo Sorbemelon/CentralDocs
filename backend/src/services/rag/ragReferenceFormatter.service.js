@@ -28,6 +28,12 @@ function capText(text = "", max = MAX_REFERENCE_EXCERPT_CHARS) {
   return String(text || "").slice(0, max);
 }
 
+function normalizeTextKey(value = "") {
+  return String(value || "")
+    .trim()
+    .toLowerCase();
+}
+
 function referenceKey(reference = {}) {
   const documentId = serializeId(reference.documentId) || "unknown_document";
   const chunkId = serializeId(reference.chunkId);
@@ -38,6 +44,56 @@ function referenceKey(reference = {}) {
   const locator = serializeLocator(reference);
   const excerpt = capText(reference.excerptPreview, 120).trim();
   return `${documentId}:locator:${locator}:excerpt:${excerpt}`;
+}
+
+function sourceReferenceKey(reference = {}) {
+  const documentId = serializeId(reference.documentId);
+  if (documentId) {
+    return `document:${documentId}`;
+  }
+
+  const title = normalizeTextKey(reference.documentTitle);
+  const fileType = normalizeTextKey(reference.fileType);
+  const folderName = normalizeTextKey(reference.folderName);
+  if (title || fileType || folderName) {
+    return `source:${folderName}:${title}:${fileType}`;
+  }
+
+  return referenceKey(reference);
+}
+
+function mergeExcerptPreview(existing = "", next = "") {
+  const parts = [existing, next]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean);
+  const unique = [];
+  const seen = new Set();
+
+  for (const part of parts) {
+    const key = part.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(part);
+  }
+
+  return capText(unique.join("\n\n"));
+}
+
+function mergeSourceReference(existing = {}, next = {}) {
+  const currentScore =
+    typeof existing.similarityScore === "number" ? existing.similarityScore : null;
+  const nextScore = typeof next.similarityScore === "number" ? next.similarityScore : null;
+
+  return {
+    ...existing,
+    excerptPreview: mergeExcerptPreview(existing.excerptPreview, next.excerptPreview),
+    similarityScore:
+      currentScore == null
+        ? nextScore
+        : nextScore == null
+          ? currentScore
+          : Math.max(currentScore, nextScore),
+  };
 }
 
 function expandCitationToken(token = "") {
@@ -114,17 +170,21 @@ export function formatReferencesForChatAnswer({
   visibleLimit = DEMO_LIMITS.visibleReferences,
   answerText = "",
 } = {}) {
-  const seen = new Set();
-  const formatted = [];
+  const bySource = new Map();
 
   for (const reference of references) {
-    const key = referenceKey(reference);
-    if (!key || seen.has(key)) {
+    const key = sourceReferenceKey(reference);
+    if (!key) {
       continue;
     }
-    seen.add(key);
-    formatted.push(toChatReference(reference, formatted.length + 1));
+
+    const existing = bySource.get(key);
+    bySource.set(key, existing ? mergeSourceReference(existing, reference) : reference);
   }
+
+  const formatted = Array.from(bySource.values()).map((reference, index) =>
+    toChatReference(reference, index + 1),
+  );
 
   const citedNumbers = extractCitationNumbersFromAnswer(answerText);
   const byCitation = new Map(formatted.map((reference) => [reference.citationNumber, reference]));

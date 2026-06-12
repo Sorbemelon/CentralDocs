@@ -15,6 +15,8 @@ process.env.GEMINI_GENERATION_FALLBACK_MODEL_1 = "gemini-3-flash-preview";
 process.env.GEMINI_GENERATION_FALLBACK_MODEL_2 = "gemini-2.5-flash";
 process.env.MONGODB_VECTOR_INDEX_NAME = "document_chunks_vector_index";
 process.env.MONGODB_VECTOR_PATH = "embedding";
+process.env.DEMO_CLEAR_RESETS_USAGE = "";
+process.env.DEMO_QUOTA_WINDOW_DAYS = "3";
 process.env.GEMINI_API_KEY_1 = "safe-summary-gemini-token";
 process.env.GEMINI_API_KEY_2 = "";
 process.env.GEMINI_API_KEY_3 = "";
@@ -25,6 +27,9 @@ const {
   env,
   getEmbeddingDimensions,
   getEmbeddingModel,
+  getDemoClearResetsUsage,
+  getDemoClearUsagePolicy,
+  getDemoQuotaWindowDays,
   getGenerationFallbackModels,
   getGenerationPrimaryModel,
   getMongoDatabaseWarning,
@@ -32,6 +37,38 @@ const {
   getVectorIndexName,
   getVectorPath,
 } = await import("../src/config/env.js");
+
+async function importEnvWith(overrides, label) {
+  const keys = [
+    "NODE_ENV",
+    "DEMO_CLEAR_RESETS_USAGE",
+    "DEMO_QUOTA_WINDOW_DAYS",
+    "MONGODB_URI",
+    "MONGODB_DATABASE_NAME",
+    "GEMINI_EMBEDDING_DIMENSIONS",
+  ];
+  const previous = new Map(keys.map((key) => [key, process.env[key]]));
+
+  for (const [key, value] of Object.entries(overrides)) {
+    if (value === undefined) {
+      delete process.env[key];
+    } else {
+      process.env[key] = value;
+    }
+  }
+
+  try {
+    return await import(`../src/config/env.js?${label}=${Date.now()}-${Math.random()}`);
+  } finally {
+    for (const [key, value] of previous.entries()) {
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+  }
+}
 
 test("demo limits match locked CentralDocs decisions", () => {
   assert.equal(DEMO_LIMITS.sessionLifetimeDays, 3);
@@ -100,6 +137,13 @@ test("safe config summary does not expose sensitive values", () => {
     path: "embedding",
     dimensions: 768,
   });
+  assert.deepEqual(summary.demo, {
+    clearPolicy: {
+      usageReset: true,
+      reason: "development_mode",
+    },
+    quotaWindowDays: 3,
+  });
   assert.equal(serialized.includes("hidden-host.example"), false);
   assert.equal(serialized.includes("safe-summary-access-token"), false);
   assert.equal(serialized.includes("safe-summary-sensitive-token"), false);
@@ -117,6 +161,64 @@ test("default model and vector getters match CentralDocs behavior", () => {
   assert.equal(getVectorIndexName(), "document_chunks_vector_index");
   assert.equal(getVectorPath(), "embedding");
   assert.equal(getMongoDatabaseWarning(), null);
+  assert.equal(getDemoClearResetsUsage(), true);
+  assert.deepEqual(getDemoClearUsagePolicy(), {
+    usageReset: true,
+    reason: "development_mode",
+  });
+  assert.equal(getDemoQuotaWindowDays(), 3);
+});
+
+test("demo clear usage policy defaults by environment and supports overrides", async () => {
+  const productionDefault = await importEnvWith({
+    NODE_ENV: "production",
+    DEMO_CLEAR_RESETS_USAGE: "",
+  }, "clear-policy-prod-default");
+  assert.equal(productionDefault.getDemoClearResetsUsage(), false);
+  assert.deepEqual(productionDefault.getDemoClearUsagePolicy(), {
+    usageReset: false,
+    reason: "production_quota_window",
+  });
+
+  const developmentDefault = await importEnvWith({
+    NODE_ENV: "development",
+    DEMO_CLEAR_RESETS_USAGE: "",
+  }, "clear-policy-dev-default");
+  assert.equal(developmentDefault.getDemoClearResetsUsage(), true);
+  assert.deepEqual(developmentDefault.getDemoClearUsagePolicy(), {
+    usageReset: true,
+    reason: "development_mode",
+  });
+
+  const productionOverride = await importEnvWith({
+    NODE_ENV: "production",
+    DEMO_CLEAR_RESETS_USAGE: "true",
+  }, "clear-policy-prod-override");
+  assert.deepEqual(productionOverride.getDemoClearUsagePolicy(), {
+    usageReset: true,
+    reason: "env_override",
+  });
+
+  const developmentOverride = await importEnvWith({
+    NODE_ENV: "development",
+    DEMO_CLEAR_RESETS_USAGE: "false",
+  }, "clear-policy-dev-override");
+  assert.deepEqual(developmentOverride.getDemoClearUsagePolicy(), {
+    usageReset: false,
+    reason: "env_override",
+  });
+});
+
+test("demo quota window defaults to three days and is configurable", async () => {
+  const defaultWindow = await importEnvWith({
+    DEMO_QUOTA_WINDOW_DAYS: "",
+  }, "quota-default");
+  assert.equal(defaultWindow.getDemoQuotaWindowDays(), 3);
+
+  const customWindow = await importEnvWith({
+    DEMO_QUOTA_WINDOW_DAYS: "7",
+  }, "quota-custom");
+  assert.equal(customWindow.getDemoQuotaWindowDays(), 7);
 });
 
 test("MongoDB URI without database path produces safe warning", async () => {

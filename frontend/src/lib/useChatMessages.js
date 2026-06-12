@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { getChat, sendChatMessage } from "@/services/chatApi";
-import { isLocalChatId, normalizeChatMessage, normalizeReferencesForAnswer } from "./workspaceData";
+import { isLocalChatId, normalizeAnswerReferences, normalizeChatMessage } from "./workspaceData";
 import { DEMO_LIMITS } from "./constants";
 
 const PENDING_STEPS = ["Resolving context", "Retrieving references", "Generating answer", "Saving response"];
@@ -156,10 +156,12 @@ export function useChatMessages({
     const user = res?.userMessage ? normalizeChatMessage(res.userMessage) : null;
     const assistant = res?.assistantMessage ? normalizeChatMessage(res.assistantMessage) : null;
     if (assistant && !assistant.references.length && Array.isArray(res?.references) && res.references.length) {
-      assistant.references = normalizeReferencesForAnswer({
+      const normalizedAnswer = normalizeAnswerReferences({
         content: assistant.content,
         references: res.references,
       });
+      assistant.content = normalizedAnswer.content;
+      assistant.references = normalizedAnswer.references;
     }
     setMessages((prev) => {
       const withoutOptimisticUser = user

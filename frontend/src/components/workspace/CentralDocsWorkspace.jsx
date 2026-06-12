@@ -604,17 +604,22 @@ export default function CentralDocsWorkspace() {
     if (!online) return;
     setOperation({ kind: "clear", status: "processing", label: "Clearing session" });
     try {
-      await clearDemoSession();
-      clearDemoSessionId();
+      const result = await clearDemoSession();
+      const usageReset = result?.clearPolicy?.usageReset !== false;
+      if (usageReset) clearDemoSessionId();
       selection.setFromChat(null); // clear without persisting to the old chat
       setPreviewDocId(null);
       setActiveTab("chat");
       search.clearSearch();
       generate.clearGeneratedResult();
       generate.closeGenerateModal();
-      setUsageOverride(null);
+      setUsageOverride(usageReset ? null : normalizeUsage(result?.session));
       setOperation({ kind: "clear", status: "complete", label: "Session cleared" });
-      toast.success("Session cleared — your demo data was reset");
+      toast.success(
+        usageReset
+          ? "Session cleared — your demo data was reset"
+          : "Workspace cleared. Demo usage is preserved for this quota period.",
+      );
       navigate("/", { replace: true });
     } catch {
       setOperation({ kind: "clear", status: "failed", label: "Clear failed" });
@@ -777,7 +782,7 @@ export default function CentralDocsWorkspace() {
     return {
       ...base,
       chats: { ...base.chats, used: liveChats },
-      folders: { ...base.folders, used: liveFolders },
+      folders: { ...base.folders, used: Math.max(base.folders.used, liveFolders) },
       uploads: { ...base.uploads, used: Math.max(base.uploads.used, liveUploads) },
       generated: { ...base.generated, used: Math.max(base.generated.used, liveGenerated) },
     };

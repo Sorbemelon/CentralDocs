@@ -425,9 +425,22 @@ export function normalizeReference(ref = {}) {
 }
 
 function referenceDedupeKey(ref = {}) {
-  const documentId = ref.documentId || "unknown-document";
-  if (ref.chunkId) return `${documentId}:chunk:${ref.chunkId}`;
-  return `${documentId}:fallback:${ref.locator || ""}:${String(ref.excerpt || "").slice(0, 120)}`;
+  if (ref.documentId) return `document:${ref.documentId}`;
+
+  const title = String(ref.title || "").trim().toLowerCase();
+  const fileType = String(ref.fileType || "").trim().toLowerCase();
+  const folderName = String(ref.folderName || "").trim().toLowerCase();
+  if ((title && title !== "untitled") || fileType || folderName) {
+    return `source:${folderName}:${title}:${fileType}`;
+  }
+
+  if (ref.chunkId) return `chunk:${ref.chunkId}`;
+  return `fallback:${ref.locator || ""}:${String(ref.excerpt || "").slice(0, 120)}`;
+}
+
+function citationNumber(value) {
+  const number = Number(value);
+  return Number.isInteger(number) && number > 0 ? number : null;
 }
 
 function expandCitationToken(token = "") {
@@ -466,31 +479,69 @@ export function extractCitationNumbers(content = "") {
   return numbers;
 }
 
-export function normalizeReferencesForAnswer({ content = "", references = [] } = {}) {
+function canonicalizeCitationMarkers(content = "", duplicateNumberMap = new Map()) {
+  const pattern = /\[((?:\s*\d+\s*(?:[-โ€“โ€”]\s*\d+\s*)?)(?:,\s*\d+\s*(?:[-โ€“โ€”]\s*\d+\s*)?)*)\]/g;
+  return String(content || "").replace(pattern, (full, token) => {
+    const originalNumbers = expandCitationToken(token);
+    if (!originalNumbers.length) return full;
+
+    const mappedNumbers = [];
+    let changed = false;
+    for (const number of originalNumbers) {
+      const mapped = duplicateNumberMap.get(number) ?? number;
+      if (mapped !== number) changed = true;
+      if (mappedNumbers.includes(mapped)) {
+        changed = true;
+        continue;
+      }
+      mappedNumbers.push(mapped);
+    }
+
+    return changed ? `[${mappedNumbers.join(", ")}]` : full;
+  });
+}
+
+export function normalizeAnswerReferences({ content = "", references = [] } = {}) {
   const deduped = [];
   const seen = new Set();
+  const duplicateNumberMap = new Map();
+
   for (const raw of references) {
     const ref = normalizeReference(raw);
     const key = referenceDedupeKey(ref);
-    if (seen.has(key)) continue;
+    const existing = deduped.find((item) => referenceDedupeKey(item) === key);
+    if (seen.has(key)) {
+      const duplicate = citationNumber(ref.number);
+      const canonical = citationNumber(existing?.number);
+      if (duplicate && canonical) duplicateNumberMap.set(duplicate, canonical);
+      continue;
+    }
     seen.add(key);
     deduped.push(ref);
   }
 
-  const citedNumbers = extractCitationNumbers(content);
+  const normalizedContent = canonicalizeCitationMarkers(content, duplicateNumberMap);
+  const citedNumbers = extractCitationNumbers(normalizedContent);
   if (citedNumbers.length) {
     const byNumber = new Map(deduped.map((ref) => [Number(ref.number), ref]));
     if (citedNumbers.every((number) => byNumber.has(number))) {
       const cited = citedNumbers.map((number) => byNumber.get(number));
       const citedSet = new Set(cited.map((ref) => Number(ref.number)));
-      return [
-        ...cited,
-        ...deduped.filter((ref) => !citedSet.has(Number(ref.number))),
-      ];
+      return {
+        content: normalizedContent,
+        references: [
+          ...cited,
+          ...deduped.filter((ref) => !citedSet.has(Number(ref.number))),
+        ],
+      };
     }
   }
 
-  return deduped;
+  return { content: normalizedContent, references: deduped };
+}
+
+export function normalizeReferencesForAnswer({ content = "", references = [] } = {}) {
+  return normalizeAnswerReferences({ content, references }).references;
 }
 
 /**
@@ -506,10 +557,15 @@ export function normalizeChatMessage(dto = {}) {
     ? dto.resolvedDocumentSnapshot
     : attachedDocs;
   const meta = dto.aiMeta;
+  const normalizedAnswer = normalizeAnswerReferences({
+    content: dto.content || "",
+    references: dto.referencesUsed || [],
+  });
+
   return {
     id: dto.id,
     role: dto.role,
-    content: dto.content || "",
+    content: normalizedAnswer.content,
     status: dto.status || null,
     createdAt: dto.createdAt || null,
     contextDocs: contextDocs.map((d) => ({
@@ -517,10 +573,7 @@ export function normalizeChatMessage(dto = {}) {
       folderName: d.folderName || null,
     })),
     attachedFolderNames: attachedFolders.map((f) => f.name || f.title || "").filter(Boolean),
-    references: normalizeReferencesForAnswer({
-      content: dto.content || "",
-      references: dto.referencesUsed || [],
-    }),
+    references: normalizedAnswer.references,
     aiMeta: meta
       ? {
           model: meta.generationModel || null,

@@ -7,6 +7,8 @@ const requiredKeys = [
   "NODE_ENV",
   "PORT",
   "CLIENT_ORIGINS",
+  "DEMO_CLEAR_RESETS_USAGE",
+  "DEMO_QUOTA_WINDOW_DAYS",
   "MONGODB_URI",
   "MONGODB_DATABASE_NAME",
   "MONGODB_VECTOR_INDEX_NAME",
@@ -46,6 +48,8 @@ test("backend env example includes deployment placeholders without real secrets"
     assert.equal(values.get(key), "<replace-me>");
   }
   assert.match(values.get("CLIENT_ORIGINS"), /localhost:5173/);
+  assert.equal(values.get("DEMO_CLEAR_RESETS_USAGE"), "false");
+  assert.equal(values.get("DEMO_QUOTA_WINDOW_DAYS"), "3");
   assert.match(values.get("MONGODB_URI"), /\/centraldocs\?/);
   assert.equal(values.get("MONGODB_DATABASE_NAME"), "centraldocs");
   assert.equal(values.get("AI_PROVIDER"), "gemini");
@@ -54,6 +58,7 @@ test("backend env example includes deployment placeholders without real secrets"
   assert.equal(values.get("MONGODB_VECTOR_INDEX_NAME"), "document_chunks_vector_index");
   assert.equal(values.get("MONGODB_VECTOR_PATH"), "embedding");
   assert.match(text, /Without \/centraldocs/);
+  assert.match(text, /without resetting usage/i);
   assert.equal(text.includes("-----BEGIN"), false);
   assert.equal(text.includes("sk-"), false);
   assert.equal(text.includes("AIza"), false);
