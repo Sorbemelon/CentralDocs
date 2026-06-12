@@ -290,8 +290,22 @@ function ChatPanelShell({ ws }) {
   const draft = chat.draft;
   const bottomRef = useRef(null);
   const tooLong = draft.length > DEMO_LIMITS.promptLength;
-  const canSend = Boolean(draft.trim()) && !offline && !noRealChat && ws.hasContext && !chat.isSending && !tooLong;
+  const canSend = Boolean(draft.trim()) && !offline && ws.hasContext && !chat.isSending && !tooLong;
   const showCount = draft.length > DEMO_LIMITS.promptLength * 0.8;
+  const sendTitle = offline
+    ? "Backend is offline"
+    : !ws.hasContext
+      ? "Select a document or folder first."
+      : tooLong
+        ? "Prompt is too long"
+        : noRealChat
+          ? "A chat will be created when you send."
+          : undefined;
+  const helperText = !ws.hasContext
+    ? "Tick a document or folder in Sources first."
+    : noRealChat
+      ? "A chat will be created when you send."
+      : `Prompt limit ${DEMO_LIMITS.promptLength.toLocaleString()} chars`;
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ block: "end", behavior: "smooth" });
@@ -304,52 +318,32 @@ function ChatPanelShell({ ws }) {
     }
   };
 
-  if (!hasActiveChat) {
-    return (
-      <div className="flex min-h-0 flex-1 flex-col gap-2.5">
-        <ScrollArea className="min-h-0 flex-1 rounded-lg border border-border bg-card shadow-sm">
-          <div className="flex min-h-full items-center justify-center p-3">
-            <EmptyState
-              icon={MessagesSquare}
-              title="No chat yet"
-              description="Create a chat when you are ready to ask questions against selected sources."
-              action={
-                <Button size="sm" onClick={ws.newChat} disabled={ws.loading?.chats}>
-                  <MessageSquarePlus /> New Chat
-                </Button>
-              }
-              className="w-full max-w-sm"
-            />
-          </div>
-        </ScrollArea>
-      </div>
-    );
-  }
-
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2.5">
-      <div className="shrink-0 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-1">
-          <h3 className="min-w-0 truncate text-sm font-semibold">{ws.activeChat.title}</h3>
-          <IconButton
-            icon={Pencil}
-            label="Rename chat"
-            size="icon-xs"
-            onClick={() => ws.requestRename({ kind: "chat", target: ws.activeChat.id, title: ws.activeChat.title })}
-            disabled={noRealChat}
-            className="shrink-0 text-muted-foreground hover:text-primary"
-          />
+      {hasActiveChat && (
+        <div className="shrink-0 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-1">
+            <h3 className="min-w-0 truncate text-sm font-semibold">{ws.activeChat.title}</h3>
+            <IconButton
+              icon={Pencil}
+              label="Rename chat"
+              size="icon-xs"
+              onClick={() => ws.requestRename({ kind: "chat", target: ws.activeChat.id, title: ws.activeChat.title })}
+              disabled={noRealChat}
+              className="shrink-0 text-muted-foreground hover:text-primary"
+            />
+          </div>
+          <Button
+            size="sm"
+            onClick={ws.openGenerateModal}
+            disabled={!canGenerate}
+            title={generateReason}
+            className="bg-[linear-gradient(100deg,var(--primary)_0%,var(--primary)_38%,var(--teal)_100%)] text-primary-foreground hover:opacity-95"
+          >
+            <Sparkles /> Generate Document
+          </Button>
         </div>
-        <Button
-          size="sm"
-          onClick={ws.openGenerateModal}
-          disabled={!canGenerate}
-          title={generateReason}
-          className="bg-[linear-gradient(100deg,var(--primary)_0%,var(--primary)_38%,var(--teal)_100%)] text-primary-foreground hover:opacity-95"
-        >
-          <Sparkles /> Generate Document
-        </Button>
-      </div>
+      )}
 
       <ScrollArea className="min-h-0 flex-1 rounded-lg border border-border bg-card shadow-sm">
         <div className="flex min-h-full flex-col gap-3 p-3">
@@ -377,6 +371,18 @@ function ChatPanelShell({ ws }) {
               <PendingAssistant step={chat.pendingStep} />
               <div ref={bottomRef} />
             </>
+          ) : !hasActiveChat ? (
+            <EmptyState
+              icon={MessagesSquare}
+              title="No chat yet"
+              description="Select sources, type your question, and CentralDocs will create a saved chat when you send."
+              action={
+                <Button size="sm" onClick={ws.newChat} disabled={ws.loading?.chats}>
+                  <MessageSquarePlus /> New Chat
+                </Button>
+              }
+              className="w-full max-w-sm self-center"
+            />
           ) : (
             <EmptyState
               icon={MessagesSquare}
@@ -424,13 +430,7 @@ function ChatPanelShell({ ws }) {
             className="min-h-0 resize-none border-0 bg-transparent p-1 shadow-none focus-visible:ring-0"
           />
           <div className="flex items-center justify-between gap-2 pt-1">
-            <span className="text-[11px] text-muted-foreground">
-              {noRealChat
-                ? "Start or select a saved chat to send."
-                : !ws.hasContext
-                  ? "Tick a document or folder in Sources first."
-                  : `Prompt limit ${DEMO_LIMITS.promptLength.toLocaleString()} chars`}
-            </span>
+            <span className="text-[11px] text-muted-foreground">{helperText}</span>
             <div className="flex items-center gap-2">
               {showCount && (
                 <span className={cn("text-[11px] tabular-nums", tooLong ? "text-destructive" : "text-muted-foreground")}>
@@ -442,7 +442,7 @@ function ChatPanelShell({ ws }) {
                 variant="teal"
                 onClick={() => chat.sendMessage()}
                 disabled={!canSend}
-                title={offline ? "Backend is offline" : undefined}
+                title={sendTitle}
               >
                 <Send /> Send
               </Button>

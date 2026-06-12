@@ -121,17 +121,6 @@ export default function CentralDocsWorkspace() {
     [applyUsageSnapshot],
   );
 
-  // RAG chat (Chat tab) — sends with the active chat's selected context.
-  const chat = useChatMessages({
-    online,
-    activeChatId: chats.activeChatId,
-    selectedDocumentIds: selection.docIds,
-    selectedFolderIds: selection.folderIds,
-    onChatUpdated: (chatDto) => chats.applyChat(normalizeChat(chatDto)),
-    onPromptUsage: mergePromptUsage,
-    onUsageSnapshot: applyUsageSnapshot,
-  });
-
   // Generate Document (Chat header) — turns the active chat into a saved document.
   const generate = useGeneratedDocuments({
     online,
@@ -245,6 +234,47 @@ export default function CentralDocsWorkspace() {
     },
     [countEffectiveContextDocuments],
   );
+
+  const ensureChatForSend = useCallback(
+    async ({ selectedDocumentIds = [], selectedFolderIds = [] } = {}) => {
+      const next = normalizeSelectionForHierarchy({
+        selectedDocumentIds,
+        selectedFolderIds,
+      });
+      if (!canApplyContextSelection(next)) {
+        const error = new Error("Could not attach the selected sources. Please try again.");
+        error.code = "CHAT_SELECTION_SAVE_FAILED";
+        throw error;
+      }
+
+      const chatForSend = await chats.newChat({
+        selectedDocumentIds: next.selectedDocumentIds,
+        selectedFolderIds: next.selectedFolderIds,
+        allowLocalFallback: false,
+      });
+      if (!chatForSend?.id || chatForSend.local || isLocalChatId(chatForSend.id)) {
+        const error = new Error("Could not create a chat. Please try again.");
+        error.code = "CHAT_CREATE_FAILED";
+        throw error;
+      }
+
+      selection.setFromChat(next);
+      setActiveTab("chat");
+      return chatForSend;
+    },
+    [canApplyContextSelection, chats, normalizeSelectionForHierarchy, selection],
+  );
+
+  const chat = useChatMessages({
+    online,
+    activeChatId: chats.activeChatId,
+    selectedDocumentIds: selection.docIds,
+    selectedFolderIds: selection.folderIds,
+    onChatUpdated: (chatDto) => chats.applyChat(normalizeChat(chatDto)),
+    onPromptUsage: mergePromptUsage,
+    onUsageSnapshot: applyUsageSnapshot,
+    ensureChatForSend,
+  });
 
   // Hydrate selected context from the active chat's persisted selection.
   useEffect(() => {

@@ -128,7 +128,11 @@ export function useChatSessions({ online }) {
 
   const setActiveChat = useCallback((id) => setActiveChatId(id), []);
 
-  const newChat = useCallback(async ({ selectedDocumentIds = [], selectedFolderIds = [] } = {}) => {
+  const newChat = useCallback(async ({
+    selectedDocumentIds = [],
+    selectedFolderIds = [],
+    allowLocalFallback = true,
+  } = {}) => {
     const title = buildUniqueChatTitle("New chat", chatsRef.current);
     if (online) {
       try {
@@ -136,9 +140,10 @@ export function useChatSessions({ online }) {
         const chat = normalizeChat(res.chat);
         setChats((prev) => [chat, ...prev]);
         setActiveChatId(chat.id);
+        setActiveSelection(selectionFromChat(chat));
         return chat;
-      } catch {
-        /* fall through to a local temporary chat */
+      } catch (error) {
+        if (!allowLocalFallback) throw error;
       }
     }
     const localChat = {

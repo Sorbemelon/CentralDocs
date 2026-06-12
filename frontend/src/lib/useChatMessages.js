@@ -4,10 +4,31 @@ import { getChat, sendChatMessage } from "@/services/chatApi";
 import { isLocalChatId, normalizeAnswerReferences, normalizeChatMessage } from "./workspaceData";
 import { DEMO_LIMITS } from "./constants";
 
-const PENDING_STEPS = ["Resolving context", "Retrieving references", "Generating answer", "Saving response"];
+const PENDING_STEPS = ["Preparing chat", "Saving selected context", "Generating answer", "Saving response"];
 const PENDING_CHAT_KEY_PREFIX = "centraldocs.pendingChat.";
 const PENDING_CHAT_STALE_MS = 150000;
 const TEMPORARY_GENERATION_MESSAGE = "AI generation is temporarily unavailable. Please try again.";
+
+function createClientChatError(message, code) {
+  const error = new Error(message);
+  error.code = code;
+  return error;
+}
+
+function isSelectionSaveError(error) {
+  const code = error?.code || error?.error?.code;
+  return (
+    code === "CHAT_SELECTION_INVALID" ||
+    code === "DOCUMENT_NOT_ATTACHABLE" ||
+    code === "FOLDER_NOT_ATTACHABLE" ||
+    code === "DOCUMENT_NOT_FOUND" ||
+    code === "FOLDER_NOT_FOUND" ||
+    code === "DOCUMENT_NOT_READY" ||
+    code === "DOCUMENT_TRASHED" ||
+    code === "FOLDER_TRASHED" ||
+    /selection|selected|attach/i.test(error?.message || "")
+  );
+}
 
 function isPendingStale(pending) {
   const startedAt = pending?.startedAt ? Date.parse(pending.startedAt) : NaN;
@@ -17,6 +38,12 @@ function isPendingStale(pending) {
 function chatErrorMessage(error) {
   const code = error?.code || error?.error?.code;
   const status = error?.status || error?.statusCode;
+  if (code === "CHAT_CREATE_FAILED") {
+    return "Could not create a chat. Please try again.";
+  }
+  if (code === "CHAT_SELECTION_SAVE_FAILED") {
+    return "Could not attach the selected sources. Please try again.";
+  }
   if (
     code === "GENERATION_PROVIDER_UNAVAILABLE" ||
     code === "GENERATION_PROVIDER_ERROR" ||
@@ -60,6 +87,7 @@ export function useChatMessages({
   onChatUpdated,
   onPromptUsage,
   onUsageSnapshot,
+  ensureChatForSend,
 }) {
   const [messages, setMessages] = useState([]);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
@@ -71,7 +99,17 @@ export function useChatMessages({
 
   const ref = useRef({});
   useEffect(() => {
-    ref.current = { online, activeChatId, selectedDocumentIds, selectedFolderIds, onChatUpdated, onPromptUsage, onUsageSnapshot, draft };
+    ref.current = {
+      online,
+      activeChatId,
+      selectedDocumentIds,
+      selectedFolderIds,
+      onChatUpdated,
+      onPromptUsage,
+      onUsageSnapshot,
+      ensureChatForSend,
+      draft,
+    };
   });
 
   const mounted = useRef(true);
@@ -242,6 +280,7 @@ export function useChatMessages({
       activeChatId: chatId,
       selectedDocumentIds: docIds,
       selectedFolderIds: folderIds,
+      ensureChatForSend: prepareChat,
       draft: text,
     } = ref.current;
     const content = String(text || "").trim();
@@ -255,10 +294,6 @@ export function useChatMessages({
       toast.error("Backend is offline. Sending requires the backend.");
       return;
     }
-    if (!chatId || isLocalChatId(chatId)) {
-      toast.error("Start or select a saved chat to send a message.");
-      return;
-    }
     if (!docIds.length && !folderIds.length) {
       toast("Select a document or folder first.");
       return;
@@ -266,30 +301,64 @@ export function useChatMessages({
 
     setIsSending(true);
     setSendError(null);
-    const optimisticId = `pending-user-${chatId}-${Date.now()}`;
-    setMessages((prev) => [
-      ...prev,
-      createOptimisticUserMessage({ id: optimisticId, content }),
-    ]);
-    writePending(chatId, content);
+    let effectiveChatId = chatId;
+    let optimisticId = null;
     startStepCycler();
     try {
-      const res = await sendChatMessage(chatId, {
+      if (!effectiveChatId || isLocalChatId(effectiveChatId)) {
+        if (typeof prepareChat !== "function") {
+          throw createClientChatError("Could not create a chat. Please try again.", "CHAT_CREATE_FAILED");
+        }
+        setPendingStep("Preparing chat");
+        let preparedChat;
+        try {
+          preparedChat = await prepareChat({
+            selectedDocumentIds: docIds,
+            selectedFolderIds: folderIds,
+          });
+        } catch (error) {
+          if (isSelectionSaveError(error)) {
+            throw createClientChatError(
+              "Could not attach the selected sources. Please try again.",
+              "CHAT_SELECTION_SAVE_FAILED",
+            );
+          }
+          throw createClientChatError("Could not create a chat. Please try again.", "CHAT_CREATE_FAILED");
+        }
+        effectiveChatId = preparedChat?.id;
+        if (!effectiveChatId || isLocalChatId(effectiveChatId)) {
+          throw createClientChatError("Could not create a chat. Please try again.", "CHAT_CREATE_FAILED");
+        }
+        setPendingStep("Saving selected context");
+      }
+
+      optimisticId = `pending-user-${effectiveChatId}-${Date.now()}`;
+      writePending(effectiveChatId, content);
+      setMessages((prev) => [
+        ...prev,
+        createOptimisticUserMessage({ id: optimisticId, content }),
+      ]);
+      setPendingStep("Generating answer");
+      const res = await sendChatMessage(effectiveChatId, {
         content,
         selectedDocumentIds: docIds,
         selectedFolderIds: folderIds,
       });
       if (!mounted.current) return;
-      clearPending(chatId);
+      clearPending(effectiveChatId);
       applyChatResponse(res);
       setDraft(""); // clear only on success
     } catch (err) {
-      clearPending(chatId);
+      if (effectiveChatId && !isLocalChatId(effectiveChatId)) clearPending(effectiveChatId);
       if (mounted.current) {
         const message = chatErrorMessage(err);
         setSendError({ message, code: err?.code, status: err?.status || err?.statusCode });
-        setMessages((prev) => prev.filter((message) => message.id !== optimisticId));
-        await loadMessagesForChat(chatId);
+        if (optimisticId) {
+          setMessages((prev) => prev.filter((message) => message.id !== optimisticId));
+        }
+        if (effectiveChatId && !isLocalChatId(effectiveChatId)) {
+          await loadMessagesForChat(effectiveChatId);
+        }
       }
       toast.error(chatErrorMessage(err));
     } finally {
