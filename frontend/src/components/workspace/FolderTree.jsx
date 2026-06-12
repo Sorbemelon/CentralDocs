@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { toast } from "sonner";
 import {
   Check,
   ChevronRight,
@@ -26,7 +25,7 @@ import { getFileIcon } from "./DocumentList";
 /**
  * Tick-style attach toggle, placed BEFORE the item icon (AutumData mechanic).
  * `via` marks items included through a selected parent folder: they render
- * ticked but slightly muted, and clicking explains instead of mutating.
+ * ticked but slightly muted.
  */
 function AttachCheck({ selected, partial, via, disabled, onToggle, label }) {
   return (
@@ -68,11 +67,6 @@ function StatusDot({ status, statusMessage }) {
   return null;
 }
 
-const viaFolderNotice = () =>
-  toast("Included via a selected folder", {
-    description: "Untick that folder to remove it, or it stays part of the context.",
-  });
-
 function DocRow({ ws, doc }) {
   const Icon = getFileIcon(doc.type);
   const [expanded, setExpanded] = useState(false);
@@ -80,7 +74,7 @@ function DocRow({ ws, doc }) {
   const effective = ws.isEffectivelySelected("document", doc.id);
   const via = effective && !direct;
   const attachLabel = via
-    ? "Included via selected folder"
+    ? "Remove from context"
     : direct
       ? "Remove from context"
       : doc.attachable === false
@@ -88,7 +82,7 @@ function DocRow({ ws, doc }) {
         : "Attach to context";
 
   const onToggle = () => {
-    if (via) return viaFolderNotice();
+    if (via) return ws.unselectIncluded("document", doc.id);
     if (direct) return ws.detach("document", doc.id);
     return ws.attach("document", doc.id);
   };
@@ -168,7 +162,7 @@ function FolderNode({ ws, folder, depth }) {
   const docs = ws.data.documents.filter((d) => d.folderId === folder.id);
 
   const onToggle = () => {
-    if (via) return viaFolderNotice();
+    if (via) return ws.unselectIncluded("folder", folder.id);
     if (direct) return ws.detach("folder", folder.id);
     return ws.attach("folder", folder.id);
   };
@@ -197,7 +191,7 @@ function FolderNode({ ws, folder, depth }) {
           onToggle={onToggle}
           label={
             via
-              ? "Included via selected folder"
+              ? "Remove folder from context"
               : direct
                 ? "Remove folder from context"
                 : "Attach folder to context"

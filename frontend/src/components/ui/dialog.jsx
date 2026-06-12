@@ -226,9 +226,10 @@ function ChoiceDialog({ open, onOpenChange, title, description, options = [], on
                   onOpenChange?.(false);
                 }}
                 disabled={opt.disabled}
+                style={opt.indentLevel ? { paddingLeft: `${0.625 + opt.indentLevel * 0.875}rem` } : undefined}
                 className="flex items-center gap-2 rounded-md border border-border bg-card px-2.5 py-1.5 text-left text-[13px] text-foreground transition-colors hover:border-primary/40 hover:bg-accent/60 disabled:opacity-50"
               >
-                {opt.label}
+                <span className="truncate">{opt.label}</span>
               </button>
             ))
           ) : (

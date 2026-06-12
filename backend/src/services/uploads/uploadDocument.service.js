@@ -36,10 +36,12 @@ import {
   findUploadDocumentById,
   findUploadFolderById,
   isFolderAllowedForUpload,
+  listReservedUploadNamesInFolder,
   updateUploadDocumentStatus,
 } from "./uploadDocument.repository.js";
 import { processUploadedDocument } from "./uploadProcessing.service.js";
 import { toDocumentStatusDto, toUploadResultDto } from "./uploadResult.dto.js";
+import { buildUniqueFilename, buildUniqueName } from "../naming/uniqueName.service.js";
 
 const defaultRepository = Object.freeze({
   createDocumentId: createUploadDocumentId,
@@ -47,6 +49,7 @@ const defaultRepository = Object.freeze({
   createUploadDocumentRecord,
   updateUploadDocumentStatus,
   findUploadDocumentById,
+  listReservedUploadNamesInFolder,
 });
 
 const defaultDependencies = Object.freeze({
@@ -254,6 +257,23 @@ function buildRetryFilenameMeta(document = {}) {
   };
 }
 
+async function makeUniqueUploadFilenameMeta({ deps, demoSessionId, folderId, filenameMeta } = {}) {
+  const existingNames =
+    (await deps.repository.listReservedUploadNamesInFolder?.({
+      demoSessionId,
+      folderId: folderId || null,
+    })) || [];
+  const downloadFilename = buildUniqueFilename(filenameMeta.downloadFilename, existingNames);
+  const title = buildUniqueName(filenameMeta.title, existingNames, { maxLength: 120 });
+
+  return {
+    ...filenameMeta,
+    originalFilename: downloadFilename,
+    downloadFilename,
+    title,
+  };
+}
+
 function toSafeRetryProcessing(processing = {}, document = {}) {
   return {
     status: processing.status || null,
@@ -317,10 +337,16 @@ export async function uploadDocumentForDemo({
     folderId: body.folderId,
     demoSessionId,
   });
-  const filenameMeta = deps.filenameNormalizer({
+  const normalizedFilenameMeta = deps.filenameNormalizer({
     originalFilename: validation.originalFilename,
     fileKind: validation.fileKind,
     title: body.title,
+  });
+  const filenameMeta = await makeUniqueUploadFilenameMeta({
+    deps,
+    demoSessionId,
+    folderId: folder?._id || folder?.id || null,
+    filenameMeta: normalizedFilenameMeta,
   });
   const documentId = deps.repository.createDocumentId?.() || createUploadDocumentId();
   const storageResult = await deps.storageSaver({

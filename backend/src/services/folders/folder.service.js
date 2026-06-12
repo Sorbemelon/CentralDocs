@@ -20,6 +20,7 @@ import {
 import { isMockFolderId } from "../../utils/ids.js";
 import { createHttpError } from "../../utils/httpError.js";
 import { toDocumentDtos } from "../documents/document.dto.js";
+import { buildUniqueName } from "../naming/uniqueName.service.js";
 import { toFolderDto, toFolderDtos } from "./folder.dto.js";
 
 const MAX_FOLDER_NAME_LENGTH = 120;
@@ -42,24 +43,45 @@ function validateFolderName(name) {
 }
 
 export function buildUniqueFolderName(baseName, existingNames = [], maxLength = MAX_FOLDER_NAME_LENGTH) {
-  const base = String(baseName || "").trim();
-  const normalizedExisting = new Set(existingNames.map((name) => String(name || "").trim().toLowerCase()));
-  if (!normalizedExisting.has(base.toLowerCase())) {
-    return base;
+  return buildUniqueName(baseName, existingNames, { maxLength });
+}
+
+function documentReservedNames(document = {}) {
+  return [document.title, document.downloadFilename, document.originalFilename].filter(Boolean);
+}
+
+async function listReservedNamesForParent({
+  demoSessionId,
+  parentFolderId = null,
+  excludeFolderId = null,
+  excludeDocumentId = null,
+} = {}) {
+  const folderFilter = {
+    demoSessionId,
+    scope: FOLDER_SCOPE.USER,
+    parentFolderId: parentFolderId || null,
+  };
+  if (excludeFolderId) {
+    folderFilter._id = { $ne: excludeFolderId };
   }
 
-  for (let index = 2; index <= existingNames.length + 2; index += 1) {
-    const suffix = ` (${index})`;
-    const stem = base.length + suffix.length <= maxLength
-      ? base
-      : base.slice(0, Math.max(1, maxLength - suffix.length)).trimEnd();
-    const candidate = `${stem}${suffix}`;
-    if (!normalizedExisting.has(candidate.toLowerCase())) {
-      return candidate;
-    }
+  const documentFilter = {
+    demoSessionId,
+    folderId: parentFolderId || null,
+  };
+  if (excludeDocumentId) {
+    documentFilter._id = { $ne: excludeDocumentId };
   }
 
-  throw createHttpError(409, "Could not create a unique folder name.", "INVALID_FOLDER_NAME");
+  const [folders, documents] = await Promise.all([
+    Folder.find(folderFilter).select({ name: 1 }).lean(),
+    Document.find(documentFilter).select({ title: 1, downloadFilename: 1, originalFilename: 1 }).lean(),
+  ]);
+
+  return [
+    ...folders.map((folder) => folder.name).filter(Boolean),
+    ...documents.flatMap(documentReservedNames),
+  ];
 }
 
 function validateScope(scope) {
@@ -187,15 +209,11 @@ export async function createFolder({ demoSessionId, name, parentFolderId = null 
     );
   }
 
-  const siblings = await Folder.find({
+  const siblings = await listReservedNamesForParent({
     demoSessionId,
-    scope: FOLDER_SCOPE.USER,
     parentFolderId: parentFolderId || null,
-    lifecycleStatus: LIFECYCLE_STATUS.ACTIVE,
-  })
-    .select({ name: 1 })
-    .lean();
-  const uniqueFolderName = buildUniqueFolderName(folderName, siblings.map((folder) => folder.name));
+  });
+  const uniqueFolderName = buildUniqueFolderName(folderName, siblings);
 
   const created = await Folder.create({
     demoSessionId,
@@ -227,8 +245,15 @@ export async function renameFolder({ folderId, demoSessionId, name } = {}) {
     throw createHttpError(400, "Trashed folders cannot be renamed.", "INVALID_REQUEST");
   }
 
-  folder.name = folderName;
-  folder.path = `/${folderName}`;
+  const existingNames = await listReservedNamesForParent({
+    demoSessionId,
+    parentFolderId: folder.parentFolderId || null,
+    excludeFolderId: folder._id,
+  });
+  const uniqueFolderName = buildUniqueFolderName(folderName, existingNames);
+
+  folder.name = uniqueFolderName;
+  folder.path = `/${uniqueFolderName}`;
   await folder.save();
 
   return toFolderDto(folder);
@@ -274,6 +299,15 @@ export async function restoreFolder({ folderId, demoSessionId } = {}) {
     throw createHttpError(404, "Folder was not found.", "FOLDER_NOT_FOUND");
   }
 
+  const existingNames = await listReservedNamesForParent({
+    demoSessionId,
+    parentFolderId: folder.parentFolderId || null,
+    excludeFolderId: folder._id,
+  });
+  const uniqueFolderName = buildUniqueFolderName(folder.name, existingNames);
+
+  folder.name = uniqueFolderName;
+  folder.path = `/${uniqueFolderName}`;
   Object.assign(folder, buildRestorePatch({ restoreFolderId: null }));
   await folder.save();
 

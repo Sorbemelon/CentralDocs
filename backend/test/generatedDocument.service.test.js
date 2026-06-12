@@ -294,8 +294,19 @@ test("generated document service defaults to a unique summary filename", async (
         scope: "generated",
         sourceType: "generated",
         lifecycleStatus: "active",
+        title: "summary",
         originalFilename: "summary.md",
         downloadFilename: "summary.md",
+      },
+      {
+        id: "generated_trashed",
+        demoSessionId: "demo_123",
+        scope: "generated",
+        sourceType: "generated",
+        lifecycleStatus: "trashed",
+        title: "summary (2)",
+        originalFilename: "summary (2).md",
+        downloadFilename: "summary (2).md",
       },
     ],
   });
@@ -307,7 +318,7 @@ test("generated document service defaults to a unique summary filename", async (
     dependencies: ctx.deps,
   });
 
-  assert.equal(result.document.downloadFilename, "summary (2).md");
+  assert.equal(result.document.downloadFilename, "summary (3).md");
 });
 
 test("generated document service enforces generated-document and storage limits", async () => {

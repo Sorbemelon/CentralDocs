@@ -1,3 +1,4 @@
+import path from "node:path";
 import mongoose from "mongoose";
 import { nanoid } from "nanoid";
 import {
@@ -5,6 +6,7 @@ import {
   DOCUMENT_SCOPES,
   DOCUMENT_STATUS,
   DOCUMENT_STATUSES,
+  FOLDER_SCOPE,
   FILE_KINDS,
   SOURCE_TYPE,
   SOURCE_TYPES,
@@ -30,6 +32,7 @@ import {
   getMockDocumentPreview,
   listMockDocuments,
 } from "../demo/demoWorkspace.service.js";
+import { buildUniqueFilename, buildUniqueName } from "../naming/uniqueName.service.js";
 import { toDocumentDto, toDocumentDtos } from "./document.dto.js";
 
 function includeTrash(query = {}) {
@@ -129,6 +132,55 @@ function buildDocumentFilter(query = {}, demoSessionId = null) {
 
 function capPreviewText(text = "") {
   return String(text || "").slice(0, 8000);
+}
+
+function documentReservedNames(document = {}) {
+  return [document.title, document.downloadFilename, document.originalFilename].filter(Boolean);
+}
+
+function titleFromFilename(filename = "") {
+  return path.basename(filename, path.extname(filename)).replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
+}
+
+async function listReservedNamesForFolder({
+  demoSessionId,
+  folderId = null,
+  excludeDocumentId = null,
+} = {}) {
+  const documentFilter = {
+    demoSessionId,
+    folderId: folderId || null,
+  };
+  if (excludeDocumentId) {
+    documentFilter._id = { $ne: excludeDocumentId };
+  }
+
+  const folderFilter = {
+    demoSessionId,
+    scope: FOLDER_SCOPE.USER,
+    parentFolderId: folderId || null,
+  };
+
+  const [documents, folders] = await Promise.all([
+    Document.find(documentFilter).select({ title: 1, downloadFilename: 1, originalFilename: 1 }).lean(),
+    Folder.find(folderFilter).select({ name: 1 }).lean(),
+  ]);
+
+  return [
+    ...documents.flatMap(documentReservedNames),
+    ...folders.map((folder) => folder.name).filter(Boolean),
+  ];
+}
+
+function applyUniqueDocumentNames(document, existingNames = []) {
+  const currentFilename = document.downloadFilename || document.originalFilename || `${document.title || "document"}.md`;
+  const downloadFilename = buildUniqueFilename(currentFilename, existingNames);
+  const desiredTitle = document.title || titleFromFilename(downloadFilename) || "Document";
+  const title = buildUniqueName(desiredTitle, existingNames);
+
+  document.downloadFilename = downloadFilename;
+  document.originalFilename = downloadFilename;
+  document.title = title;
 }
 
 async function buildChunkPreviewText(documentId) {
@@ -307,7 +359,14 @@ export async function moveDocument({ documentId, demoSessionId, folderId } = {})
     }
   }
 
-  document.folderId = folderId || null;
+  const targetFolderId = folderId || null;
+  const existingNames = await listReservedNamesForFolder({
+    demoSessionId,
+    folderId: targetFolderId,
+    excludeDocumentId: document._id,
+  });
+  applyUniqueDocumentNames(document, existingNames);
+  document.folderId = targetFolderId;
   await document.save();
 
   return toDocumentDto(document);
@@ -358,6 +417,12 @@ export async function restoreDocument({ documentId, demoSessionId } = {}) {
   }
 
   const wasTrashed = document.lifecycleStatus === LIFECYCLE_STATUS.TRASHED;
+  const existingNames = await listReservedNamesForFolder({
+    demoSessionId,
+    folderId: document.folderId || null,
+    excludeDocumentId: document._id,
+  });
+  applyUniqueDocumentNames(document, existingNames);
   Object.assign(document, buildRestorePatch({ restoreFolderId: null }));
   await document.save();
   if (wasTrashed) {

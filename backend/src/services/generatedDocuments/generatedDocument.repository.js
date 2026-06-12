@@ -13,6 +13,7 @@ import {
 import { LIFECYCLE_STATUS } from "../../constants/lifecycle.constants.js";
 import { isMongoConnected } from "../../db/connectMongo.js";
 import { Document } from "../../models/Document.model.js";
+import { Folder } from "../../models/Folder.model.js";
 import { createHttpError } from "../../utils/httpError.js";
 
 function requirePersistence() {
@@ -113,18 +114,27 @@ export async function countGeneratedDocumentsByDemoSession({ demoSessionId } = {
 
 export async function listGeneratedDocumentFilenamesByDemoSession({ demoSessionId } = {}) {
   requirePersistence();
-  const documents = await Document.find({
-    demoSessionId,
-    scope: DOCUMENT_SCOPE.GENERATED,
-    sourceType: SOURCE_TYPE.GENERATED,
-    lifecycleStatus: LIFECYCLE_STATUS.ACTIVE,
-  })
-    .select({ downloadFilename: 1, originalFilename: 1 })
-    .lean();
+  const [documents, folders] = await Promise.all([
+    Document.find({
+      demoSessionId,
+      folderId: null,
+    })
+      .select({ title: 1, downloadFilename: 1, originalFilename: 1 })
+      .lean(),
+    Folder.find({
+      demoSessionId,
+      parentFolderId: null,
+    })
+      .select({ name: 1 })
+      .lean(),
+  ]);
 
-  return documents
-    .map((document) => document.downloadFilename || document.originalFilename)
-    .filter(Boolean);
+  return [
+    ...documents.flatMap((document) =>
+      [document.title, document.downloadFilename, document.originalFilename].filter(Boolean),
+    ),
+    ...folders.map((folder) => folder.name).filter(Boolean),
+  ];
 }
 
 export async function updateGeneratedDocumentIndexingFields({
@@ -183,12 +193,9 @@ export function createMemoryGeneratedDocumentRepository({ seed = [] } = {}) {
         .filter(
           (document) =>
             document.demoSessionId === demoSessionId &&
-            document.scope === DOCUMENT_SCOPE.GENERATED &&
-            document.sourceType === SOURCE_TYPE.GENERATED &&
-            document.lifecycleStatus !== LIFECYCLE_STATUS.TRASHED,
+            (document.folderId || null) === null,
         )
-        .map((document) => document.downloadFilename || document.originalFilename)
-        .filter(Boolean);
+        .flatMap((document) => [document.title, document.downloadFilename, document.originalFilename].filter(Boolean));
     },
     async updateGeneratedDocumentIndexingFields({ documentId, patch = {} } = {}) {
       const record = documents.get(String(documentId));

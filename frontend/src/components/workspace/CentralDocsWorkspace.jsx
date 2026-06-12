@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { cn } from "@/lib/cn";
@@ -94,6 +94,7 @@ export default function CentralDocsWorkspace() {
   );
 
   const selection = useSelectedContext({ onPersist: persistSelection });
+  const hydratedSelectionChatIdRef = useRef(null);
 
   // Semantic search (Search tab) — defaults to the active chat's selected context.
   const search = useSemanticSearch({
@@ -235,6 +236,60 @@ export default function CentralDocsWorkspace() {
     [countEffectiveContextDocuments],
   );
 
+  const findSelectedAncestorFolderId = useCallback(
+    (folderId) => {
+      if (!folderId) return null;
+      if (selection.folderIds.includes(folderId)) return folderId;
+      return getFolderLineage(folderId).find((ancestorId) => selection.folderIds.includes(ancestorId)) || null;
+    },
+    [getFolderLineage, selection.folderIds],
+  );
+
+  const unselectIncluded = useCallback(
+    (kind, id) => {
+      const targetDoc = kind === "document" ? documents.find((doc) => doc.id === id) : null;
+      const ancestorFolderId = kind === "folder"
+        ? findSelectedAncestorFolderId(id)
+        : findSelectedAncestorFolderId(targetDoc?.folderId);
+      if (!ancestorFolderId) return;
+
+      const ancestorFolderIds = new Set([ancestorFolderId, ...getDescendantFolderIds(ancestorFolderId)]);
+      const excludedFolderIds = kind === "folder" ? new Set([id, ...getDescendantFolderIds(id)]) : new Set();
+      const remainingSubtreeDocIds = documents
+        .filter((doc) => {
+          if (doc.attachable === false) return false;
+          if (!ancestorFolderIds.has(doc.folderId)) return false;
+          if (kind === "document" && doc.id === id) return false;
+          if (excludedFolderIds.has(doc.folderId)) return false;
+          return true;
+        })
+        .map((doc) => doc.id);
+      const next = normalizeSelectionForHierarchy({
+        selectedDocumentIds: [
+          ...selection.docIds.filter((docId) => {
+            const doc = documents.find((item) => item.id === docId);
+            return !doc || !ancestorFolderIds.has(doc.folderId);
+          }),
+          ...remainingSubtreeDocIds,
+        ],
+        selectedFolderIds: selection.folderIds.filter((folderId) => !ancestorFolderIds.has(folderId)),
+      });
+
+      if (!canApplyContextSelection(next)) return;
+      selection.setFromChat(next);
+      persistSelection(next.selectedDocumentIds, next.selectedFolderIds);
+    },
+    [
+      canApplyContextSelection,
+      documents,
+      findSelectedAncestorFolderId,
+      getDescendantFolderIds,
+      normalizeSelectionForHierarchy,
+      persistSelection,
+      selection,
+    ],
+  );
+
   const ensureChatForSend = useCallback(
     async ({ selectedDocumentIds = [], selectedFolderIds = [] } = {}) => {
       const next = normalizeSelectionForHierarchy({
@@ -276,10 +331,45 @@ export default function CentralDocsWorkspace() {
     ensureChatForSend,
   });
 
-  // Hydrate selected context from the active chat's persisted selection.
+  // Hydrate selected context only when the user intentionally switches chats.
   useEffect(() => {
-    if (chats.activeSelection) selection.setFromChat(normalizeSelectionForHierarchy(chats.activeSelection));
-  }, [chats.activeSelection, normalizeSelectionForHierarchy, selection.setFromChat]);
+    if (!chats.activeChatId) return;
+    if (chats.activeSelectionChatId !== chats.activeChatId) return;
+    if (hydratedSelectionChatIdRef.current === chats.activeChatId) return;
+
+    selection.setFromChat(normalizeSelectionForHierarchy(chats.activeSelection || {}));
+    hydratedSelectionChatIdRef.current = chats.activeChatId;
+  }, [
+    chats.activeChatId,
+    chats.activeSelection,
+    chats.activeSelectionChatId,
+    normalizeSelectionForHierarchy,
+    selection.setFromChat,
+  ]);
+
+  useEffect(() => {
+    if (!online || wsData.loading) return;
+    const activeDocIds = new Set(documents.map((doc) => doc.id));
+    const activeFolderIds = new Set(folders.map((folder) => folder.id));
+    const nextDocIds = selection.docIds.filter((docId) => activeDocIds.has(docId));
+    const nextFolderIds = selection.folderIds.filter((folderId) => activeFolderIds.has(folderId));
+    if (nextDocIds.length === selection.docIds.length && nextFolderIds.length === selection.folderIds.length) return;
+
+    selection.setFromChat({
+      selectedDocumentIds: nextDocIds,
+      selectedFolderIds: nextFolderIds,
+    });
+    persistSelection(nextDocIds, nextFolderIds);
+  }, [
+    documents,
+    folders,
+    online,
+    persistSelection,
+    selection,
+    selection.docIds,
+    selection.folderIds,
+    wsData.loading,
+  ]);
 
   // --- selection wrappers (toast + local/remote handled by the hook) ---
   const attach = useCallback(
@@ -562,7 +652,7 @@ export default function CentralDocsWorkspace() {
     [applyUsageSnapshot, chats],
   );
 
-  // --- management actions (rename / move / archive / clear; online-only) ---
+  // --- management actions (rename / move / clear; online-only) ---
   const renameFolder = useCallback(
     async (folder, name) => {
       if (folder.readOnly) return;
@@ -610,21 +700,6 @@ export default function CentralDocsWorkspace() {
       } catch (err) {
         setOperation({ kind: "rename", status: "failed", label: "Rename failed" });
         toast.error(err?.message || "Couldn't rename the chat");
-      }
-    },
-    [chats],
-  );
-
-  const archiveChat = useCallback(
-    async (id) => {
-      setOperation({ kind: "archive", status: "processing", label: "Archiving chat" });
-      try {
-        await chats.archiveChat(id); // local chats archive locally; saved chats hit the backend
-        setOperation({ kind: "archive", status: "complete", label: "Chat archived" });
-        toast.success("Chat archived");
-      } catch (err) {
-        setOperation({ kind: "archive", status: "failed", label: "Archive failed" });
-        toast.error(err?.message || "Couldn't archive the chat");
       }
     },
     [chats],
@@ -838,6 +913,7 @@ export default function CentralDocsWorkspace() {
     isSelected: selection.isSelected,
     attach,
     detach,
+    unselectIncluded,
     clearSelection,
     selectedFolders,
     selectedDocs,
@@ -885,7 +961,6 @@ export default function CentralDocsWorkspace() {
     renameFolder,
     moveDocument,
     renameChat,
-    archiveChat,
     requestClearSession,
     requestRename,
     requestMove,
@@ -898,15 +973,47 @@ export default function CentralDocsWorkspace() {
     notifyBackendRequired,
   };
 
-  // Move-to-folder options: user folders only (mock excluded), + root when foldered.
+  const getFolderPathLabel = useCallback(
+    (folder) => {
+      const names = [folder.name];
+      let current = folder;
+      const visited = new Set([folder.id]);
+      while (current?.parentFolderId && !visited.has(current.parentFolderId)) {
+        visited.add(current.parentFolderId);
+        current = getFolderById(current.parentFolderId);
+        if (current?.name) names.unshift(current.name);
+      }
+      return names.join(" / ");
+    },
+    [getFolderById],
+  );
+
+  const getFolderDepth = useCallback(
+    (folder) => {
+      let depth = 0;
+      let current = folder;
+      const visited = new Set([folder.id]);
+      while (current?.parentFolderId && !visited.has(current.parentFolderId)) {
+        visited.add(current.parentFolderId);
+        current = getFolderById(current.parentFolderId);
+        if (current) depth += 1;
+      }
+      return depth;
+    },
+    [getFolderById],
+  );
+
+  // Move-to-folder options: user folders only (mock excluded), with path labels.
   const moveDoc = dialog?.type === "move" ? dialog.doc : null;
   const moveOptions = [
-    ...(moveDoc?.folderId ? [{ id: null, label: "No folder (root)" }] : []),
+    { id: null, label: moveDoc?.folderId ? "Root" : "Root (current)", disabled: !moveDoc?.folderId, indentLevel: 0 },
     ...folders
       .filter((f) => f.group === "user" && !f.readOnly)
+      .sort((a, b) => getFolderPathLabel(a).localeCompare(getFolderPathLabel(b)))
       .map((f) => ({
         id: f.id,
-        label: moveDoc && moveDoc.folderId === f.id ? `${f.name} (current)` : f.name,
+        label: moveDoc && moveDoc.folderId === f.id ? `${getFolderPathLabel(f)} (current)` : getFolderPathLabel(f),
+        indentLevel: getFolderDepth(f),
         disabled: moveDoc ? moveDoc.folderId === f.id : false,
       })),
   ];

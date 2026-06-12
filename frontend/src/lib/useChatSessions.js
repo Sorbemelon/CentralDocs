@@ -43,6 +43,7 @@ export function useChatSessions({ online }) {
   const [chats, setChats] = useState(() => []);
   const [activeChatId, setActiveChatId] = useState(null);
   const [activeSelection, setActiveSelection] = useState(null);
+  const [activeSelectionChatId, setActiveSelectionChatId] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -63,6 +64,7 @@ export function useChatSessions({ online }) {
       setChats([]);
       setActiveChatId(null);
       setActiveSelection(null);
+      setActiveSelectionChatId(null);
       return;
     }
     setLoading(true);
@@ -79,6 +81,7 @@ export function useChatSessions({ online }) {
         setChats([]);
         setActiveChatId(null);
         setActiveSelection(null);
+        setActiveSelectionChatId(null);
       }
     } finally {
       if (mounted.current) setLoading(false);
@@ -100,6 +103,7 @@ export function useChatSessions({ online }) {
     async function loadSelection() {
       if (!activeChatId) {
         setActiveSelection(null);
+        setActiveSelectionChatId(null);
         return;
       }
       const chat = chatsRef.current.find((c) => c.id === activeChatId);
@@ -113,11 +117,16 @@ export function useChatSessions({ online }) {
             selectedFolderIds: sel.selectedFolderIds || res.chat?.currentSelectedFolderIds || [],
             resolvedDocumentCount: res.chat?.resolvedDocumentCount,
           });
+          setActiveSelectionChatId(activeChatId);
         } catch {
-          if (!cancelled) setActiveSelection(selectionFromChat(chat));
+          if (!cancelled) {
+            setActiveSelection(selectionFromChat(chat));
+            setActiveSelectionChatId(activeChatId);
+          }
         }
       } else {
         setActiveSelection(selectionFromChat(chat));
+        setActiveSelectionChatId(activeChatId);
       }
     }
     loadSelection();
@@ -141,6 +150,7 @@ export function useChatSessions({ online }) {
         setChats((prev) => [chat, ...prev]);
         setActiveChatId(chat.id);
         setActiveSelection(selectionFromChat(chat));
+        setActiveSelectionChatId(chat.id);
         return chat;
       } catch (error) {
         if (!allowLocalFallback) throw error;
@@ -159,6 +169,8 @@ export function useChatSessions({ online }) {
     };
     setChats((prev) => [localChat, ...prev]);
     setActiveChatId(localChat.id);
+    setActiveSelection(selectionFromChat(localChat));
+    setActiveSelectionChatId(localChat.id);
     return localChat;
   }, [online]);
 
@@ -214,18 +226,6 @@ export function useChatSessions({ online }) {
     [online, applyChat],
   );
 
-  // Archive a chat: hide it from the list (backend archive when online + saved).
-  const archiveChat = useCallback(
-    async (id) => {
-      if (online && !isLocalChatId(id)) {
-        await updateChat(id, { archived: true });
-      }
-      setChats((prev) => prev.filter((c) => c.id !== id));
-      setActiveChatId((prev) => (prev === id ? chatsRef.current.find((c) => c.id !== id)?.id || null : prev));
-    },
-    [online],
-  );
-
   const activeChat = chats.find((c) => c.id === activeChatId) || null;
 
   return {
@@ -235,13 +235,13 @@ export function useChatSessions({ online }) {
     activeChatId,
     activeChat,
     activeSelection,
+    activeSelectionChatId,
     isLocalActiveChat: isLocalChatId(activeChatId),
     setActiveChat,
     newChat,
     removeChat,
     applyChat,
     renameChat,
-    archiveChat,
     reload: load,
   };
 }

@@ -47,7 +47,7 @@ export const FALLBACK_DOCUMENTS = [
 /** Soft-deleted placeholders for the Trash filter (user/generated only; never mock). */
 export const FALLBACK_TRASH = [
   { id: "trash-doc-1", title: "Old Vendor Draft", type: "DOCX", source: SOURCE_KIND.uploaded, kind: "document", deletedAt: "2 days ago" },
-  { id: "trash-fld-1", title: "Archived Experiments", type: "FOLDER", source: SOURCE_KIND.uploaded, kind: "folder", deletedAt: "1 day ago" },
+  { id: "trash-fld-1", title: "Old Experiments", type: "FOLDER", source: SOURCE_KIND.uploaded, kind: "folder", deletedAt: "1 day ago" },
 ];
 
 /** Generated documents list for the Generated tab. */

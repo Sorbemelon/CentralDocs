@@ -114,6 +114,43 @@ test("upload document service saves metadata, processes document, and increments
   assert.equal(ctx.usageUpdates.length, 1);
 });
 
+test("upload document service suffixes names reserved by active and trashed siblings", async () => {
+  const repository = createMemoryUploadDocumentRepository({
+    folders: [
+      {
+        id: "folder_archived",
+        demoSessionId: "demo_123",
+        scope: "user",
+        name: "brief (2)",
+        parentFolderId: null,
+        lifecycleStatus: "trashed",
+        readOnly: false,
+      },
+    ],
+    documents: [
+      {
+        id: "doc_active",
+        demoSessionId: "demo_123",
+        folderId: null,
+        title: "brief",
+        originalFilename: "brief.md",
+        downloadFilename: "brief.md",
+        lifecycleStatus: "active",
+      },
+    ],
+  });
+  const ctx = dependencies({ repository });
+
+  const result = await uploadDocumentForDemo({
+    demoSessionId: "demo_123",
+    files: [uploadFile({ name: "brief.md" })],
+    dependencies: ctx.deps,
+  });
+
+  assert.equal(result.document.downloadFilename, "brief (3).md");
+  assert.equal(result.document.title, "brief (3)");
+});
+
 test("upload document service checks and records hidden IP quota", async () => {
   const hiddenCalls = [];
   const ctx = dependencies({

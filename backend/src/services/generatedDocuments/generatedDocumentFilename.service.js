@@ -59,7 +59,15 @@ export function buildUniqueGeneratedDocumentFilename(
   const normalizedExisting = new Set(
     existingFilenames.map((value) => String(value || "").trim().toLowerCase()).filter(Boolean),
   );
-  if (!normalizedExisting.has(String(filename || "").toLowerCase())) {
+  const conflicts = (candidate) => {
+    const extension = path.extname(candidate);
+    const basename = path.basename(candidate, extension);
+    return (
+      normalizedExisting.has(String(candidate || "").trim().toLowerCase()) ||
+      normalizedExisting.has(String(basename || "").trim().toLowerCase())
+    );
+  };
+  if (!conflicts(filename)) {
     return filename;
   }
 
@@ -69,7 +77,7 @@ export function buildUniqueGeneratedDocumentFilename(
     const suffix = ` (${index})`;
     const basenameLimit = Math.max(1, maxLength - extension.length - suffix.length);
     const candidate = `${basename.slice(0, basenameLimit).trimEnd()}${suffix}${extension}`;
-    if (!normalizedExisting.has(candidate.toLowerCase())) {
+    if (!conflicts(candidate)) {
       return candidate;
     }
   }

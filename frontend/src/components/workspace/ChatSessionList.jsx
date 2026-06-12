@@ -1,6 +1,5 @@
 import { useState } from "react";
 import {
-  Archive,
   ChevronDown,
   MessageSquarePlus,
   MessageSquareText,
@@ -12,7 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { IconButton } from "@/components/common/IconButton";
 import { LoadingState } from "@/components/common/LoadingState";
 import { EmptyState } from "@/components/common/EmptyState";
@@ -83,10 +82,6 @@ function ChatRow({ ws, chat }) {
           </Button>
         }
       >
-        <DropdownMenuItem onClick={() => ws.archiveChat(chat.id)}>
-          <Archive /> Archive
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
         <DropdownMenuItem tone="destructive" onClick={() => ws.requestDeleteChat(chat)}>
           <Trash2 /> Delete
         </DropdownMenuItem>

@@ -102,6 +102,31 @@ export async function findUploadDocumentById({ documentId, demoSessionId } = {})
   return Document.findOne({ _id: documentId, demoSessionId }).lean();
 }
 
+export async function listReservedUploadNamesInFolder({ demoSessionId, folderId = null } = {}) {
+  requirePersistence();
+  const documentFilter = {
+    demoSessionId,
+    folderId: folderId || null,
+  };
+  const folderFilter = {
+    demoSessionId,
+    scope: FOLDER_SCOPE.USER,
+    parentFolderId: folderId || null,
+  };
+
+  const [documents, folders] = await Promise.all([
+    Document.find(documentFilter).select({ title: 1, downloadFilename: 1, originalFilename: 1 }).lean(),
+    Folder.find(folderFilter).select({ name: 1 }).lean(),
+  ]);
+
+  return [
+    ...documents.flatMap((document) =>
+      [document.title, document.downloadFilename, document.originalFilename].filter(Boolean),
+    ),
+    ...folders.map((folder) => folder.name).filter(Boolean),
+  ];
+}
+
 function clone(record) {
   return record ? JSON.parse(JSON.stringify(record)) : null;
 }
@@ -158,6 +183,24 @@ export function createMemoryUploadDocumentRepository({ documents = [], folders =
         return null;
       }
       return clone(record);
+    },
+    async listReservedUploadNamesInFolder({ demoSessionId, folderId = null } = {}) {
+      const targetFolderId = folderId || null;
+      const documents = [...documentStore.values()].filter(
+        (document) => document.demoSessionId === demoSessionId && (document.folderId || null) === targetFolderId,
+      );
+      const folders = [...folderStore.values()].filter(
+        (folder) =>
+          folder.demoSessionId === demoSessionId &&
+          folder.scope === FOLDER_SCOPE.USER &&
+          (folder.parentFolderId || null) === targetFolderId,
+      );
+      return [
+        ...documents.flatMap((document) =>
+          [document.title, document.downloadFilename, document.originalFilename].filter(Boolean),
+        ),
+        ...folders.map((folder) => folder.name).filter(Boolean),
+      ];
     },
     _unsafeSnapshot() {
       return {

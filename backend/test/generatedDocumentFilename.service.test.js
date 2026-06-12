@@ -74,4 +74,10 @@ test("generated document filename adds a number when the name already exists", (
     buildUniqueGeneratedDocumentFilename("brief.txt", ["brief.txt"]),
     "brief (2).txt",
   );
+  assert.equal(
+    normalizeGeneratedDocumentFilename("summary.md", {
+      existingFilenames: ["summary"],
+    }).filename,
+    "summary (2).md",
+  );
 });
