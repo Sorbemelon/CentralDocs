@@ -33,9 +33,9 @@
 </p>
 
 <p align="center">
-  <strong>Live Demo:</strong> Coming soon
+  <strong>Live Demo:</strong> <a href="https://centraldocsai.vercel.app">centraldocsai.vercel.app</a>
   &nbsp;&nbsp;|&nbsp;&nbsp;
-  <strong>Backend API:</strong> Coming soon
+  <strong>Backend API:</strong> <a href="https://centraldocs.onrender.com/api/health">health check</a>
 </p>
 
 ---
