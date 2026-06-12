@@ -4,6 +4,7 @@ import mongoose from "mongoose";
 
 const { AI_ACTION_TYPE, AI_ROUTING_STATUS } = await import("../src/constants/ai.constants.js");
 const { AiRoutingAttempt } = await import("../src/models/AiRoutingAttempt.model.js");
+const { DemoQuotaWindow } = await import("../src/models/DemoQuotaWindow.model.js");
 const { UsageEvent } = await import("../src/models/UsageEvent.model.js");
 
 function hasIndex(schema, expectedFields) {
@@ -43,4 +44,23 @@ test("AiRoutingAttempt schema has enums, defaults, and indexes", () => {
   assert.equal(hasIndex(AiRoutingAttempt.schema, { actionType: 1 }), true);
   assert.equal(hasIndex(AiRoutingAttempt.schema, { model: 1 }), true);
   assert.equal(hasIndex(AiRoutingAttempt.schema, { isRateLimit: 1 }), true);
+});
+
+test("DemoQuotaWindow schema stores hashed identity and quota window indexes", () => {
+  const window = new DemoQuotaWindow({
+    identityHash: "a".repeat(64),
+    windowStartedAt: new Date("2026-06-01T00:00:00.000Z"),
+    expiresAt: new Date("2026-06-08T00:00:00.000Z"),
+  });
+
+  assert.equal(window.usage.uploadedFiles, 0);
+  assert.equal(window.usage.aiPrompts, 0);
+  assert.equal(window.usage.generatedDocuments, 0);
+  assert.equal(window.usage.storageBytes, 0);
+  assert.equal(window.validateSync(), undefined);
+  assert.equal("rawIp" in DemoQuotaWindow.schema.paths, false);
+  assert.equal("ipAddress" in DemoQuotaWindow.schema.paths, false);
+  assert.equal(hasIndex(DemoQuotaWindow.schema, { identityHash: 1, windowStartedAt: 1 }), true);
+  assert.equal(hasIndex(DemoQuotaWindow.schema, { identityHash: 1, expiresAt: 1 }), true);
+  assert.equal(hasIndex(DemoQuotaWindow.schema, { expiresAt: 1 }), true);
 });

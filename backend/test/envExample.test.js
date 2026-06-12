@@ -8,7 +8,11 @@ const requiredKeys = [
   "PORT",
   "CLIENT_ORIGINS",
   "DEMO_CLEAR_RESETS_USAGE",
+  "DEMO_SESSION_TTL_DAYS",
   "DEMO_QUOTA_WINDOW_DAYS",
+  "DEMO_IP_QUOTA_ENABLED",
+  "DEMO_IP_QUOTA_MULTIPLIER",
+  "DEMO_IP_HASH_SECRET",
   "MONGODB_URI",
   "MONGODB_DATABASE_NAME",
   "MONGODB_VECTOR_INDEX_NAME",
@@ -49,7 +53,11 @@ test("backend env example includes deployment placeholders without real secrets"
   }
   assert.match(values.get("CLIENT_ORIGINS"), /localhost:5173/);
   assert.equal(values.get("DEMO_CLEAR_RESETS_USAGE"), "false");
-  assert.equal(values.get("DEMO_QUOTA_WINDOW_DAYS"), "3");
+  assert.equal(values.get("DEMO_SESSION_TTL_DAYS"), "3");
+  assert.equal(values.get("DEMO_QUOTA_WINDOW_DAYS"), "7");
+  assert.equal(values.get("DEMO_IP_QUOTA_ENABLED"), "true");
+  assert.equal(values.get("DEMO_IP_QUOTA_MULTIPLIER"), "3");
+  assert.equal(values.get("DEMO_IP_HASH_SECRET"), "<replace-with-server-only-random-secret>");
   assert.match(values.get("MONGODB_URI"), /\/centraldocs\?/);
   assert.equal(values.get("MONGODB_DATABASE_NAME"), "centraldocs");
   assert.equal(values.get("AI_PROVIDER"), "gemini");
@@ -59,6 +67,7 @@ test("backend env example includes deployment placeholders without real secrets"
   assert.equal(values.get("MONGODB_VECTOR_PATH"), "embedding");
   assert.match(text, /Without \/centraldocs/);
   assert.match(text, /without resetting usage/i);
+  assert.match(text, /Hidden IP-aware quota resets after DEMO_QUOTA_WINDOW_DAYS/i);
   assert.equal(text.includes("-----BEGIN"), false);
   assert.equal(text.includes("sk-"), false);
   assert.equal(text.includes("AIza"), false);

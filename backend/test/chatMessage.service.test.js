@@ -215,6 +215,70 @@ test("RAG chat message creation stores user and assistant messages with citation
   assert.equal(result.chat.aiPromptCount, 1);
 });
 
+test("RAG chat message creation checks and records hidden IP prompt quota", async () => {
+  const deps = dependencies();
+  const hiddenCalls = [];
+  const result = await createChatMessageWithRagAnswer({
+    chatId: "chat_1",
+    demoSessionId: "demo_123",
+    quotaIdentity: { enabled: true, identityHash: "safe_hash" },
+    body: { content: "What are the rollout risks?" },
+    dependencies: {
+      ...deps,
+      hiddenQuotaGuard: async ({ quotaIdentity, delta }) => {
+        hiddenCalls.push(["guard", quotaIdentity, delta]);
+        return { status: "checked" };
+      },
+      hiddenQuotaUsageUpdater: async ({ quotaIdentity, delta }) => {
+        hiddenCalls.push(["usage", quotaIdentity, delta]);
+        return { status: "updated" };
+      },
+    },
+  });
+
+  assert.equal(result.assistantMessage.role, "assistant");
+  assert.deepEqual(hiddenCalls, [
+    ["guard", { enabled: true, identityHash: "safe_hash" }, { aiPrompts: 1 }],
+    ["usage", { enabled: true, identityHash: "safe_hash" }, { aiPrompts: 1 }],
+  ]);
+});
+
+test("RAG chat message creation blocks hidden IP prompt quota before saving messages", async () => {
+  const deps = dependencies();
+  let generatorCalled = false;
+  const error = Object.assign(new Error("Demo usage limit reached for this period. Please try again later."), {
+    statusCode: 429,
+    code: "DEMO_IP_QUOTA_LIMIT_REACHED",
+  });
+
+  await assert.rejects(
+    () =>
+      createChatMessageWithRagAnswer({
+        chatId: "chat_1",
+        demoSessionId: "demo_123",
+        quotaIdentity: { enabled: true, identityHash: "safe_hash" },
+        body: { content: "What are the rollout risks?" },
+        dependencies: {
+          ...deps,
+          hiddenQuotaGuard: async () => {
+            throw error;
+          },
+          generator: async () => {
+            generatorCalled = true;
+          },
+        },
+      }),
+    { code: "DEMO_IP_QUOTA_LIMIT_REACHED" },
+  );
+
+  const storedMessages = await deps.chatMessageRepository.listMessagesByChatSession({
+    chatSessionId: "chat_1",
+    demoSessionId: "demo_123",
+  });
+  assert.equal(generatorCalled, false);
+  assert.equal(storedMessages.length, 0);
+});
+
 test("RAG chat message creation rejects no context before provider call", async () => {
   const deps = dependencies();
   let generatorCalled = false;

@@ -53,6 +53,8 @@ function dependencies({
   indexer,
   storageSaver,
   generator,
+  hiddenQuotaGuard,
+  hiddenQuotaUsageUpdater,
 } = {}) {
   const generatedDocumentRepository = createMemoryGeneratedDocumentRepository({ seed: generatedSeed });
   const chatSessionRepository = createMemoryChatSessionRepository({
@@ -133,6 +135,8 @@ function dependencies({
         Object.assign(usageSession, applyUsageDelta(usageSession, delta));
         return usageSession;
       },
+      hiddenQuotaGuard: hiddenQuotaGuard || (async () => ({ status: "skipped" })),
+      hiddenQuotaUsageUpdater: hiddenQuotaUsageUpdater || (async () => ({ status: "skipped" })),
     },
     generatedDocumentRepository,
     chatSessionRepository,
@@ -215,6 +219,69 @@ test("generated document service accepts empty instruction with default and vali
       }),
     { code: "CHAT_HAS_NO_MESSAGES" },
   );
+});
+
+test("generated document service checks and records hidden IP quota", async () => {
+  const hiddenCalls = [];
+  const generatedOutput = "# Brief\n\nA saved generated document.";
+  const ctx = dependencies({
+    generatedOutput,
+    hiddenQuotaGuard: async ({ quotaIdentity, delta }) => {
+      hiddenCalls.push(["guard", quotaIdentity, delta]);
+      return { status: "checked" };
+    },
+    hiddenQuotaUsageUpdater: async ({ quotaIdentity, delta }) => {
+      hiddenCalls.push(["usage", quotaIdentity, delta]);
+      return { status: "updated" };
+    },
+  });
+
+  await generateDocumentFromChat({
+    chatId: "chat_1",
+    demoSessionId: "demo_123",
+    quotaIdentity: { enabled: true, identityHash: "safe_hash" },
+    body: { filename: "summary.md" },
+    dependencies: ctx.deps,
+  });
+
+  const sizeBytes = Buffer.byteLength(generatedOutput, "utf8");
+  assert.deepEqual(hiddenCalls, [
+    ["guard", { enabled: true, identityHash: "safe_hash" }, { generatedDocuments: 1 }],
+    ["guard", { enabled: true, identityHash: "safe_hash" }, { generatedDocuments: 1, storageBytes: sizeBytes }],
+    ["usage", { enabled: true, identityHash: "safe_hash" }, { generatedDocuments: 1, storageBytes: sizeBytes }],
+  ]);
+});
+
+test("generated document service blocks hidden IP quota before provider generation", async () => {
+  let generatorCalled = false;
+  const error = Object.assign(new Error("Demo usage limit reached for this period. Please try again later."), {
+    statusCode: 429,
+    code: "DEMO_IP_QUOTA_LIMIT_REACHED",
+  });
+  const ctx = dependencies({
+    hiddenQuotaGuard: async () => {
+      throw error;
+    },
+    generator: async () => {
+      generatorCalled = true;
+      return { text: "# Should not happen" };
+    },
+  });
+
+  await assert.rejects(
+    () =>
+      generateDocumentFromChat({
+        chatId: "chat_1",
+        demoSessionId: "demo_123",
+        quotaIdentity: { enabled: true, identityHash: "safe_hash" },
+        body: { filename: "summary.md" },
+        dependencies: ctx.deps,
+      }),
+    { code: "DEMO_IP_QUOTA_LIMIT_REACHED" },
+  );
+
+  assert.equal(generatorCalled, false);
+  assert.equal(ctx.usageUpdates.length, 0);
 });
 
 test("generated document service defaults to a unique summary filename", async () => {

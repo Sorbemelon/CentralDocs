@@ -107,6 +107,7 @@ chatRouter.post(
     const result = await createChatMessageWithRagAnswer({
       chatId: req.params.chatId,
       demoSessionId: req.demoSessionId,
+      quotaIdentity: req.demoQuotaIdentity,
       body: req.body,
     });
 
@@ -123,6 +124,7 @@ chatRouter.post(
     const result = await generateDocumentFromChat({
       chatId: req.params.chatId,
       demoSessionId: req.demoSessionId,
+      quotaIdentity: req.demoQuotaIdentity,
       body: req.body,
     });
 

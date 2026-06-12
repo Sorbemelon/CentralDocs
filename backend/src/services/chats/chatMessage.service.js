@@ -14,6 +14,7 @@ import {
 import { resolveChatSelection } from "./chatSelection.service.js";
 import { buildRagContext } from "../rag/ragContext.service.js";
 import { answerChatMessageWithRag } from "../rag/ragAnswer.service.js";
+import { assertHiddenIpQuotaAvailable } from "../demo/demoIpQuota.service.js";
 
 const defaultDependencies = Object.freeze({
   chatSessionRepository: defaultChatSessionRepository,
@@ -21,6 +22,7 @@ const defaultDependencies = Object.freeze({
   selectionResolver: resolveChatSelection,
   contextBuilder: buildRagContext,
   ragAnswerer: answerChatMessageWithRag,
+  hiddenQuotaGuard: assertHiddenIpQuotaAvailable,
   now: () => new Date(),
 });
 
@@ -160,6 +162,7 @@ export async function createUserChatMessage({
 export async function createChatMessageWithRagAnswer({
   chatId,
   demoSessionId,
+  quotaIdentity = null,
   body = {},
   dependencies = {},
 } = {}) {
@@ -179,6 +182,13 @@ export async function createChatMessageWithRagAnswer({
     selectionRepositories: deps.selectionRepositories || {},
     searchDependencies: deps.searchDependencies || {},
   });
+  if (ragContext.references.length > 0) {
+    await deps.hiddenQuotaGuard?.({
+      quotaIdentity,
+      delta: { aiPrompts: 1 },
+      repository: deps.hiddenQuotaRepository,
+    });
+  }
 
   let selectedChat = chat;
   if (ragContext.hasOverride) {
@@ -220,6 +230,9 @@ export async function createChatMessageWithRagAnswer({
     userMessage,
     chatSession: chatAfterUser,
     ragContext,
-    dependencies: deps,
+    dependencies: {
+      ...deps,
+      quotaIdentity,
+    },
   });
 }

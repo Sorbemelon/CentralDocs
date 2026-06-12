@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { env, getSafeConfigSummary } from "../config/env.js";
+import { env, getDemoIpQuotaConfigSummary, getSafeConfigSummary } from "../config/env.js";
 import { getMongoStatus } from "../db/connectMongo.js";
 import { getAiDependencyStatus, getAiModelLane, getGeminiStatus } from "../services/ai/aiModelLane.js";
 import { getStorageStatus } from "../services/storage/s3Storage.service.js";
@@ -42,6 +42,7 @@ healthRouter.get("/dependencies", (req, res) => {
         path: env.vectorPath,
         dimensions: env.embeddingDimensions,
       },
+      ipQuota: getDemoIpQuotaConfigSummary(),
     },
     config: getSafeConfigSummary(),
     aiModelLane: getAiModelLane(),

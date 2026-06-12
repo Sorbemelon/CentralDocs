@@ -4,6 +4,7 @@ import { CHAT_SESSION_ERROR_CODE } from "../../constants/chatSession.constants.j
 import { createHttpError, HttpError } from "../../utils/httpError.js";
 import { assertCanSendAiPrompt } from "../demo/demoUsage.service.js";
 import { applyDemoSessionUsageDelta, getDemoSession } from "../demo/demoSession.service.js";
+import { applyHiddenIpQuotaUsageDelta } from "../demo/demoIpQuota.service.js";
 import * as defaultChatMessageRepository from "../chats/chatMessage.repository.js";
 import { toChatMessageDto } from "../chats/chatMessage.dto.js";
 import * as defaultChatSessionRepository from "../chats/chatSession.repository.js";
@@ -28,6 +29,7 @@ const defaultDependencies = Object.freeze({
   generator: generateTextWithLane,
   demoSessionReader: getDemoSession,
   demoSessionUsageUpdater: applyDemoSessionUsageDelta,
+  hiddenQuotaUsageUpdater: applyHiddenIpQuotaUsageDelta,
   now: () => new Date(),
 });
 
@@ -144,12 +146,21 @@ async function rollbackAcceptedUserMessage({ deps, chatId, demoSessionId, userMe
   }
 }
 
-async function recordAiPromptUsage({ deps, demoSessionId } = {}) {
+async function recordAiPromptUsage({ deps, demoSessionId, quotaIdentity } = {}) {
+  let session = null;
   try {
-    return (await deps.demoSessionUsageUpdater?.(demoSessionId, { aiPrompts: 1 })) || null;
+    session = (await deps.demoSessionUsageUpdater?.(demoSessionId, { aiPrompts: 1 })) || null;
   } catch {
-    return null;
+    session = null;
   }
+
+  await deps.hiddenQuotaUsageUpdater?.({
+    quotaIdentity,
+    delta: { aiPrompts: 1 },
+    repository: deps.hiddenQuotaRepository,
+  });
+
+  return session;
 }
 
 export async function answerChatMessageWithRag({
@@ -164,6 +175,7 @@ export async function answerChatMessageWithRag({
 } = {}) {
   requireDemoSessionId(demoSessionId);
   const deps = getDependencies(dependencies);
+  const quotaIdentity = dependencies.quotaIdentity || null;
   const chat = assertChatFound(chatSession);
 
   const context =
@@ -246,7 +258,7 @@ export async function answerChatMessageWithRag({
       demoSessionId,
       at: deps.now(),
     });
-    await recordAiPromptUsage({ deps, demoSessionId });
+    await recordAiPromptUsage({ deps, demoSessionId, quotaIdentity });
     await rollbackAcceptedUserMessage({ deps, chatId, demoSessionId, userMessage });
 
     if (error instanceof HttpError) {
@@ -263,7 +275,7 @@ export async function answerChatMessageWithRag({
     references: context.references,
     answerText: generation.text,
   });
-  const promptUsageSession = await recordAiPromptUsage({ deps, demoSessionId });
+  const promptUsageSession = await recordAiPromptUsage({ deps, demoSessionId, quotaIdentity });
   await deps.chatSessionRepository.incrementAiPromptCount({
     chatId,
     demoSessionId,

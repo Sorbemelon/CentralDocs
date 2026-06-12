@@ -41,6 +41,7 @@ documentRouter.post(
   asyncHandler(async (req, res) => {
     const result = await uploadDocumentForDemo({
       demoSessionId: req.demoSessionId,
+      quotaIdentity: req.demoQuotaIdentity,
       files: req.files || [],
       body: req.body || {},
     });

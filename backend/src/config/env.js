@@ -18,7 +18,10 @@ export const DEFAULT_GEMINI_GENERATION_FALLBACK_MODELS = Object.freeze([
 ]);
 export const DEFAULT_MONGODB_VECTOR_INDEX_NAME = "document_chunks_vector_index";
 export const DEFAULT_MONGODB_VECTOR_PATH = "embedding";
-export const DEFAULT_DEMO_QUOTA_WINDOW_DAYS = 3;
+export const DEFAULT_DEMO_SESSION_TTL_DAYS = 3;
+export const DEFAULT_DEMO_QUOTA_WINDOW_DAYS = 7;
+export const DEFAULT_DEMO_IP_QUOTA_MULTIPLIER = 3;
+const NON_PRODUCTION_IP_HASH_SECRET = "centraldocs-local-demo-ip-quota-secret";
 
 const emptyToUndefined = (value) => {
   if (typeof value === "string" && value.trim() === "") {
@@ -78,10 +81,20 @@ const envSchema = z.object({
   GEMINI_GENERATION_FALLBACK_MODEL_1: defaultedTrimmedString(DEFAULT_GEMINI_GENERATION_FALLBACK_MODELS[0]),
   GEMINI_GENERATION_FALLBACK_MODEL_2: defaultedTrimmedString(DEFAULT_GEMINI_GENERATION_FALLBACK_MODELS[1]),
   DEMO_CLEAR_RESETS_USAGE: optionalBoolean(),
+  DEMO_SESSION_TTL_DAYS: z.preprocess(
+    emptyToUndefined,
+    z.coerce.number().int().positive().default(DEFAULT_DEMO_SESSION_TTL_DAYS),
+  ),
   DEMO_QUOTA_WINDOW_DAYS: z.preprocess(
     emptyToUndefined,
     z.coerce.number().int().positive().default(DEFAULT_DEMO_QUOTA_WINDOW_DAYS),
   ),
+  DEMO_IP_QUOTA_ENABLED: optionalBoolean(),
+  DEMO_IP_QUOTA_MULTIPLIER: z.preprocess(
+    emptyToUndefined,
+    z.coerce.number().int().positive().default(DEFAULT_DEMO_IP_QUOTA_MULTIPLIER),
+  ),
+  DEMO_IP_HASH_SECRET: optionalTrimmedString(),
   AWS_REGION: optionalTrimmedString(),
   AWS_S3_BUCKET: optionalTrimmedString(),
   AWS_ACCESS_KEY_ID: optionalTrimmedString(),
@@ -90,6 +103,15 @@ const envSchema = z.object({
   GEMINI_API_KEY_2: optionalTrimmedString(),
   GEMINI_API_KEY_3: optionalTrimmedString(),
   GEMINI_API_KEYS: optionalTrimmedString(),
+}).superRefine((value, ctx) => {
+  const ipQuotaEnabled = value.DEMO_IP_QUOTA_ENABLED ?? value.NODE_ENV === "production";
+  if (value.NODE_ENV === "production" && ipQuotaEnabled && !value.DEMO_IP_HASH_SECRET) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["DEMO_IP_HASH_SECRET"],
+      message: "DEMO_IP_HASH_SECRET is required in production when DEMO_IP_QUOTA_ENABLED=true.",
+    });
+  }
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -117,6 +139,10 @@ const demoClearUsagePolicyReason = rawEnv.DEMO_CLEAR_RESETS_USAGE !== undefined
   : demoClearResetsUsage
     ? "development_mode"
     : "production_quota_window";
+const demoIpQuotaEnabled = rawEnv.DEMO_IP_QUOTA_ENABLED ?? rawEnv.NODE_ENV === "production";
+const demoIpHashSecret =
+  rawEnv.DEMO_IP_HASH_SECRET ||
+  (rawEnv.NODE_ENV === "production" ? null : NON_PRODUCTION_IP_HASH_SECRET);
 
 function parseOrigins(value) {
   if (!value) {
@@ -195,7 +221,11 @@ export const env = Object.freeze({
   vectorPath: rawEnv.MONGODB_VECTOR_PATH,
   demoClearResetsUsage,
   demoClearUsagePolicyReason,
+  demoSessionTtlDays: rawEnv.DEMO_SESSION_TTL_DAYS,
   demoQuotaWindowDays: rawEnv.DEMO_QUOTA_WINDOW_DAYS,
+  demoIpQuotaEnabled,
+  demoIpQuotaMultiplier: rawEnv.DEMO_IP_QUOTA_MULTIPLIER,
+  demoIpHashSecretConfigured: Boolean(rawEnv.DEMO_IP_HASH_SECRET),
 });
 
 export function getMongoUri() {
@@ -288,6 +318,32 @@ export function getDemoQuotaWindowDays() {
   return env.demoQuotaWindowDays;
 }
 
+export function getDemoSessionTtlDays() {
+  return env.demoSessionTtlDays;
+}
+
+export function isDemoIpQuotaEnabled() {
+  return env.demoIpQuotaEnabled;
+}
+
+export function getDemoIpQuotaMultiplier() {
+  return env.demoIpQuotaMultiplier;
+}
+
+export function getDemoIpHashSecret() {
+  return demoIpHashSecret;
+}
+
+export function getDemoIpQuotaConfigSummary() {
+  return {
+    enabled: env.demoIpQuotaEnabled,
+    multiplier: env.demoIpQuotaMultiplier,
+    quotaWindowDays: env.demoQuotaWindowDays,
+    sessionTtlDays: env.demoSessionTtlDays,
+    hashSecretConfigured: env.demoIpHashSecretConfigured,
+  };
+}
+
 export function getSafeConfigSummary() {
   const aiConfigured = env.geminiKeyCount > 0;
 
@@ -330,7 +386,9 @@ export function getSafeConfigSummary() {
     },
     demo: {
       clearPolicy: getDemoClearUsagePolicy(),
+      sessionTtlDays: env.demoSessionTtlDays,
       quotaWindowDays: env.demoQuotaWindowDays,
+      ipQuota: getDemoIpQuotaConfigSummary(),
     },
   };
 }

@@ -16,6 +16,11 @@ process.env.GEMINI_GENERATION_FALLBACK_MODEL_1 = "gemini-3-flash-preview";
 process.env.GEMINI_GENERATION_FALLBACK_MODEL_2 = "gemini-2.5-flash";
 process.env.MONGODB_VECTOR_INDEX_NAME = "document_chunks_vector_index";
 process.env.MONGODB_VECTOR_PATH = "embedding";
+process.env.DEMO_SESSION_TTL_DAYS = "3";
+process.env.DEMO_QUOTA_WINDOW_DAYS = "7";
+process.env.DEMO_IP_QUOTA_ENABLED = "";
+process.env.DEMO_IP_QUOTA_MULTIPLIER = "3";
+process.env.DEMO_IP_HASH_SECRET = "";
 process.env.GEMINI_API_KEY_1 = "health-test-gemini-token";
 process.env.GEMINI_API_KEY_2 = "";
 process.env.GEMINI_API_KEY_3 = "";
@@ -95,6 +100,13 @@ test("GET /api/health/dependencies returns safe dependency statuses", async () =
     path: "embedding",
     dimensions: 768,
   });
+  assert.deepEqual(response.body.dependencies.ipQuota, {
+    enabled: false,
+    multiplier: 3,
+    quotaWindowDays: 7,
+    sessionTtlDays: 3,
+    hashSecretConfigured: false,
+  });
   assert.equal(response.body.config.geminiKeyCount, 1);
   assert.equal(response.body.config.aiProvider, "gemini");
   assert.deepEqual(response.body.config.ai.liveRuntime, {
@@ -112,6 +124,13 @@ test("GET /api/health/dependencies returns safe dependency statuses", async () =
     indexName: "document_chunks_vector_index",
     path: "embedding",
     dimensions: 768,
+  });
+  assert.deepEqual(response.body.config.demo.ipQuota, {
+    enabled: false,
+    multiplier: 3,
+    quotaWindowDays: 7,
+    sessionTtlDays: 3,
+    hashSecretConfigured: false,
   });
   assert.deepEqual(response.body.aiModelLane.liveRuntime, {
     enabled: true,
@@ -131,5 +150,6 @@ test("GET /api/health/dependencies returns safe dependency statuses", async () =
   assert.equal(body.includes("health-test-access-token"), false);
   assert.equal(body.includes("health-test-sensitive-token"), false);
   assert.equal(body.includes("health-test-gemini-token"), false);
+  assert.equal(body.includes("DEMO_IP_HASH_SECRET"), false);
   assert.equal(body.includes("mongodb+srv://example.invalid"), false);
 });

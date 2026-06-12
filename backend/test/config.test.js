@@ -16,7 +16,11 @@ process.env.GEMINI_GENERATION_FALLBACK_MODEL_2 = "gemini-2.5-flash";
 process.env.MONGODB_VECTOR_INDEX_NAME = "document_chunks_vector_index";
 process.env.MONGODB_VECTOR_PATH = "embedding";
 process.env.DEMO_CLEAR_RESETS_USAGE = "";
-process.env.DEMO_QUOTA_WINDOW_DAYS = "3";
+process.env.DEMO_SESSION_TTL_DAYS = "3";
+process.env.DEMO_QUOTA_WINDOW_DAYS = "7";
+process.env.DEMO_IP_QUOTA_ENABLED = "";
+process.env.DEMO_IP_QUOTA_MULTIPLIER = "3";
+process.env.DEMO_IP_HASH_SECRET = "";
 process.env.GEMINI_API_KEY_1 = "safe-summary-gemini-token";
 process.env.GEMINI_API_KEY_2 = "";
 process.env.GEMINI_API_KEY_3 = "";
@@ -29,6 +33,9 @@ const {
   getEmbeddingModel,
   getDemoClearResetsUsage,
   getDemoClearUsagePolicy,
+  getDemoIpQuotaConfigSummary,
+  getDemoIpQuotaMultiplier,
+  getDemoSessionTtlDays,
   getDemoQuotaWindowDays,
   getGenerationFallbackModels,
   getGenerationPrimaryModel,
@@ -42,7 +49,11 @@ async function importEnvWith(overrides, label) {
   const keys = [
     "NODE_ENV",
     "DEMO_CLEAR_RESETS_USAGE",
+    "DEMO_SESSION_TTL_DAYS",
     "DEMO_QUOTA_WINDOW_DAYS",
+    "DEMO_IP_QUOTA_ENABLED",
+    "DEMO_IP_QUOTA_MULTIPLIER",
+    "DEMO_IP_HASH_SECRET",
     "MONGODB_URI",
     "MONGODB_DATABASE_NAME",
     "GEMINI_EMBEDDING_DIMENSIONS",
@@ -142,7 +153,15 @@ test("safe config summary does not expose sensitive values", () => {
       usageReset: true,
       reason: "development_mode",
     },
-    quotaWindowDays: 3,
+    sessionTtlDays: 3,
+    quotaWindowDays: 7,
+    ipQuota: {
+      enabled: false,
+      multiplier: 3,
+      quotaWindowDays: 7,
+      sessionTtlDays: 3,
+      hashSecretConfigured: false,
+    },
   });
   assert.equal(serialized.includes("hidden-host.example"), false);
   assert.equal(serialized.includes("safe-summary-access-token"), false);
@@ -166,13 +185,23 @@ test("default model and vector getters match CentralDocs behavior", () => {
     usageReset: true,
     reason: "development_mode",
   });
-  assert.equal(getDemoQuotaWindowDays(), 3);
+  assert.equal(getDemoSessionTtlDays(), 3);
+  assert.equal(getDemoQuotaWindowDays(), 7);
+  assert.equal(getDemoIpQuotaMultiplier(), 3);
+  assert.deepEqual(getDemoIpQuotaConfigSummary(), {
+    enabled: false,
+    multiplier: 3,
+    quotaWindowDays: 7,
+    sessionTtlDays: 3,
+    hashSecretConfigured: false,
+  });
 });
 
 test("demo clear usage policy defaults by environment and supports overrides", async () => {
   const productionDefault = await importEnvWith({
     NODE_ENV: "production",
     DEMO_CLEAR_RESETS_USAGE: "",
+    DEMO_IP_HASH_SECRET: "production-test-ip-hash-secret",
   }, "clear-policy-prod-default");
   assert.equal(productionDefault.getDemoClearResetsUsage(), false);
   assert.deepEqual(productionDefault.getDemoClearUsagePolicy(), {
@@ -193,6 +222,7 @@ test("demo clear usage policy defaults by environment and supports overrides", a
   const productionOverride = await importEnvWith({
     NODE_ENV: "production",
     DEMO_CLEAR_RESETS_USAGE: "true",
+    DEMO_IP_HASH_SECRET: "production-test-ip-hash-secret",
   }, "clear-policy-prod-override");
   assert.deepEqual(productionOverride.getDemoClearUsagePolicy(), {
     usageReset: true,
@@ -209,16 +239,58 @@ test("demo clear usage policy defaults by environment and supports overrides", a
   });
 });
 
-test("demo quota window defaults to three days and is configurable", async () => {
+test("demo session TTL defaults to three days and hidden quota window defaults to seven days", async () => {
   const defaultWindow = await importEnvWith({
+    DEMO_SESSION_TTL_DAYS: "",
     DEMO_QUOTA_WINDOW_DAYS: "",
-  }, "quota-default");
-  assert.equal(defaultWindow.getDemoQuotaWindowDays(), 3);
+  }, "ttl-quota-default");
+  assert.equal(defaultWindow.getDemoSessionTtlDays(), 3);
+  assert.equal(defaultWindow.getDemoQuotaWindowDays(), 7);
 
   const customWindow = await importEnvWith({
-    DEMO_QUOTA_WINDOW_DAYS: "7",
-  }, "quota-custom");
-  assert.equal(customWindow.getDemoQuotaWindowDays(), 7);
+    DEMO_SESSION_TTL_DAYS: "4",
+    DEMO_QUOTA_WINDOW_DAYS: "9",
+  }, "ttl-quota-custom");
+  assert.equal(customWindow.getDemoSessionTtlDays(), 4);
+  assert.equal(customWindow.getDemoQuotaWindowDays(), 9);
+});
+
+test("hidden IP quota config defaults by environment and requires production secret", async () => {
+  const testDefault = await importEnvWith({
+    NODE_ENV: "test",
+    DEMO_IP_QUOTA_ENABLED: "",
+    DEMO_IP_HASH_SECRET: "",
+  }, "ip-quota-test-default");
+  assert.equal(testDefault.getDemoIpQuotaConfigSummary().enabled, false);
+
+  const productionDefault = await importEnvWith({
+    NODE_ENV: "production",
+    DEMO_IP_QUOTA_ENABLED: "",
+    DEMO_IP_HASH_SECRET: "production-test-ip-hash-secret",
+  }, "ip-quota-prod-default");
+  assert.deepEqual(productionDefault.getDemoIpQuotaConfigSummary(), {
+    enabled: true,
+    multiplier: 3,
+    quotaWindowDays: 7,
+    sessionTtlDays: 3,
+    hashSecretConfigured: true,
+  });
+
+  const productionDisabled = await importEnvWith({
+    NODE_ENV: "production",
+    DEMO_IP_QUOTA_ENABLED: "false",
+    DEMO_IP_HASH_SECRET: "",
+  }, "ip-quota-prod-disabled");
+  assert.equal(productionDisabled.getDemoIpQuotaConfigSummary().enabled, false);
+
+  await assert.rejects(
+    () => importEnvWith({
+      NODE_ENV: "production",
+      DEMO_IP_QUOTA_ENABLED: "",
+      DEMO_IP_HASH_SECRET: "",
+    }, "ip-quota-prod-missing-secret"),
+    /DEMO_IP_HASH_SECRET/,
+  );
 });
 
 test("MongoDB URI without database path produces safe warning", async () => {

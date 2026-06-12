@@ -17,6 +17,10 @@ import {
   applyDemoSessionUsageDelta,
   getDemoSession,
 } from "../demo/demoSession.service.js";
+import {
+  applyHiddenIpQuotaUsageDelta,
+  assertHiddenIpQuotaAvailable,
+} from "../demo/demoIpQuota.service.js";
 import { toDocumentDto } from "../documents/document.dto.js";
 import { validateUploadFiles } from "./uploadValidation.service.js";
 import { normalizeUploadFilename } from "./uploadFilename.service.js";
@@ -55,6 +59,8 @@ const defaultDependencies = Object.freeze({
   processor: processUploadedDocument,
   demoSessionReader: getDemoSession,
   demoSessionUsageUpdater: applyDemoSessionUsageDelta,
+  hiddenQuotaGuard: assertHiddenIpQuotaAvailable,
+  hiddenQuotaUsageUpdater: applyHiddenIpQuotaUsageDelta,
   payloadBuilder: buildUploadDocumentPayload,
 });
 
@@ -288,6 +294,7 @@ async function createUploadDocumentWithCleanup({ deps, payload, storageResult } 
 
 export async function uploadDocumentForDemo({
   demoSessionId,
+  quotaIdentity = null,
   files = [],
   body = {},
   dependencies = {},
@@ -297,6 +304,14 @@ export async function uploadDocumentForDemo({
   const validation = deps.fileValidator(files);
   const usageSession = await getUsageSession({ deps, demoSessionId });
   assertUploadUsageAvailable(usageSession, validation.sizeBytes);
+  await deps.hiddenQuotaGuard?.({
+    quotaIdentity,
+    delta: {
+      uploadedFiles: 1,
+      storageBytes: validation.sizeBytes,
+    },
+    repository: deps.hiddenQuotaRepository,
+  });
   const folder = await resolveUploadFolder({
     deps,
     folderId: body.folderId,
@@ -335,6 +350,14 @@ export async function uploadDocumentForDemo({
     demoSessionId,
     usageSession,
     sizeBytes: validation.sizeBytes,
+  });
+  await deps.hiddenQuotaUsageUpdater?.({
+    quotaIdentity,
+    delta: {
+      uploadedFiles: 1,
+      storageBytes: validation.sizeBytes,
+    },
+    repository: deps.hiddenQuotaRepository,
   });
   const processing = await deps.processor({
     document,

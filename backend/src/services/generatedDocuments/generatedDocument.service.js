@@ -18,6 +18,10 @@ import {
   applyDemoSessionUsageDelta,
   getDemoSession,
 } from "../demo/demoSession.service.js";
+import {
+  applyHiddenIpQuotaUsageDelta,
+  assertHiddenIpQuotaAvailable,
+} from "../demo/demoIpQuota.service.js";
 import { resolveChatSelection } from "../chats/chatSelection.service.js";
 import { buildGeneratedDocumentPrompt } from "./generatedDocumentPrompt.service.js";
 import { collectGeneratedDocumentReferences } from "./generatedDocumentReference.service.js";
@@ -46,6 +50,8 @@ const defaultDependencies = Object.freeze({
   indexer: indexGeneratedDocument,
   demoSessionReader: getDemoSession,
   demoSessionUsageUpdater: applyDemoSessionUsageDelta,
+  hiddenQuotaGuard: assertHiddenIpQuotaAvailable,
+  hiddenQuotaUsageUpdater: applyHiddenIpQuotaUsageDelta,
   generatedDocumentRepository: {
     createDocumentId: createGeneratedDocumentId,
     createGeneratedDocumentRecord,
@@ -324,6 +330,7 @@ function safeGenerationWarnings(generationWarnings = [], indexingWarnings = []) 
 export async function generateDocumentFromChat({
   chatId,
   demoSessionId,
+  quotaIdentity = null,
   body = {},
   dependencies = {},
 } = {}) {
@@ -347,6 +354,11 @@ export async function generateDocumentFromChat({
 
   const usageSession = await getUsageSession({ deps, demoSessionId });
   assertGeneratedDocumentLimit(usageSession);
+  await deps.hiddenQuotaGuard?.({
+    quotaIdentity,
+    delta: { generatedDocuments: 1 },
+    repository: deps.hiddenQuotaRepository,
+  });
   const existingFilenames =
     (await deps.generatedDocumentRepository.listGeneratedDocumentFilenamesByDemoSession?.({
       demoSessionId,
@@ -400,6 +412,14 @@ export async function generateDocumentFromChat({
   const generatedText = assertGeneratedText(generation.text);
   const sizeBytes = Buffer.byteLength(generatedText, "utf8");
   assertGeneratedDocumentSize(usageSession, sizeBytes);
+  await deps.hiddenQuotaGuard?.({
+    quotaIdentity,
+    delta: {
+      generatedDocuments: 1,
+      storageBytes: sizeBytes,
+    },
+    repository: deps.hiddenQuotaRepository,
+  });
 
   const documentId =
     deps.generatedDocumentRepository.createDocumentId?.() || createGeneratedDocumentId();
@@ -460,6 +480,14 @@ export async function generateDocumentFromChat({
     demoSessionId,
     usageSession,
     sizeBytes,
+  });
+  await deps.hiddenQuotaUsageUpdater?.({
+    quotaIdentity,
+    delta: {
+      generatedDocuments: 1,
+      storageBytes: sizeBytes,
+    },
+    repository: deps.hiddenQuotaRepository,
   });
   const warnings = safeGenerationWarnings(
     generation.warnings,

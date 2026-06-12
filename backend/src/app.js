@@ -19,6 +19,9 @@ import { trashRouter } from "./routes/trash.routes.js";
 export const app = express();
 
 app.disable("x-powered-by");
+if (env.NODE_ENV === "production") {
+  app.set("trust proxy", 1);
+}
 
 function isLocalDevOrigin(origin) {
   if (env.NODE_ENV === "production") return false;

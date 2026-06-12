@@ -1,3 +1,5 @@
+import { buildDemoQuotaIdentityFromRequest } from "../services/demo/demoQuotaIdentity.service.js";
+
 export const DEMO_SESSION_COOKIE = "centraldocs_demo_session";
 export const DEMO_SESSION_HEADER = "x-demo-session-id";
 
@@ -11,5 +13,6 @@ export function demoSessionMiddleware(req, res, next) {
     sessionId,
     source: headerSessionId ? "header" : cookieSessionId ? "cookie" : "none",
   };
+  req.demoQuotaIdentity = buildDemoQuotaIdentityFromRequest(req);
   next();
 }

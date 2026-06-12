@@ -27,6 +27,8 @@ function dependencies({
   storageReader,
   storageCleaner,
   processor,
+  hiddenQuotaGuard,
+  hiddenQuotaUsageUpdater,
   repository = createMemoryUploadDocumentRepository({ folders }),
 } = {}) {
   const usageSession = {
@@ -63,6 +65,8 @@ function dependencies({
         })),
       storageReader: storageReader || (async () => Buffer.from("# Brief")),
       storageCleaner: storageCleaner || (async () => ({ deleted: true })),
+      hiddenQuotaGuard: hiddenQuotaGuard || (async () => ({ status: "skipped" })),
+      hiddenQuotaUsageUpdater: hiddenQuotaUsageUpdater || (async () => ({ status: "skipped" })),
       processor:
         processor ||
         (async ({ document, repository }) => {
@@ -108,6 +112,62 @@ test("upload document service saves metadata, processes document, and increments
   assert.equal(result.usage.uploadedFiles, 1);
   assert.equal(result.remaining.uploadedFiles, 4);
   assert.equal(ctx.usageUpdates.length, 1);
+});
+
+test("upload document service checks and records hidden IP quota", async () => {
+  const hiddenCalls = [];
+  const ctx = dependencies({
+    hiddenQuotaGuard: async ({ quotaIdentity, delta }) => {
+      hiddenCalls.push(["guard", quotaIdentity, delta]);
+      return { status: "checked" };
+    },
+    hiddenQuotaUsageUpdater: async ({ quotaIdentity, delta }) => {
+      hiddenCalls.push(["usage", quotaIdentity, delta]);
+      return { status: "updated" };
+    },
+  });
+
+  await uploadDocumentForDemo({
+    demoSessionId: "demo_123",
+    quotaIdentity: { enabled: true, identityHash: "safe_hash" },
+    files: [uploadFile({ buffer: Buffer.from("# Hidden quota") })],
+    dependencies: ctx.deps,
+  });
+
+  assert.deepEqual(hiddenCalls, [
+    ["guard", { enabled: true, identityHash: "safe_hash" }, { uploadedFiles: 1, storageBytes: 14 }],
+    ["usage", { enabled: true, identityHash: "safe_hash" }, { uploadedFiles: 1, storageBytes: 14 }],
+  ]);
+});
+
+test("upload document service blocks hidden IP quota before storage save", async () => {
+  let storageCalled = false;
+  const error = Object.assign(new Error("Demo usage limit reached for this period. Please try again later."), {
+    statusCode: 429,
+    code: "DEMO_IP_QUOTA_LIMIT_REACHED",
+  });
+  const ctx = dependencies({
+    hiddenQuotaGuard: async () => {
+      throw error;
+    },
+    storageSaver: async () => {
+      storageCalled = true;
+    },
+  });
+
+  await assert.rejects(
+    () =>
+      uploadDocumentForDemo({
+        demoSessionId: "demo_123",
+        quotaIdentity: { enabled: true, identityHash: "safe_hash" },
+        files: [uploadFile()],
+        dependencies: ctx.deps,
+      }),
+    { code: "DEMO_IP_QUOTA_LIMIT_REACHED" },
+  );
+
+  assert.equal(storageCalled, false);
+  assert.equal(ctx.usageUpdates.length, 0);
 });
 
 test("upload document service rejects upload and storage limits before saving", async () => {

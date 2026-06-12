@@ -157,6 +157,7 @@ test("RAG answer service enforces AI prompt limit before provider call", async (
 
 test("RAG answer service rolls back accepted user message on provider failure", async () => {
   const deps = dependencies();
+  const hiddenUsageUpdates = [];
 
   await assert.rejects(
     () =>
@@ -170,6 +171,11 @@ test("RAG answer service rolls back accepted user message on provider failure", 
         dependencies: {
           ...deps,
           historyLoader: async () => ({ rollingSummary: null, recentMessages: [] }),
+          quotaIdentity: { enabled: true, identityHash: "safe_hash" },
+          hiddenQuotaUsageUpdater: async ({ quotaIdentity, delta }) => {
+            hiddenUsageUpdates.push({ quotaIdentity, delta });
+            return { status: "updated" };
+          },
           generator: async () => {
             throw new Error("provider exploded with unsafe details");
           },
@@ -187,4 +193,10 @@ test("RAG answer service rolls back accepted user message on provider failure", 
   assert.equal(messages.length, 0);
   assert.equal(chat.messageCount, 0);
   assert.equal(chat.aiPromptCount, 1);
+  assert.deepEqual(hiddenUsageUpdates, [
+    {
+      quotaIdentity: { enabled: true, identityHash: "safe_hash" },
+      delta: { aiPrompts: 1 },
+    },
+  ]);
 });
