@@ -156,8 +156,35 @@ function formatReferencePath(ref) {
   return [ref.folderName, formatReferenceFilename(ref)].filter(Boolean).join(" / ");
 }
 
+function referenceSourceKey(ref) {
+  return [
+    ref.documentId || "",
+    ref.folderName || "",
+    formatReferenceFilename(ref),
+  ].join("|");
+}
+
+function groupReferencesBySource(refs = []) {
+  const grouped = [];
+  const bySource = new Map();
+  refs.forEach((ref) => {
+    const key = referenceSourceKey(ref);
+    if (!bySource.has(key)) {
+      const item = { ...ref, numbers: [] };
+      bySource.set(key, item);
+      grouped.push(item);
+    }
+    const number = Number(ref.number);
+    if (Number.isFinite(number) && !bySource.get(key).numbers.includes(number)) {
+      bySource.get(key).numbers.push(number);
+    }
+  });
+  return grouped;
+}
+
 function AssistantMessage({ message, selected, onSelect }) {
   const refs = message.references || [];
+  const sourceRefs = groupReferencesBySource(refs);
   const [refsOpen, setRefsOpen] = useState("");
   const [focusedRefNumber, setFocusedRefNumber] = useState(null);
   const refNodes = useRef(new Map());
@@ -192,30 +219,31 @@ function AssistantMessage({ message, selected, onSelect }) {
       >
         <MarkdownContent content={message.content} references={refs} onCitationClick={focusReference} />
       </div>
-      {refs.length > 0 && (
+      {sourceRefs.length > 0 && (
         <Accordion type="single" value={refsOpen} onValueChange={setRefsOpen} className="max-w-[80%] items-start">
           <AccordionItem value="refs" className="flex flex-col items-start">
             <AccordionTrigger className="w-auto justify-start gap-1 text-[11px] text-muted-foreground">
-              References used: {refs.length}
+              References used: {sourceRefs.length}
             </AccordionTrigger>
             <AccordionContent className="flex flex-col gap-0.5 py-1 text-[12px]">
-              {refs.map((r) => (
+              {sourceRefs.map((r) => (
                 <div
-                  key={`${r.number}-${r.documentId}`}
-                  id={`assistant-ref-${message.id}-${r.number}`}
+                  key={`${r.documentId || formatReferencePath(r)}-${r.numbers.join("-")}`}
+                  id={`assistant-ref-${message.id}-${r.numbers[0] || r.number}`}
                   ref={(node) => {
-                    const key = Number(r.number);
-                    if (node) refNodes.current.set(key, node);
-                    else refNodes.current.delete(key);
+                    r.numbers.forEach((number) => {
+                      if (node) refNodes.current.set(number, node);
+                      else refNodes.current.delete(number);
+                    });
                   }}
                   className={cn(
                     "px-1.5 py-0.5 text-muted-foreground transition-colors",
-                    focusedRefNumber === Number(r.number) && "text-primary",
+                    r.numbers.includes(focusedRefNumber) && "text-primary",
                   )}
                 >
                   <div className="flex items-start gap-1.5">
                     <span className="mt-0.5 shrink-0 font-mono text-[10px] font-semibold text-primary">
-                      {r.number}
+                      {r.numbers.length ? r.numbers.join(",") : r.number}
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="flex min-w-0 items-center gap-1.5 text-foreground">
