@@ -9,7 +9,7 @@
 
 import { DOC_STATUS, SOURCE_KIND } from "@/lib/constants";
 
-/** Folders: 6 read-only demo folders + 1 user folder. */
+/** Folders: read-only demo folders for local/offline fallback. */
 export const FALLBACK_FOLDERS = [
   { id: "fld-strategy", name: "Strategy & Rollout", source: SOURCE_KIND.mock, readOnly: true, group: "demo" },
   { id: "fld-docops", name: "Document Operations", source: SOURCE_KIND.mock, readOnly: true, group: "demo" },
@@ -17,7 +17,6 @@ export const FALLBACK_FOLDERS = [
   { id: "fld-signals", name: "Customer & Support Signals", source: SOURCE_KIND.mock, readOnly: true, group: "demo" },
   { id: "fld-meetings", name: "Meeting Evidence", source: SOURCE_KIND.mock, readOnly: true, group: "demo" },
   { id: "fld-generated", name: "Generated Examples", source: SOURCE_KIND.mock, readOnly: true, group: "demo" },
-  { id: "fld-my-uploads", name: "My Uploads", source: SOURCE_KIND.uploaded, readOnly: false, group: "user" },
 ];
 
 /** Documents across the story. type is a short display badge. */
@@ -43,9 +42,6 @@ export const FALLBACK_DOCUMENTS = [
 
   { id: "doc-example-summary", title: "Example Chat Summary", type: "MD", folderId: "fld-generated", source: SOURCE_KIND.mock, status: DOC_STATUS.ready, readOnly: true, excerpt: "Example of a generated chat summary document (read-only sample)." },
 
-  // User/generated items — delete affordances enabled for future soft-delete.
-  { id: "doc-upload-notes", title: "Q3 Process Notes", type: "MD", folderId: "fld-my-uploads", source: SOURCE_KIND.uploaded, status: DOC_STATUS.processing, readOnly: false, excerpt: "Uploaded notes — currently processing." },
-  { id: "doc-gen-brief", title: "Orchid Rollout Brief", type: "MD", folderId: "fld-my-uploads", source: SOURCE_KIND.generated, status: DOC_STATUS.ready, readOnly: false, excerpt: "Generated internal briefing produced from a chat session." },
 ];
 
 /** Soft-deleted placeholders for the Trash filter (user/generated only; never mock). */
@@ -56,22 +52,14 @@ export const FALLBACK_TRASH = [
 
 /** Generated documents list for the Generated tab. */
 export const FALLBACK_GENERATED = [
-  { id: "doc-gen-brief", title: "Orchid Rollout Brief", type: "MD", status: DOC_STATUS.ready, createdAt: "Just now", source: SOURCE_KIND.generated },
-  { id: "doc-gen-summary", title: "Vendor Onboarding Summary", type: "MD", status: DOC_STATUS.ready, createdAt: "Earlier today", source: SOURCE_KIND.generated },
-];
-
-/** Local placeholder chat sessions for the left sidebar. */
-export const FALLBACK_CHATS = [
-  { id: "chat-1", title: "Rollout risk review", contextCount: 5, active: true },
-  { id: "chat-2", title: "Vendor onboarding questions", contextCount: 2, active: false },
-  { id: "chat-3", title: "Customer pain points", contextCount: 3, active: false },
 ];
 
 /** Usage counters (display-only). */
 export const FALLBACK_USAGE = {
   uploads: { used: 0, limit: 5 },
-  chats: { used: 1, limit: 5 },
+  chats: { used: 0, limit: 5 },
   prompts: { used: 0, limit: 10 },
   generated: { used: 0, limit: 3 },
+  folders: { used: 0, limit: 10 },
   storageMb: { used: 0, limit: 20 },
 };

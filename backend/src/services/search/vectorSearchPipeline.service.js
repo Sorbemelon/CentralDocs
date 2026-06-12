@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import { LIFECYCLE_STATUS } from "../../constants/lifecycle.constants.js";
 import {
   SEARCH_EMBEDDING,
+  SEARCH_LIMITS,
   VECTOR_SEARCH,
 } from "../../constants/search.constants.js";
 import { validateEmbeddingVector } from "../embedding/embeddingVector.service.js";
@@ -64,7 +65,7 @@ export function buildVectorSearchPipeline({
   demoSessionId = null,
 } = {}) {
   const vector = validateEmbeddingVector(queryVector, SEARCH_EMBEDDING.dimensions);
-  const limit = Number.isInteger(topK) && topK > 0 ? topK : 6;
+  const limit = Number.isInteger(topK) && topK > 0 ? topK : SEARCH_LIMITS.defaultTopK;
   const numCandidates = Math.max(
     VECTOR_SEARCH.minNumCandidates,
     limit * VECTOR_SEARCH.numCandidatesMultiplier,

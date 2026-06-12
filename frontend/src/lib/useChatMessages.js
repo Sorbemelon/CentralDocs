@@ -1,11 +1,26 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { getChat, sendChatMessage } from "@/services/chatApi";
-import { isLocalChatId, normalizeChatMessage, normalizeReference } from "./workspaceData";
+import { isLocalChatId, normalizeChatMessage, normalizeReferencesForAnswer } from "./workspaceData";
 import { DEMO_LIMITS } from "./constants";
-import { FALLBACK_CHAT_MESSAGES } from "@/data/demoCopy";
 
 const PENDING_STEPS = ["Resolving context", "Retrieving references", "Generating answer", "Saving response"];
+const PENDING_CHAT_KEY_PREFIX = "centraldocs.pendingChat.";
+
+function createOptimisticUserMessage({ id, content, createdAt }) {
+  return {
+    id,
+    role: "user",
+    content,
+    status: "sending",
+    createdAt: createdAt || new Date().toISOString(),
+    contextDocs: [],
+    attachedFolderNames: [],
+    references: [],
+    aiMeta: null,
+    optimistic: true,
+  };
+}
 
 /**
  * Chat message state for the active chat. Loads saved messages from getChat and
@@ -19,6 +34,7 @@ export function useChatMessages({
   selectedFolderIds = [],
   onChatUpdated,
   onPromptUsage,
+  onUsageSnapshot,
 }) {
   const [messages, setMessages] = useState([]);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
@@ -30,7 +46,7 @@ export function useChatMessages({
 
   const ref = useRef({});
   useEffect(() => {
-    ref.current = { online, activeChatId, selectedDocumentIds, selectedFolderIds, onChatUpdated, onPromptUsage, draft };
+    ref.current = { online, activeChatId, selectedDocumentIds, selectedFolderIds, onChatUpdated, onPromptUsage, onUsageSnapshot, draft };
   });
 
   const mounted = useRef(true);
@@ -50,10 +66,40 @@ export function useChatMessages({
     return null;
   };
 
+  const pendingKey = (chatId) => `${PENDING_CHAT_KEY_PREFIX}${chatId}`;
+
+  const readPending = (chatId) => {
+    try {
+      const raw = sessionStorage.getItem(pendingKey(chatId));
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const writePending = (chatId, content) => {
+    try {
+      sessionStorage.setItem(
+        pendingKey(chatId),
+        JSON.stringify({ content, startedAt: new Date().toISOString() }),
+      );
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const clearPending = (chatId) => {
+    try {
+      sessionStorage.removeItem(pendingKey(chatId));
+    } catch {
+      /* ignore */
+    }
+  };
+
   const loadMessagesForChat = useCallback(async (chatId) => {
     const { online: on } = ref.current;
     if (!chatId || !on || isLocalChatId(chatId)) {
-      setMessages(FALLBACK_CHAT_MESSAGES);
+      setMessages([]);
       setSelectedAssistantMessageId(null);
       return;
     }
@@ -61,7 +107,38 @@ export function useChatMessages({
     try {
       const res = await getChat(chatId);
       if (!mounted.current) return;
-      const list = (res.messages || []).map(normalizeChatMessage);
+      let list = (res.messages || []).map(normalizeChatMessage);
+      const pending = readPending(chatId);
+      if (pending) {
+        const pendingUserIndex = list.findLastIndex?.(
+          (message) => message.role === "user" && message.content === pending.content,
+        ) ?? -1;
+        const hasAssistantAfterPending =
+          pendingUserIndex >= 0 && list.slice(pendingUserIndex + 1).some((message) => message.role === "assistant");
+        if (hasAssistantAfterPending) {
+          clearPending(chatId);
+          setIsSending(false);
+          setPendingStep(null);
+        } else {
+          if (pendingUserIndex < 0) {
+            list = [
+              ...list,
+              createOptimisticUserMessage({
+                id: `pending-user-${chatId}`,
+                content: pending.content,
+                createdAt: pending.startedAt,
+              }),
+            ];
+          }
+          setIsSending(true);
+          setPendingStep("Generating answer");
+          window.setTimeout(() => {
+            if (mounted.current && ref.current.activeChatId === chatId) {
+              loadMessagesForChat(chatId);
+            }
+          }, 5000);
+        }
+      }
       setMessages(list);
       setSelectedAssistantMessageId(latestAssistantId(list));
     } catch {
@@ -79,13 +156,29 @@ export function useChatMessages({
     const user = res?.userMessage ? normalizeChatMessage(res.userMessage) : null;
     const assistant = res?.assistantMessage ? normalizeChatMessage(res.assistantMessage) : null;
     if (assistant && !assistant.references.length && Array.isArray(res?.references) && res.references.length) {
-      assistant.references = res.references.map(normalizeReference);
+      assistant.references = normalizeReferencesForAnswer({
+        content: assistant.content,
+        references: res.references,
+      });
     }
-    setMessages((prev) => [...prev, user, assistant].filter(Boolean));
+    setMessages((prev) => {
+      const withoutOptimisticUser = user
+        ? prev.filter(
+          (message) =>
+            !(
+              message.optimistic &&
+              message.role === "user" &&
+              message.content === user.content
+            ),
+        )
+        : prev;
+      return [...withoutOptimisticUser, user, assistant].filter(Boolean);
+    });
     if (assistant) setSelectedAssistantMessageId(assistant.id);
     const { onChatUpdated: onChat, onPromptUsage: onUsage } = ref.current;
     if (res?.chat && onChat) onChat(res.chat);
     if (res?.usage && res.usage.aiPrompts != null && onUsage) onUsage(res.usage.aiPrompts);
+    if (res?.usage && ref.current.onUsageSnapshot) ref.current.onUsageSnapshot(res.usage);
   }, []);
 
   const startStepCycler = () => {
@@ -134,6 +227,12 @@ export function useChatMessages({
 
     setIsSending(true);
     setSendError(null);
+    const optimisticId = `pending-user-${chatId}-${Date.now()}`;
+    setMessages((prev) => [
+      ...prev,
+      createOptimisticUserMessage({ id: optimisticId, content }),
+    ]);
+    writePending(chatId, content);
     startStepCycler();
     try {
       const res = await sendChatMessage(chatId, {
@@ -142,10 +241,16 @@ export function useChatMessages({
         selectedFolderIds: folderIds,
       });
       if (!mounted.current) return;
+      clearPending(chatId);
       applyChatResponse(res);
       setDraft(""); // clear only on success
     } catch (err) {
-      if (mounted.current) setSendError(err);
+      clearPending(chatId);
+      if (mounted.current) {
+        setSendError(err);
+        setMessages((prev) => prev.filter((message) => message.id !== optimisticId));
+        await loadMessagesForChat(chatId);
+      }
       toast.error(err?.message || "Couldn't generate an answer. Your prompt was kept.");
     } finally {
       if (mounted.current) {

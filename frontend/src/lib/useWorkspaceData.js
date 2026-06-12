@@ -41,22 +41,21 @@ export function useWorkspaceData({ online, bootstrap, filter }) {
       setLoading(true);
       setError(null);
       try {
-        let rawFolders;
-        let rawDocuments;
-        if (!force && bootstrap?.folders && bootstrap?.documents) {
-          rawFolders = bootstrap.folders;
-          rawDocuments = bootstrap.documents;
-        } else {
-          const [foldersRes, documentsRes] = await Promise.all([listFolders(), listDocuments()]);
-          rawFolders = foldersRes.folders;
-          rawDocuments = documentsRes.documents;
-        }
+        const [foldersRes, documentsRes] = await Promise.all([listFolders(), listDocuments()]);
+        const rawFolders = foldersRes.folders;
+        const rawDocuments = documentsRes.documents;
         if (mounted.current) {
           setFolders((rawFolders || []).map(normalizeFolder));
           setDocuments((rawDocuments || []).map(normalizeDocument));
         }
       } catch (err) {
-        if (mounted.current) setError(err); // keep previous/fallback state
+        if (mounted.current) {
+          setError(err);
+          if (!force && bootstrap?.folders && bootstrap?.documents) {
+            setFolders((bootstrap.folders || []).map(normalizeFolder));
+            setDocuments((bootstrap.documents || []).map(normalizeDocument));
+          }
+        }
       } finally {
         if (mounted.current) setLoading(false);
       }

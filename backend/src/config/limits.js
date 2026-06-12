@@ -16,8 +16,8 @@ export const DEMO_LIMITS = Object.freeze({
   maxPromptLengthChars: 1500,
   maxGenerateDocumentInstructionLengthChars: 2000,
   maxSemanticSearchQueryLengthChars: 500,
-  topKRetrieval: 6,
-  visibleReferences: 5,
+  topKRetrieval: 15,
+  visibleReferences: 10,
   recentChatHistoryMessages: 8,
 });
 

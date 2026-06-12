@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { generateDocumentFromChat } from "@/services/chatApi";
 import {
+  buildUniqueGeneratedFilename,
+  documentDownloadFilename,
   isLocalChatId,
   normalizeDocument,
   validateGeneratedFilename,
@@ -15,7 +17,12 @@ import { GENERATED_DEFAULT_FILENAME, GENERATED_DOC_STEPS } from "@/data/demoCopy
  * so the submit stays stable. The workspace handles list/usage updates via
  * onGenerated(doc, res); this hook keeps the success result for the modal.
  */
-export function useGeneratedDocuments({ online, activeChatId, onGenerated }) {
+export function useGeneratedDocuments({
+  online,
+  activeChatId,
+  existingGeneratedDocuments = [],
+  onGenerated,
+}) {
   const [modalOpen, setModalOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationError, setGenerationError] = useState(null);
@@ -25,6 +32,20 @@ export function useGeneratedDocuments({ online, activeChatId, onGenerated }) {
   const [includeReferences, setIncludeReferences] = useState(true);
   const [includeCurrentSelectedDocuments, setIncludeCurrentSelectedDocuments] = useState(true);
   const [genStep, setGenStep] = useState(null);
+
+  const existingFilenames = useCallback(() => {
+    const filenames = existingGeneratedDocuments.map(documentDownloadFilename).filter(Boolean);
+    if (generatedResult?.document) {
+      const lastGenerated = documentDownloadFilename(generatedResult.document);
+      if (lastGenerated) filenames.push(lastGenerated);
+    }
+    return filenames;
+  }, [existingGeneratedDocuments, generatedResult]);
+
+  const nextDefaultFilename = useCallback(
+    () => buildUniqueGeneratedFilename(GENERATED_DEFAULT_FILENAME, existingFilenames()).value || GENERATED_DEFAULT_FILENAME,
+    [existingFilenames],
+  );
 
   const ref = useRef({});
   useEffect(() => {
@@ -36,6 +57,7 @@ export function useGeneratedDocuments({ online, activeChatId, onGenerated }) {
       filename,
       includeReferences,
       includeCurrentSelectedDocuments,
+      existingGeneratedDocuments,
     };
   });
 
@@ -67,8 +89,9 @@ export function useGeneratedDocuments({ online, activeChatId, onGenerated }) {
 
   const openGenerateModal = useCallback(() => {
     setGenerationError(null);
+    setFilename(nextDefaultFilename());
     setModalOpen(true);
-  }, []);
+  }, [nextDefaultFilename]);
 
   const clearGeneratedResult = useCallback(() => setGeneratedResult(null), []);
 
@@ -79,11 +102,11 @@ export function useGeneratedDocuments({ online, activeChatId, onGenerated }) {
     setGeneratedResult((prev) => {
       if (prev) {
         setInstruction("");
-        setFilename(GENERATED_DEFAULT_FILENAME);
+        setFilename(nextDefaultFilename());
       }
       return null;
     });
-  }, []);
+  }, [nextDefaultFilename]);
 
   const generateDocument = useCallback(async () => {
     const {
@@ -97,7 +120,7 @@ export function useGeneratedDocuments({ online, activeChatId, onGenerated }) {
     } = ref.current;
 
     const insV = validateGeneratedInstruction(ins);
-    const fnV = validateGeneratedFilename(fn);
+    const fnV = buildUniqueGeneratedFilename(fn, existingFilenames());
 
     if (!on) {
       toast.error("Backend is offline. Generation requires the backend.");
@@ -134,7 +157,11 @@ export function useGeneratedDocuments({ online, activeChatId, onGenerated }) {
         download: res.download || null,
         warnings: res.generation?.warnings || [],
       });
-      cb?.(doc, res); // workspace: applyDocument + reload + usage merge
+      try {
+        cb?.(doc, res); // workspace: applyDocument + reload + usage merge
+      } catch {
+        toast.warning("Document created, but the workspace list did not refresh.");
+      }
       toast.success(`Generated ${doc.title}`);
     } catch (err) {
       if (mounted.current) setGenerationError(err?.message || "Couldn't generate the document.");
@@ -145,7 +172,7 @@ export function useGeneratedDocuments({ online, activeChatId, onGenerated }) {
         setIsGenerating(false);
       }
     }
-  }, []);
+  }, [existingFilenames]);
 
   return {
     modalOpen,
@@ -166,6 +193,7 @@ export function useGeneratedDocuments({ online, activeChatId, onGenerated }) {
     setIncludeCurrentSelectedDocuments,
     validateGeneratedFilename,
     validateGeneratedInstruction,
+    resolvedFilename: buildUniqueGeneratedFilename(filename, existingFilenames()),
     generateDocument,
     clearGeneratedResult,
   };

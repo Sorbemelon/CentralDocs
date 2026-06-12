@@ -91,7 +91,8 @@ function byAnyPublicId(entities = [], getIds) {
   const map = new Map();
   for (const entity of entities) {
     for (const id of getIds(entity)) {
-      map.set(id, entity);
+      const existing = map.get(id);
+      map.set(id, preferDocumentCandidate(entity, existing) ? entity : existing);
     }
   }
 
@@ -105,6 +106,34 @@ function isDocumentSelected(document, selectedDocumentIds) {
 
 function publicDocumentFolderId(document = {}) {
   return serializeId(document.folderMockId || document.publicFolderId || document.folderId);
+}
+
+function vectorDocumentId(document = {}) {
+  return serializeId(document.vectorDocumentId || document._id || document.id);
+}
+
+function documentDedupeId(document = {}) {
+  return serializeId(document.id || document.mockId || document._id);
+}
+
+function hasPersistentVectorId(document = {}) {
+  const publicId = serializeId(document.id || document.mockId || document._id);
+  const vectorId = vectorDocumentId(document);
+  return Boolean(publicId && vectorId && publicId !== vectorId);
+}
+
+function preferDocumentCandidate(candidate = {}, existing = null) {
+  if (!existing) {
+    return true;
+  }
+
+  if (hasPersistentVectorId(candidate) && !hasPersistentVectorId(existing)) {
+    return true;
+  }
+
+  const candidateChunkCount = candidate.contentStats?.chunkCount || 0;
+  const existingChunkCount = existing.contentStats?.chunkCount || 0;
+  return candidateChunkCount > existingChunkCount;
 }
 
 function resolvedFromFolderIds(document, selectedFolderIds) {
@@ -128,6 +157,7 @@ function enrichDocument(document = {}, folderById = new Map(), selectedFolderIds
   return {
     ...document,
     id: serializeId(document.id || document.mockId || document._id),
+    vectorDocumentId: vectorDocumentId(document),
     folderId,
     folderName: document.folderName || folder?.name || folder?.title || null,
     resolvedFromFolderIds: resolvedFromFolderIds(document, selectedFolderIds),
@@ -135,19 +165,27 @@ function enrichDocument(document = {}, folderById = new Map(), selectedFolderIds
 }
 
 function dedupeDocuments(documents = []) {
-  const seen = new Set();
-  const deduped = [];
+  const byId = new Map();
+  const order = [];
 
   for (const document of documents) {
-    const id = serializeId(document.id || document.mockId || document._id);
-    if (!id || seen.has(id)) {
+    const id = documentDedupeId(document);
+    if (!id) {
       continue;
     }
-    seen.add(id);
-    deduped.push(document);
+    if (!byId.has(id)) {
+      order.push(id);
+      byId.set(id, document);
+      continue;
+    }
+
+    const existing = byId.get(id);
+    if (preferDocumentCandidate(document, existing)) {
+      byId.set(id, document);
+    }
   }
 
-  return deduped;
+  return order.map((id) => byId.get(id));
 }
 
 export async function resolveChatSelection({

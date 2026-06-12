@@ -1,10 +1,10 @@
 import { MessagesSquare } from "lucide-react";
 import { DEMO_FLOW, GUIDE_QUESTIONS } from "@/data/demoCopy";
 
-/** Compact demo steps + three simple prompts that prefill the chat draft. */
+/** Compact demo steps + three simple prompts that select related files and prefill chat. */
 function DemoGuideCard({ ws }) {
-  const askInChat = (q) => {
-    ws.chat.prefillDraftFromSearch(q);
+  const askInChat = (question) => {
+    ws.askSuggestedQuestion(question);
     ws.setActiveTab("chat");
   };
 
@@ -23,19 +23,19 @@ function DemoGuideCard({ ws }) {
 
       <div>
         <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-teal-subtle-foreground">
-          Try asking · prefills the chat
+          Try asking · selects files
         </p>
         <div className="flex flex-col gap-1">
           {GUIDE_QUESTIONS.map((q) => (
             <button
-              key={q}
+              key={q.text}
               type="button"
               onClick={() => askInChat(q)}
-              title="Prefill this prompt in the Chat tab"
+              title="Select related files and prefill this prompt"
               className="group flex items-start gap-1.5 rounded-md border border-teal/30 bg-card px-2 py-1 text-left text-[12px] text-foreground shadow-sm transition-colors hover:border-teal hover:bg-teal-subtle/60"
             >
               <MessagesSquare className="mt-0.5 size-3 shrink-0 text-teal" />
-              {q}
+              {q.text}
             </button>
           ))}
         </div>

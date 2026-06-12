@@ -20,11 +20,21 @@ export const app = express();
 
 app.disable("x-powered-by");
 
+function isLocalDevOrigin(origin) {
+  if (env.NODE_ENV === "production") return false;
+  try {
+    const url = new URL(origin);
+    return ["localhost", "127.0.0.1", "::1"].includes(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
 app.use(helmet());
 app.use(
   cors({
     origin(origin, callback) {
-      if (!origin || env.CLIENT_ORIGINS.includes(origin)) {
+      if (!origin || env.CLIENT_ORIGINS.includes(origin) || isLocalDevOrigin(origin)) {
         callback(null, true);
         return;
       }
@@ -40,6 +50,7 @@ app.use(
     limit: 300,
     standardHeaders: "draft-8",
     legacyHeaders: false,
+    skip: (req) => req.path.startsWith("/api/health"),
   }),
 );
 app.use(express.json({ limit: "1mb" }));

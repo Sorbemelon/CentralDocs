@@ -1,11 +1,13 @@
-import { useRef, useState } from "react";
-import { FileText, Folder, Loader2, MessagesSquare, Quote, Send, Sparkles } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { FileText, Folder, Loader2, MessageSquarePlus, MessagesSquare, Pencil, Quote, Send, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { EmptyState } from "@/components/common/EmptyState";
+import { IconButton } from "@/components/common/IconButton";
 import { LoadingState } from "@/components/common/LoadingState";
+import { MarkdownContent } from "@/components/common/MarkdownContent";
 import { cn } from "@/lib/cn";
 import { DEMO_LIMITS } from "@/lib/constants";
 import { CHAT_SAMPLE_QUESTIONS } from "@/data/demoCopy";
@@ -70,7 +72,6 @@ function UserMessage({ message }) {
 
 function LegacyAssistantMessage({ message, selected, onSelect }) {
   const refs = message.references || [];
-  const meta = message.aiMeta;
   return (
     <div className="flex flex-col items-start gap-1">
       <button
@@ -83,7 +84,7 @@ function LegacyAssistantMessage({ message, selected, onSelect }) {
       >
         {message.content}
       </button>
-      {(refs.length > 0 || meta) && (
+      {refs.length > 0 && (
         <Accordion type="single" className="max-w-[80%]">
           <AccordionItem value="refs">
             <AccordionTrigger className="text-[11px] text-muted-foreground">
@@ -99,13 +100,6 @@ function LegacyAssistantMessage({ message, selected, onSelect }) {
                   {r.locator ? <span className="font-mono"> · {r.locator}</span> : null}
                 </div>
               ))}
-              {meta && (
-                <p className="pt-1 text-[10px] text-muted-foreground">
-                  {[meta.model, meta.latencyMs != null ? `${meta.latencyMs} ms` : null, meta.fallbackUsed ? "fallback" : null]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </p>
-              )}
             </AccordionContent>
           </AccordionItem>
         </Accordion>
@@ -164,7 +158,6 @@ function formatReferencePath(ref) {
 
 function AssistantMessage({ message, selected, onSelect }) {
   const refs = message.references || [];
-  const meta = message.aiMeta;
   const [refsOpen, setRefsOpen] = useState("");
   const [focusedRefNumber, setFocusedRefNumber] = useState(null);
   const refNodes = useRef(new Map());
@@ -197,9 +190,9 @@ function AssistantMessage({ message, selected, onSelect }) {
           selected && "ring-2 ring-primary/25 ring-offset-1 ring-offset-background",
         )}
       >
-        <AnswerContent content={message.content} refs={refs} onCitationClick={focusReference} />
+        <MarkdownContent content={message.content} references={refs} onCitationClick={focusReference} />
       </div>
-      {(refs.length > 0 || meta) && (
+      {refs.length > 0 && (
         <Accordion type="single" value={refsOpen} onValueChange={setRefsOpen} className="max-w-[80%] items-start">
           <AccordionItem value="refs" className="flex flex-col items-start">
             <AccordionTrigger className="w-auto justify-start gap-1 text-[11px] text-muted-foreground">
@@ -233,13 +226,6 @@ function AssistantMessage({ message, selected, onSelect }) {
                   </div>
                 </div>
               ))}
-              {meta && (
-                <p className="pt-1 text-[10px] text-muted-foreground">
-                  {[meta.model, meta.latencyMs != null ? `${meta.latencyMs} ms` : null, meta.fallbackUsed ? "fallback" : null]
-                    .filter(Boolean)
-                    .join(" - ")}
-                </p>
-              )}
             </AccordionContent>
           </AccordionItem>
         </Accordion>
@@ -262,6 +248,7 @@ function PendingAssistant({ step }) {
 function ChatPanelShell({ ws }) {
   const chat = ws.chat;
   const offline = !ws.online;
+  const hasActiveChat = Boolean(ws.activeChat);
   const noRealChat = !ws.activeChat || ws.activeChat.local;
   const hasMessages = (chat.messages?.length || 0) > 0;
   const canGenerate = !offline && !noRealChat && hasMessages;
@@ -273,9 +260,14 @@ function ChatPanelShell({ ws }) {
         ? "Send a message first"
         : undefined;
   const draft = chat.draft;
+  const bottomRef = useRef(null);
   const tooLong = draft.length > DEMO_LIMITS.promptLength;
   const canSend = Boolean(draft.trim()) && !offline && !noRealChat && ws.hasContext && !chat.isSending && !tooLong;
   const showCount = draft.length > DEMO_LIMITS.promptLength * 0.8;
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ block: "end", behavior: "smooth" });
+  }, [chat.messages, chat.isSending, chat.pendingStep]);
 
   const onKeyDown = (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -284,11 +276,49 @@ function ChatPanelShell({ ws }) {
     }
   };
 
+  if (!hasActiveChat) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col gap-2.5">
+        <ScrollArea className="min-h-0 flex-1 rounded-lg border border-border bg-card shadow-sm">
+          <div className="flex min-h-full items-center justify-center p-3">
+            <EmptyState
+              icon={MessagesSquare}
+              title="No chat yet"
+              description="Create a chat when you are ready to ask questions against selected sources."
+              action={
+                <Button size="sm" onClick={ws.newChat} disabled={ws.loading?.chats}>
+                  <MessageSquarePlus /> New Chat
+                </Button>
+              }
+              className="w-full max-w-sm"
+            />
+          </div>
+        </ScrollArea>
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2.5">
       <div className="shrink-0 flex flex-wrap items-center justify-between gap-2">
-        <h3 className="min-w-0 truncate text-sm font-semibold">{ws.activeChat?.title || "New chat"}</h3>
-        <Button size="sm" variant="teal" onClick={ws.openGenerateModal} disabled={!canGenerate} title={generateReason}>
+        <div className="flex min-w-0 items-center gap-1">
+          <h3 className="min-w-0 truncate text-sm font-semibold">{ws.activeChat.title}</h3>
+          <IconButton
+            icon={Pencil}
+            label="Rename chat"
+            size="icon-xs"
+            onClick={() => ws.requestRename({ kind: "chat", target: ws.activeChat.id, title: ws.activeChat.title })}
+            disabled={noRealChat}
+            className="shrink-0 text-muted-foreground hover:text-primary"
+          />
+        </div>
+        <Button
+          size="sm"
+          onClick={ws.openGenerateModal}
+          disabled={!canGenerate}
+          title={generateReason}
+          className="bg-[linear-gradient(100deg,var(--primary)_0%,var(--primary)_38%,var(--teal)_100%)] text-primary-foreground hover:opacity-95"
+        >
           <Sparkles /> Generate Document
         </Button>
       </div>
@@ -312,9 +342,13 @@ function ChatPanelShell({ ws }) {
                 ),
               )}
               {chat.isSending && <PendingAssistant step={chat.pendingStep} />}
+              <div ref={bottomRef} />
             </>
           ) : chat.isSending ? (
-            <PendingAssistant step={chat.pendingStep} />
+            <>
+              <PendingAssistant step={chat.pendingStep} />
+              <div ref={bottomRef} />
+            </>
           ) : (
             <EmptyState
               icon={MessagesSquare}
@@ -322,14 +356,14 @@ function ChatPanelShell({ ws }) {
               description="Answers are grounded in the documents you tick in the source tree, with references."
               action={
                 <div className="flex flex-col gap-1">
-                  {CHAT_SAMPLE_QUESTIONS.slice(0, 4).map((q) => (
+                  {CHAT_SAMPLE_QUESTIONS.slice(0, 3).map((q) => (
                     <button
-                      key={q}
+                      key={q.text}
                       type="button"
-                      onClick={() => chat.setDraft(q)}
+                      onClick={() => ws.askSuggestedQuestion(q)}
                       className="rounded-md border border-border bg-card/60 px-2 py-1 text-left text-[12px] text-foreground transition-colors hover:border-primary/40 hover:bg-accent/60"
                     >
-                      {q}
+                      {q.text}
                     </button>
                   ))}
                 </div>
@@ -353,6 +387,7 @@ function ChatPanelShell({ ws }) {
             maxLength={DEMO_LIMITS.promptLength + 200}
             placeholder="Ask about selected documents..."
             aria-label="Chat prompt"
+            disabled={chat.isSending}
             className="min-h-0 resize-none border-0 bg-transparent p-1 shadow-none focus-visible:ring-0"
           />
           <div className="flex items-center justify-between gap-2 pt-1">
@@ -376,7 +411,7 @@ function ChatPanelShell({ ws }) {
                 disabled={!canSend}
                 title={offline ? "Backend is offline" : undefined}
               >
-                {chat.isSending ? <Loader2 className="animate-spin" /> : <Send />} Send
+                <Send /> Send
               </Button>
             </div>
           </div>

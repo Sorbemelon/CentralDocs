@@ -111,6 +111,22 @@ export async function countGeneratedDocumentsByDemoSession({ demoSessionId } = {
   });
 }
 
+export async function listGeneratedDocumentFilenamesByDemoSession({ demoSessionId } = {}) {
+  requirePersistence();
+  const documents = await Document.find({
+    demoSessionId,
+    scope: DOCUMENT_SCOPE.GENERATED,
+    sourceType: SOURCE_TYPE.GENERATED,
+    lifecycleStatus: LIFECYCLE_STATUS.ACTIVE,
+  })
+    .select({ downloadFilename: 1, originalFilename: 1 })
+    .lean();
+
+  return documents
+    .map((document) => document.downloadFilename || document.originalFilename)
+    .filter(Boolean);
+}
+
 export async function updateGeneratedDocumentIndexingFields({
   documentId,
   demoSessionId,
@@ -161,6 +177,18 @@ export function createMemoryGeneratedDocumentRepository({ seed = [] } = {}) {
           document.sourceType === SOURCE_TYPE.GENERATED &&
           document.lifecycleStatus !== LIFECYCLE_STATUS.TRASHED,
       ).length;
+    },
+    async listGeneratedDocumentFilenamesByDemoSession({ demoSessionId } = {}) {
+      return [...documents.values()]
+        .filter(
+          (document) =>
+            document.demoSessionId === demoSessionId &&
+            document.scope === DOCUMENT_SCOPE.GENERATED &&
+            document.sourceType === SOURCE_TYPE.GENERATED &&
+            document.lifecycleStatus !== LIFECYCLE_STATUS.TRASHED,
+        )
+        .map((document) => document.downloadFilename || document.originalFilename)
+        .filter(Boolean);
     },
     async updateGeneratedDocumentIndexingFields({ documentId, patch = {} } = {}) {
       const record = documents.get(String(documentId));

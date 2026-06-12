@@ -6,7 +6,13 @@ import {
   CHAT_SESSION_LIMITS,
 } from "../../constants/chatSession.constants.js";
 import { createHttpError, HttpError } from "../../utils/httpError.js";
-import { assertCanCreateChat, getRemainingLimits } from "../demo/demoUsage.service.js";
+import { applyDemoSessionUsageDelta, getDemoSession } from "../demo/demoSession.service.js";
+import {
+  assertCanCreateChat,
+  buildChatLifecycleUsageDelta,
+  getRemainingLimits,
+  getUsageSnapshot,
+} from "../demo/demoUsage.service.js";
 import * as defaultChatMessageRepository from "./chatMessage.repository.js";
 import * as defaultChatSessionRepository from "./chatSession.repository.js";
 import { toChatMessageDtos } from "./chatMessage.dto.js";
@@ -18,6 +24,8 @@ const defaultDependencies = Object.freeze({
   chatMessageRepository: defaultChatMessageRepository,
   messageDtoMapper: toChatMessageDtos,
   selectionResolver: resolveChatSelection,
+  demoSessionReader: getDemoSession,
+  demoSessionUsageUpdater: applyDemoSessionUsageDelta,
   now: () => new Date(),
 });
 
@@ -75,6 +83,38 @@ export function validateChatTitle(title, { required = false } = {}) {
   return trimmed;
 }
 
+function getChatPublicId(chat) {
+  return String(chat?.id || chat?._id || "");
+}
+
+export function buildUniqueChatTitle(preferredTitle, existingChats = [], { excludeChatId = null } = {}) {
+  const baseTitle = validateChatTitle(preferredTitle);
+  const excludedId = excludeChatId ? String(excludeChatId) : null;
+  const existing = new Set(
+    existingChats
+      .filter((chat) => !excludedId || getChatPublicId(chat) !== excludedId)
+      .map((chat) => String(chat?.title || "").trim().toLowerCase())
+      .filter(Boolean),
+  );
+
+  if (!existing.has(baseTitle.toLowerCase())) {
+    return baseTitle;
+  }
+
+  for (let index = 2; index <= existing.size + 2; index += 1) {
+    const suffix = ` (${index})`;
+    const stemMax = CHAT_SESSION_LIMITS.maxTitleLength - suffix.length;
+    const stem = baseTitle.slice(0, stemMax).trimEnd() || CHAT_SESSION_DEFAULTS.title;
+    const candidate = `${stem}${suffix}`;
+    if (!existing.has(candidate.toLowerCase())) {
+      return candidate;
+    }
+  }
+
+  const suffix = ` (${Date.now()})`;
+  return `${baseTitle.slice(0, CHAT_SESSION_LIMITS.maxTitleLength - suffix.length).trimEnd()}${suffix}`;
+}
+
 function toChatSessionLimitError(error) {
   if (error instanceof HttpError && error.code === "DEMO_LIMIT_REACHED") {
     return createHttpError(
@@ -87,9 +127,9 @@ function toChatSessionLimitError(error) {
   return error;
 }
 
-function assertChatSessionLimit(count) {
+function assertChatSessionLimit(usageSource) {
   try {
-    assertCanCreateChat({ usage: { chatSessions: count } });
+    assertCanCreateChat(usageSource);
   } catch (error) {
     throw toChatSessionLimitError(error);
   }
@@ -111,15 +151,49 @@ function countChatStates(chats = []) {
   );
 }
 
-function buildChatLimitSummary(activeSessionCount) {
+async function getChatUsageSession({ deps, demoSessionId, activeSessionCount = 0 } = {}) {
+  const session = await deps.demoSessionReader?.(demoSessionId);
+  const usage = getUsageSnapshot(session || { usage: { chatSessions: activeSessionCount } });
+
+  return {
+    ...(session || {}),
+    usage: {
+      ...usage,
+      chatSessions: Math.max(usage.chatSessions, activeSessionCount),
+    },
+  };
+}
+
+async function buildChatLimitSummary({ deps, demoSessionId, activeSessionCount }) {
+  const usageSession = await getChatUsageSession({ deps, demoSessionId, activeSessionCount });
+
   return {
     limits: { ...DEMO_LIMITS },
-    remaining: getRemainingLimits({
-      usage: {
-        chatSessions: activeSessionCount,
-      },
-    }),
+    remaining: getRemainingLimits(usageSession),
   };
+}
+
+async function applyChatLifecycleUsageDelta({
+  deps,
+  demoSessionId,
+  direction,
+} = {}) {
+  try {
+    const delta = buildChatLifecycleUsageDelta(direction);
+    if (Object.keys(delta).length === 0) {
+      return null;
+    }
+
+    const session = await deps.demoSessionUsageUpdater?.(demoSessionId, delta);
+    return session
+      ? {
+          usage: getUsageSnapshot(session),
+          remaining: getRemainingLimits(session),
+        }
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 function assertChatFound(chat) {
@@ -150,7 +224,11 @@ export async function listSavedChatSessions({
   return {
     chats: toChatSessionDtos(visibleChats),
     counts,
-    ...buildChatLimitSummary(visibleChats.length),
+    ...(await buildChatLimitSummary({
+      deps,
+      demoSessionId,
+      activeSessionCount: visibleChats.length,
+    })),
   };
 }
 
@@ -164,7 +242,13 @@ export async function createSavedChatSession({
   const activeCount = await deps.chatSessionRepository.countActiveChatSessionsByDemoSession({
     demoSessionId,
   });
-  assertChatSessionLimit(activeCount);
+  assertChatSessionLimit(
+    await getChatUsageSession({
+      deps,
+      demoSessionId,
+      activeSessionCount: activeCount,
+    }),
+  );
 
   const selection = await deps.selectionResolver({
     demoSessionId,
@@ -172,16 +256,26 @@ export async function createSavedChatSession({
     selectedFolderIds: body.selectedFolderIds,
     repositories: deps.selectionRepositories || {},
   });
+  const activeChats = await deps.chatSessionRepository.listChatSessionsByDemoSession({
+    demoSessionId,
+    includeTrash: false,
+  });
   const chat = await deps.chatSessionRepository.createChatSession({
     demoSessionId,
-    title: validateChatTitle(body.title),
+    title: buildUniqueChatTitle(body.title, activeChats),
     selectedDocumentIds: selection.selectedDocumentIds,
     selectedFolderIds: selection.selectedFolderIds,
+  });
+  const usagePatch = await applyChatLifecycleUsageDelta({
+    deps,
+    demoSessionId,
+    direction: "create",
   });
 
   return {
     chat: toChatSessionDto(chat, { resolvedDocumentCount: selection.resolvedDocuments.length }),
     selection: toSelectionDto(selection),
+    ...(usagePatch || {}),
   };
 }
 
@@ -238,7 +332,13 @@ export async function updateSavedChatSession({
 
   const patch = {};
   if (body.title !== undefined) {
-    patch.title = validateChatTitle(body.title, { required: true });
+    const activeChats = await deps.chatSessionRepository.listChatSessionsByDemoSession({
+      demoSessionId,
+      includeTrash: false,
+    });
+    patch.title = buildUniqueChatTitle(validateChatTitle(body.title, { required: true }), activeChats, {
+      excludeChatId: chatId,
+    });
   }
   if (body.archived !== undefined) {
     patch.archivedAt = body.archived ? deps.now() : null;
@@ -273,10 +373,16 @@ export async function deleteSavedChatSession({
   const trashed = assertChatFound(
     await deps.chatSessionRepository.softDeleteChatSession({ chatId, demoSessionId }),
   );
+  const usagePatch = await applyChatLifecycleUsageDelta({
+    deps,
+    demoSessionId,
+    direction: "delete",
+  });
 
   return {
     status: "trashed",
     chat: toChatSessionDto(trashed),
+    ...(usagePatch || {}),
   };
 }
 

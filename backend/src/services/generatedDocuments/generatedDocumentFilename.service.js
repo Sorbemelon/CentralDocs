@@ -1,6 +1,7 @@
 import path from "node:path";
 import {
   GENERATED_DOCUMENT_CONTENT_TYPE,
+  GENERATED_DOCUMENT_DEFAULT_FILENAME,
   GENERATED_DOCUMENT_ERROR_CODE,
   GENERATED_DOCUMENT_FILE_KIND,
   GENERATED_DOCUMENT_FORMAT,
@@ -50,8 +51,36 @@ function capFilenameLength(filename) {
   return `${basename.slice(0, basenameLimit)}${extension}`;
 }
 
-export function normalizeGeneratedDocumentFilename(filename = "generated-document.md") {
-  const raw = String(filename || "").trim() || "generated-document.md";
+export function buildUniqueGeneratedDocumentFilename(
+  filename,
+  existingFilenames = [],
+  maxLength = GENERATED_DOCUMENT_LIMITS.maxFilenameLength,
+) {
+  const normalizedExisting = new Set(
+    existingFilenames.map((value) => String(value || "").trim().toLowerCase()).filter(Boolean),
+  );
+  if (!normalizedExisting.has(String(filename || "").toLowerCase())) {
+    return filename;
+  }
+
+  const extension = path.extname(filename);
+  const basename = path.basename(filename, extension);
+  for (let index = 2; index <= existingFilenames.length + 2; index += 1) {
+    const suffix = ` (${index})`;
+    const basenameLimit = Math.max(1, maxLength - extension.length - suffix.length);
+    const candidate = `${basename.slice(0, basenameLimit).trimEnd()}${suffix}${extension}`;
+    if (!normalizedExisting.has(candidate.toLowerCase())) {
+      return candidate;
+    }
+  }
+
+  return filename;
+}
+
+export function normalizeGeneratedDocumentFilename(filename = GENERATED_DOCUMENT_DEFAULT_FILENAME, {
+  existingFilenames = [],
+} = {}) {
+  const raw = String(filename || "").trim() || GENERATED_DOCUMENT_DEFAULT_FILENAME;
   assertNoPathSegments(raw);
 
   const extensionWithDot = path.extname(raw);
@@ -71,7 +100,10 @@ export function normalizeGeneratedDocumentFilename(filename = "generated-documen
     );
   }
 
-  const sanitized = capFilenameLength(sanitizeFilename(`${basename}.${extension}`));
+  const sanitized = buildUniqueGeneratedDocumentFilename(
+    capFilenameLength(sanitizeFilename(`${basename}.${extension}`)),
+    existingFilenames,
+  );
   const finalExtension = path.extname(sanitized).replace(".", "").toLowerCase();
   if (!GENERATED_DOCUMENT_FORMATS.includes(finalExtension)) {
     rejectUnsupportedFormat();

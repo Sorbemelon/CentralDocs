@@ -5,6 +5,7 @@ process.env.NODE_ENV = "test";
 process.env.MONGODB_URI = "";
 
 const {
+  buildUniqueFolderName,
   createFolder,
   listFolderDocuments,
   listFolders,
@@ -43,6 +44,24 @@ test("folder write service requires persistence and rejects mock edits", async (
     () => renameFolder({ folderId: strategyFolderId, demoSessionId: "demo_test", name: "New" }),
     { code: "READ_ONLY_RESOURCE", statusCode: 403 },
   );
+});
+
+test("folder creation helper builds unique sibling names", () => {
+  assert.equal(buildUniqueFolderName("New folder", []), "New folder");
+  assert.equal(buildUniqueFolderName("New folder", ["New folder"]), "New folder (2)");
+  assert.equal(
+    buildUniqueFolderName("New folder", ["New folder", "New folder (2)", "New folder (3)"]),
+    "New folder (4)",
+  );
+  assert.equal(buildUniqueFolderName("New folder", ["new folder"]), "New folder (2)");
+});
+
+test("folder creation helper keeps numbered names within max length", () => {
+  const longName = "A".repeat(120);
+  const unique = buildUniqueFolderName(longName, [longName]);
+
+  assert.equal(unique.length, 120);
+  assert.match(unique, / \(2\)$/);
 });
 
 test("folder DTO hides raw internals", () => {

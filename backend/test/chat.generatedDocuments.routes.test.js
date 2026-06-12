@@ -161,15 +161,15 @@ test("POST /api/chats/:chatId/generated-documents returns generated document res
   assert.equal(JSON.stringify(response.body).includes("demo-sessions/demo_123"), false);
 });
 
-test("generated document route returns JSON validation errors", async () => {
+test("generated document route accepts empty instruction and returns filename validation errors", async () => {
   installRouteDependencies();
 
   const empty = await request(app)
     .post("/api/chats/chat_1/generated-documents")
     .set("x-demo-session-id", "demo_123")
     .send({ instruction: "" })
-    .expect(400);
-  assert.equal(empty.body.error.code, "GENERATED_DOCUMENT_INSTRUCTION_EMPTY");
+    .expect(201);
+  assert.match(empty.body.document.generatedMeta.generationInstruction, /Summarize this chat/i);
 
   const unsupported = await request(app)
     .post("/api/chats/chat_1/generated-documents")

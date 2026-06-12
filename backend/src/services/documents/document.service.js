@@ -15,12 +15,15 @@ import { Document } from "../../models/Document.model.js";
 import { Folder } from "../../models/Folder.model.js";
 import { isMockDocumentId, isMockFolderId } from "../../utils/ids.js";
 import { createHttpError } from "../../utils/httpError.js";
+import { listChunksForDocument } from "../indexing/documentChunk.repository.js";
 import {
   activeOnlyFilter,
   buildRestorePatch,
   buildSoftDeletePatch,
   isTrashedLifecycle,
 } from "../lifecycle/softDelete.service.js";
+import { applyDemoSessionUsageDelta } from "../demo/demoSession.service.js";
+import { buildDocumentLifecycleUsageDelta } from "../demo/demoUsage.service.js";
 import {
   findMockDocumentById,
   findMockFolderById,
@@ -124,8 +127,46 @@ function buildDocumentFilter(query = {}, demoSessionId = null) {
   return filter;
 }
 
+function capPreviewText(text = "") {
+  return String(text || "").slice(0, 8000);
+}
+
+async function buildChunkPreviewText(documentId) {
+  try {
+    const chunks = await listChunksForDocument({ documentId });
+    const text = chunks
+      .map((chunk) => String(chunk.content || "").trim())
+      .filter(Boolean)
+      .slice(0, 8)
+      .join("\n\n");
+    return capPreviewText(text);
+  } catch {
+    return null;
+  }
+}
+
 export function getDocumentPersistenceStatus() {
   return getMongoStatus();
+}
+
+async function applyDocumentLifecycleUsageDelta({
+  document,
+  demoSessionId,
+  direction,
+} = {}) {
+  const delta = buildDocumentLifecycleUsageDelta(
+    document?.toObject ? document.toObject() : document,
+    direction,
+  );
+  if (Object.keys(delta).length === 0) {
+    return null;
+  }
+
+  try {
+    return await applyDemoSessionUsageDelta(demoSessionId, delta);
+  } catch {
+    return null;
+  }
 }
 
 export async function listDocuments({ query = {}, demoSessionId = null } = {}) {
@@ -159,7 +200,12 @@ export async function getDocumentById({ documentId, query = {}, demoSessionId = 
       throw createHttpError(404, "Document was not found.", "DOCUMENT_NOT_FOUND");
     }
 
-    return toDocumentDto(mockDocument, { includePreview: true });
+    const dto = toDocumentDto(mockDocument, { includePreview: true });
+    const preview = await getMockDocumentPreview(documentId);
+    if (preview?.previewText) {
+      dto.extractedTextPreview = preview.previewText;
+    }
+    return dto;
   }
 
   if (isMockDocumentId(documentId)) {
@@ -208,14 +254,19 @@ export async function getDocumentPreviewById({ documentId, demoSessionId = null 
     throw createHttpError(404, "Document was not found.", "DOCUMENT_NOT_FOUND");
   }
 
+  const chunkPreview = document.extractedTextPreview
+    ? null
+    : await buildChunkPreviewText(document._id);
+  const extractedTextPreview = document.extractedTextPreview || chunkPreview || null;
+
   return {
     id: String(document._id),
     title: document.title,
     fileKind: document.fileKind,
     folderName: null,
-    extractedTextPreview: document.extractedTextPreview || null,
-    previewUnavailable: !document.extractedTextPreview,
-    reason: document.extractedTextPreview ? null : "preview_not_available",
+    extractedTextPreview,
+    previewUnavailable: !extractedTextPreview,
+    reason: extractedTextPreview ? null : "preview_not_available",
   };
 }
 
@@ -275,6 +326,7 @@ export async function softDeleteDocument({ documentId, demoSessionId } = {}) {
     throw createHttpError(403, "Read-only documents cannot be deleted.", "READ_ONLY_RESOURCE");
   }
 
+  const wasActive = document.lifecycleStatus === LIFECYCLE_STATUS.ACTIVE;
   Object.assign(
     document,
     buildSoftDeletePatch({
@@ -284,6 +336,13 @@ export async function softDeleteDocument({ documentId, demoSessionId } = {}) {
     }),
   );
   await document.save();
+  if (wasActive) {
+    await applyDocumentLifecycleUsageDelta({
+      document,
+      demoSessionId,
+      direction: "delete",
+    });
+  }
 
   return toDocumentDto(document);
 }
@@ -298,8 +357,16 @@ export async function restoreDocument({ documentId, demoSessionId } = {}) {
     throw createHttpError(404, "Document was not found.", "DOCUMENT_NOT_FOUND");
   }
 
+  const wasTrashed = document.lifecycleStatus === LIFECYCLE_STATUS.TRASHED;
   Object.assign(document, buildRestorePatch({ restoreFolderId: null }));
   await document.save();
+  if (wasTrashed) {
+    await applyDocumentLifecycleUsageDelta({
+      document,
+      demoSessionId,
+      direction: "restore",
+    });
+  }
 
   return toDocumentDto(document);
 }

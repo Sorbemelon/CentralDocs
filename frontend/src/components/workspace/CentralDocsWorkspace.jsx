@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { cn } from "@/lib/cn";
-import { SOURCE_FILTER, SOURCE_KIND } from "@/lib/constants";
+import { clearDemoSessionId } from "@/lib/apiClient";
+import { DEMO_LIMITS, SOURCE_FILTER, SOURCE_KIND } from "@/lib/constants";
 import {
   isLocalChatId,
   normalizeChat,
@@ -40,13 +42,26 @@ import { MainWorkspacePanel } from "./MainWorkspacePanel";
 import { RightContextPanel } from "./RightContextPanel";
 import { GenerateDocumentModalShell } from "./GenerateDocumentModalShell";
 
+function buildUniqueFolderName(baseName, existingNames = []) {
+  const normalizedExisting = new Set(existingNames.map((name) => String(name || "").trim().toLowerCase()));
+  if (!normalizedExisting.has(baseName.toLowerCase())) return baseName;
+
+  for (let index = 2; index <= existingNames.length + 2; index += 1) {
+    const candidate = `${baseName} (${index})`;
+    if (!normalizedExisting.has(candidate.toLowerCase())) return candidate;
+  }
+
+  return `${baseName} (${Date.now()})`;
+}
+
 /**
  * One compact workspace route. Wires backend folders/documents/trash/chats,
  * demo session/bootstrap, upload, search, RAG chat, generated documents, and
  * management actions while degrading gracefully to the offline fallback.
  */
 export default function CentralDocsWorkspace() {
-  const demo = useDemoSession();
+  const navigate = useNavigate();
+  const demo = useDemoSession({ requireExistingSession: true });
   const online = demo.online;
 
   const [activeTab, setActiveTab] = useState("chat");
@@ -60,6 +75,10 @@ export default function CentralDocsWorkspace() {
 
   const wsData = useWorkspaceData({ online, bootstrap: demo.bootstrap, filter: sourceFilter });
   const chats = useChatSessions({ online });
+
+  useEffect(() => {
+    if (demo.needsLaunch) navigate("/", { replace: true });
+  }, [demo.needsLaunch, navigate]);
 
   // Persist selection to the active backend chat (no-op offline / local chat).
   const persistSelection = useCallback(
@@ -75,12 +94,6 @@ export default function CentralDocsWorkspace() {
   );
 
   const selection = useSelectedContext({ onPersist: persistSelection });
-  const { setFromChat } = selection;
-
-  // Hydrate selected context from the active chat's persisted selection.
-  useEffect(() => {
-    if (chats.activeSelection) setFromChat(chats.activeSelection);
-  }, [chats.activeSelection, setFromChat]);
 
   // Semantic search (Search tab) — defaults to the active chat's selected context.
   const search = useSemanticSearch({
@@ -89,15 +102,23 @@ export default function CentralDocsWorkspace() {
     selectedFolderIds: selection.folderIds,
   });
 
-  // Merge only the prompt counter from a chat response (other counters stay).
-  const mergePromptUsage = useCallback(
-    (aiPrompts) => {
+  const applyUsageSnapshot = useCallback(
+    (snapshot) => {
+      if (!snapshot) return;
       setUsageOverride((prev) => {
         const base = prev ?? demo.usage;
-        return { ...base, prompts: { ...base.prompts, used: aiPrompts } };
+        return normalizeUsageFromSnapshot(snapshot, base);
       });
     },
     [demo.usage],
+  );
+
+  // Merge only the prompt counter from a chat response (other counters stay).
+  const mergePromptUsage = useCallback(
+    (aiPrompts) => {
+      applyUsageSnapshot({ aiPrompts });
+    },
+    [applyUsageSnapshot],
   );
 
   // RAG chat (Chat tab) — sends with the active chat's selected context.
@@ -108,16 +129,18 @@ export default function CentralDocsWorkspace() {
     selectedFolderIds: selection.folderIds,
     onChatUpdated: (chatDto) => chats.applyChat(normalizeChat(chatDto)),
     onPromptUsage: mergePromptUsage,
+    onUsageSnapshot: applyUsageSnapshot,
   });
 
   // Generate Document (Chat header) — turns the active chat into a saved document.
   const generate = useGeneratedDocuments({
     online,
     activeChatId: chats.activeChatId,
+    existingGeneratedDocuments: wsData.generated,
     onGenerated: (doc, res) => {
       wsData.applyDocument(doc);
       wsData.reloadActive();
-      if (res?.usage) setUsageOverride(normalizeUsageFromSnapshot(res.usage));
+      if (res?.usage) applyUsageSnapshot(res.usage);
     },
   });
 
@@ -137,6 +160,97 @@ export default function CentralDocsWorkspace() {
     return map;
   }, [folders]);
 
+  const getDescendantFolderIds = useCallback(
+    (folderId) => {
+      const ids = [];
+      const walk = (id) => {
+        (folderChildren.get(id) || []).forEach((child) => {
+          ids.push(child.id);
+          walk(child.id);
+        });
+      };
+      walk(folderId);
+      return ids;
+    },
+    [folderChildren],
+  );
+
+  const getFolderLineage = useCallback(
+    (folderId) => {
+      const lineage = [];
+      let current = getFolderById(folderId);
+      const visited = new Set();
+      while (current?.parentFolderId && !visited.has(current.parentFolderId)) {
+        visited.add(current.parentFolderId);
+        lineage.push(current.parentFolderId);
+        current = getFolderById(current.parentFolderId);
+      }
+      return lineage;
+    },
+    [getFolderById],
+  );
+
+  const normalizeSelectionForHierarchy = useCallback(
+    ({ selectedDocumentIds = [], selectedFolderIds = [] } = {}) => {
+      const folderSet = new Set(selectedFolderIds);
+      const prunedFolderIds = [...folderSet].filter(
+        (folderId) => !getFolderLineage(folderId).some((ancestorId) => folderSet.has(ancestorId)),
+      );
+      const effectiveFolders = new Set(prunedFolderIds);
+      prunedFolderIds.forEach((folderId) => {
+        getDescendantFolderIds(folderId).forEach((descendantId) => effectiveFolders.add(descendantId));
+      });
+      const prunedDocumentIds = [...new Set(selectedDocumentIds)].filter((docId) => {
+        const doc = documents.find((item) => item.id === docId);
+        return !doc || !effectiveFolders.has(doc.folderId);
+      });
+
+      return {
+        selectedDocumentIds: prunedDocumentIds,
+        selectedFolderIds: prunedFolderIds,
+      };
+    },
+    [documents, getDescendantFolderIds, getFolderLineage],
+  );
+
+  const countEffectiveContextDocuments = useCallback(
+    ({ selectedDocumentIds = [], selectedFolderIds = [] } = {}) => {
+      const effectiveFolders = new Set(selectedFolderIds);
+      selectedFolderIds.forEach((folderId) => {
+        getDescendantFolderIds(folderId).forEach((descendantId) => effectiveFolders.add(descendantId));
+      });
+
+      const docSet = new Set(selectedDocumentIds);
+      documents.forEach((doc) => {
+        if (effectiveFolders.has(doc.folderId)) docSet.add(doc.id);
+      });
+      return docSet.size;
+    },
+    [documents, getDescendantFolderIds],
+  );
+
+  const canApplyContextSelection = useCallback(
+    (nextSelection) => {
+      const nextCount = countEffectiveContextDocuments(nextSelection);
+      const limit = DEMO_LIMITS.contextSelectionDocumentLimit;
+
+      if (nextCount > limit) {
+        toast.error(`Select up to ${limit} documents`, {
+          description: "Remove a source before adding more context.",
+        });
+        return false;
+      }
+
+      return true;
+    },
+    [countEffectiveContextDocuments],
+  );
+
+  // Hydrate selected context from the active chat's persisted selection.
+  useEffect(() => {
+    if (chats.activeSelection) selection.setFromChat(normalizeSelectionForHierarchy(chats.activeSelection));
+  }, [chats.activeSelection, normalizeSelectionForHierarchy, selection.setFromChat]);
+
   // --- selection wrappers (toast + local/remote handled by the hook) ---
   const attach = useCallback(
     (kind, id) => {
@@ -146,15 +260,45 @@ export default function CentralDocsWorkspace() {
           toast.error("This document isn't ready to attach yet.");
           return;
         }
-        selection.attach(kind, id, { attachable: doc ? doc.attachable : undefined });
+        const next = normalizeSelectionForHierarchy({
+          selectedDocumentIds: [...selection.docIds, id],
+          selectedFolderIds: selection.folderIds,
+        });
+        if (!canApplyContextSelection(next)) return;
+        selection.setFromChat(next);
+        persistSelection(next.selectedDocumentIds, next.selectedFolderIds);
       } else {
-        selection.attach(kind, id);
+        const next = normalizeSelectionForHierarchy({
+          selectedDocumentIds: selection.docIds,
+          selectedFolderIds: [...selection.folderIds, id],
+        });
+        if (!canApplyContextSelection(next)) return;
+        selection.setFromChat(next);
+        persistSelection(next.selectedDocumentIds, next.selectedFolderIds);
       }
       toast.success(kind === "folder" ? "Folder attached to context" : "Document attached to context");
     },
-    [selection, documents],
+    [selection, documents, normalizeSelectionForHierarchy, canApplyContextSelection, persistSelection],
   );
-  const detach = selection.detach;
+  const detach = useCallback(
+    (kind, id) => {
+      if (kind === "folder") {
+        const folderIdsToRemove = new Set([id, ...getDescendantFolderIds(id)]);
+        const docIdsToRemove = new Set(
+          documents.filter((doc) => folderIdsToRemove.has(doc.folderId)).map((doc) => doc.id),
+        );
+        const next = {
+          selectedDocumentIds: selection.docIds.filter((docId) => !docIdsToRemove.has(docId)),
+          selectedFolderIds: selection.folderIds.filter((folderId) => !folderIdsToRemove.has(folderId)),
+        };
+        selection.setFromChat(next);
+        persistSelection(next.selectedDocumentIds, next.selectedFolderIds);
+        return;
+      }
+      selection.detach(kind, id);
+    },
+    [documents, getDescendantFolderIds, persistSelection, selection],
+  );
   const clearSelection = selection.clear;
 
   // Refresh demo usage after actions that change counts (delete/restore have no usage in their response).
@@ -162,11 +306,13 @@ export default function CentralDocsWorkspace() {
     if (!online) return;
     try {
       const res = await getDemoSession();
-      if (res?.session) setUsageOverride(normalizeUsage(res.session));
+      if (res?.session) {
+        setUsageOverride((prev) => normalizeUsageFromSnapshot(res.session.usage, prev ?? demo.usage));
+      }
     } catch {
       /* keep previous usage values */
     }
-  }, [online]);
+  }, [demo.usage, online]);
 
   const notifyBackendRequired = useCallback((action = "This action") => {
     toast.error(`${action} needs the backend.`, {
@@ -286,7 +432,7 @@ export default function CentralDocsWorkspace() {
         const doc = normalizeDocument(res.document);
         wsData.applyDocument(doc);
         wsData.reloadActive();
-        if (res.usage) setUsageOverride(normalizeUsageFromSnapshot(res.usage));
+        if (res.usage) applyUsageSnapshot(res.usage);
         const failed = doc.status === "failed";
         setOperation({
           kind: "upload",
@@ -304,7 +450,7 @@ export default function CentralDocsWorkspace() {
         return { ok: false, error: err };
       }
     },
-    [online, notifyBackendRequired, wsData],
+    [online, notifyBackendRequired, wsData, applyUsageSnapshot],
   );
 
   const retryDocument = useCallback(
@@ -337,17 +483,23 @@ export default function CentralDocsWorkspace() {
     async (parentFolderId) => {
       if (!online) return notifyBackendRequired("Create folder");
       try {
+        const targetParentId = parentFolderId || null;
+        const siblingNames = folders
+          .filter((folder) => !folder.readOnly && (folder.parentFolderId || null) === targetParentId)
+          .map((folder) => folder.name);
+        const name = buildUniqueFolderName("New folder", siblingNames);
         await apiCreateFolder({
-          name: "New folder",
+          name,
           ...(parentFolderId ? { parentFolderId } : {}),
         });
-        toast.success("Folder created");
-        wsData.reloadActive();
+        toast.success(`Folder created: ${name}`);
+        await wsData.reloadActive();
+        refreshUsage();
       } catch (err) {
         toast.error(err?.message || "Couldn't create the folder");
       }
     },
-    [online, notifyBackendRequired, wsData],
+    [folders, online, notifyBackendRequired, wsData, refreshUsage],
   );
 
   const restoreTrashItem = useCallback(
@@ -370,13 +522,14 @@ export default function CentralDocsWorkspace() {
   const removeChat = useCallback(
     async (id) => {
       try {
-        await chats.removeChat(id);
+        const res = await chats.removeChat(id);
+        if (res?.usage) applyUsageSnapshot(res.usage);
         toast.success("Chat removed");
       } catch {
         toast.error("Couldn't remove the chat");
       }
     },
-    [chats],
+    [applyUsageSnapshot, chats],
   );
 
   // --- management actions (rename / move / archive / clear; online-only) ---
@@ -452,6 +605,7 @@ export default function CentralDocsWorkspace() {
     setOperation({ kind: "clear", status: "processing", label: "Clearing session" });
     try {
       await clearDemoSession();
+      clearDemoSessionId();
       selection.setFromChat(null); // clear without persisting to the old chat
       setPreviewDocId(null);
       setActiveTab("chat");
@@ -459,16 +613,14 @@ export default function CentralDocsWorkspace() {
       generate.clearGeneratedResult();
       generate.closeGenerateModal();
       setUsageOverride(null);
-      await demo.reload();
-      await Promise.all([wsData.reloadActive(), wsData.reloadTrash()]);
-      chats.reload();
       setOperation({ kind: "clear", status: "complete", label: "Session cleared" });
       toast.success("Session cleared — your demo data was reset");
+      navigate("/", { replace: true });
     } catch {
       setOperation({ kind: "clear", status: "failed", label: "Clear failed" });
       toast.error("Couldn't clear the session");
     }
-  }, [online, selection, search, generate, demo, wsData, chats]);
+  }, [online, selection, search, generate, navigate]);
 
   // --- dialog requests (compact confirm / rename / move) ---
   const confirmAction = useCallback((cfg) => setDialog({ type: "confirm", ...cfg }), []);
@@ -549,6 +701,16 @@ export default function CentralDocsWorkspace() {
     [effectiveFolderIds, selection.docIds, documents],
   );
 
+  const isPartiallySelectedFolder = useCallback(
+    (folderId) => {
+      if (effectiveFolderIds.has(folderId)) return false;
+      const folderIds = new Set([folderId, ...getDescendantFolderIds(folderId)]);
+      if (selection.folderIds.some((id) => folderIds.has(id) && id !== folderId)) return true;
+      return documents.some((doc) => folderIds.has(doc.folderId) && selection.docIds.includes(doc.id));
+    },
+    [documents, effectiveFolderIds, getDescendantFolderIds, selection.docIds, selection.folderIds],
+  );
+
   const counts = useMemo(
     () => ({
       folders: selection.folderIds.length,
@@ -560,13 +722,74 @@ export default function CentralDocsWorkspace() {
 
   const hasContext = counts.folders > 0 || counts.documents > 0;
 
+  const askSuggestedQuestion = useCallback(
+    (question) => {
+      const prompt = typeof question === "string" ? question : question?.text;
+      if (prompt) chat.prefillDraftFromSearch(prompt);
+
+      const targetIds = new Set((question?.documentIds || []).filter(Boolean));
+      const targetTitles = new Set(
+        (question?.documentTitles || [])
+          .map((title) => String(title || "").trim().toLowerCase())
+          .filter(Boolean),
+      );
+
+      const associatedDocIds = documents
+        .filter((doc) => {
+          const title = String(doc.title || "").trim().toLowerCase();
+          return (
+            doc.attachable !== false &&
+            (targetIds.has(doc.id) || targetTitles.has(title))
+          );
+        })
+        .map((doc) => doc.id);
+
+      if (associatedDocIds.length > 0) {
+        const next = normalizeSelectionForHierarchy({
+          selectedDocumentIds: associatedDocIds,
+          selectedFolderIds: [],
+        });
+        if (canApplyContextSelection(next)) {
+          selection.setFromChat(next);
+          persistSelection(next.selectedDocumentIds, next.selectedFolderIds);
+        }
+      }
+
+      setActiveTab("chat");
+    },
+    [
+      canApplyContextSelection,
+      chat,
+      documents,
+      normalizeSelectionForHierarchy,
+      persistSelection,
+      selection,
+    ],
+  );
+
+  const displayUsage = useMemo(() => {
+    const base = usageOverride ?? demo.usage;
+    if (!online) return base;
+    const liveChats = chats.chats.filter((chatItem) => !chatItem.local).length;
+    const liveFolders = folders.filter((folder) => folder.group === "user" && !folder.readOnly).length;
+    const liveUploads = documents.filter((doc) => doc.source === SOURCE_KIND.uploaded).length;
+    const liveGenerated = documents.filter((doc) => doc.source === SOURCE_KIND.generated).length;
+    return {
+      ...base,
+      chats: { ...base.chats, used: liveChats },
+      folders: { ...base.folders, used: liveFolders },
+      uploads: { ...base.uploads, used: Math.max(base.uploads.used, liveUploads) },
+      generated: { ...base.generated, used: Math.max(base.generated.used, liveGenerated) },
+    };
+  }, [chats.chats, demo.usage, documents, folders, online, usageOverride]);
+
   const ws = {
     data: {
       folders,
       documents,
       generated: wsData.generated,
       trash: wsData.trash,
-      usage: usageOverride ?? demo.usage,
+      usage: displayUsage,
     },
     online,
     backendStatus: demo.backendStatus,
@@ -587,6 +810,7 @@ export default function CentralDocsWorkspace() {
     folderChildren,
     effectiveFolderIds,
     isEffectivelySelected,
+    isPartiallySelectedFolder,
     counts,
     hasContext,
 
@@ -605,6 +829,7 @@ export default function CentralDocsWorkspace() {
 
     search,
     chat,
+    askSuggestedQuestion,
     generate,
 
     previewDocId,
@@ -650,6 +875,8 @@ export default function CentralDocsWorkspace() {
         disabled: moveDoc ? moveDoc.folderId === f.id : false,
       })),
   ];
+
+  if (demo.needsLaunch) return null;
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-background text-foreground">

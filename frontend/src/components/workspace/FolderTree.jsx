@@ -28,7 +28,7 @@ import { getFileIcon } from "./DocumentList";
  * `via` marks items included through a selected parent folder: they render
  * ticked but slightly muted, and clicking explains instead of mutating.
  */
-function AttachCheck({ selected, via, disabled, onToggle, label }) {
+function AttachCheck({ selected, partial, via, disabled, onToggle, label }) {
   return (
     <button
       type="button"
@@ -41,11 +41,13 @@ function AttachCheck({ selected, via, disabled, onToggle, label }) {
         "inline-flex size-4 shrink-0 items-center justify-center rounded border transition-colors",
         selected
           ? cn("border-teal bg-teal text-teal-foreground", via && "opacity-70")
-          : "border-input bg-card text-transparent hover:border-teal/60 hover:text-teal/50",
+          : partial
+            ? "border-teal/65 bg-card text-teal hover:border-teal"
+            : "border-input bg-card text-transparent hover:border-teal/60 hover:text-teal/50",
         disabled && "cursor-not-allowed opacity-40",
       )}
     >
-      <Check className="size-3" strokeWidth={3} />
+      {partial && !selected ? <span className="size-1.5 rounded-full bg-current" /> : <Check className="size-3" strokeWidth={3} />}
     </button>
   );
 }
@@ -158,6 +160,7 @@ function FolderNode({ ws, folder, depth }) {
   const [open, setOpen] = useState(false);
   const direct = ws.isSelected("folder", folder.id);
   const effective = ws.isEffectivelySelected("folder", folder.id);
+  const partial = ws.isPartiallySelectedFolder?.(folder.id) || false;
   const via = effective && !direct;
   const FolderIcon = open ? FolderOpen : Folder;
 
@@ -189,6 +192,7 @@ function FolderNode({ ws, folder, depth }) {
         </button>
         <AttachCheck
           selected={effective}
+          partial={partial}
           via={via}
           onToggle={onToggle}
           label={

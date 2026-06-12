@@ -70,6 +70,8 @@ export function normalizeDocument(dto = {}) {
   return {
     id: dto.id,
     title: dto.title || dto.originalFilename || "Untitled",
+    originalFilename: dto.originalFilename || null,
+    downloadFilename: dto.downloadFilename || null,
     type: toTypeBadge(dto),
     folderId: dto.folderId || null,
     folderName: dto.folderName || null,
@@ -139,6 +141,7 @@ export function normalizeUsage(session) {
     chats: { used: usage.chatSessions ?? 0, limit: limits.maxChatSessions ?? FALLBACK_USAGE.chats.limit },
     prompts: { used: usage.aiPrompts ?? 0, limit: limits.maxAiPrompts ?? FALLBACK_USAGE.prompts.limit },
     generated: { used: usage.generatedDocuments ?? 0, limit: limits.maxGeneratedDocuments ?? FALLBACK_USAGE.generated.limit },
+    folders: { used: usage.userFolders ?? 0, limit: limits.maxUserFolders ?? FALLBACK_USAGE.folders.limit },
     storageMb: {
       used: Math.round(((usage.storageBytes ?? 0) / MB) * 10) / 10,
       limit: limits.maxStorageBytes ? Math.round(limits.maxStorageBytes / MB) : FALLBACK_USAGE.storageMb.limit,
@@ -147,16 +150,23 @@ export function normalizeUsage(session) {
 }
 
 /** Map an upload/retry response usage snapshot into the UsageCard shape (fixed demo limits). */
-export function normalizeUsageFromSnapshot(usage = {}) {
+export function normalizeUsageFromSnapshot(usage = {}, baseUsage = FALLBACK_USAGE) {
+  const maxUsage = (incoming, current = 0) =>
+    incoming == null ? current : Math.max(Number(incoming || 0), Number(current || 0));
+  const nextStorageMb = usage.storageBytes == null
+    ? baseUsage.storageMb?.used ?? 0
+    : Math.max(
+        Math.round((usage.storageBytes / MB) * 10) / 10,
+        baseUsage.storageMb?.used ?? 0,
+      );
+
   return {
-    uploads: { used: usage.uploadedFiles ?? 0, limit: DEMO_LIMITS.uploads },
-    chats: { used: usage.chatSessions ?? 0, limit: DEMO_LIMITS.savedChats },
-    prompts: { used: usage.aiPrompts ?? 0, limit: DEMO_LIMITS.prompts },
-    generated: { used: usage.generatedDocuments ?? 0, limit: DEMO_LIMITS.generatedDocuments },
-    storageMb: {
-      used: Math.round(((usage.storageBytes ?? 0) / MB) * 10) / 10,
-      limit: DEMO_LIMITS.storageMb,
-    },
+    uploads: { used: maxUsage(usage.uploadedFiles, baseUsage.uploads?.used), limit: DEMO_LIMITS.uploads },
+    chats: { used: usage.chatSessions ?? baseUsage.chats?.used ?? 0, limit: DEMO_LIMITS.savedChats },
+    prompts: { used: usage.aiPrompts ?? baseUsage.prompts?.used ?? 0, limit: DEMO_LIMITS.prompts },
+    generated: { used: maxUsage(usage.generatedDocuments, baseUsage.generated?.used), limit: DEMO_LIMITS.generatedDocuments },
+    folders: { used: usage.userFolders ?? baseUsage.folders?.used ?? 0, limit: DEMO_LIMITS.userFolders },
+    storageMb: { used: nextStorageMb, limit: DEMO_LIMITS.storageMb },
   };
 }
 
@@ -246,7 +256,6 @@ const GENERATED_FILENAME_MAX = 120; // mirrors backend maxFilenameLength
 /** Validate the free-form instruction. Returns { valid, value?, error? }. */
 export function validateGeneratedInstruction(text) {
   const trimmed = String(text || "").trim();
-  if (!trimmed) return { valid: false, error: "Describe the document to generate." };
   if (trimmed.length > DEMO_LIMITS.generateInstructionLength) {
     return {
       valid: false,
@@ -281,6 +290,40 @@ export function validateGeneratedFilename(filename) {
     value = `${base.slice(0, cap)}.${ext}`;
   }
   return { valid: true, value, extension: ext };
+}
+
+export function documentDownloadFilename(doc = {}) {
+  if (doc.downloadFilename) return doc.downloadFilename;
+  if (doc.originalFilename) return doc.originalFilename;
+  const type = String(doc.type || "").toLowerCase();
+  if (doc.title && type) return `${doc.title}.${type}`;
+  return doc.title || "";
+}
+
+export function buildUniqueGeneratedFilename(filename, existingFilenames = []) {
+  const normalized = validateGeneratedFilename(filename);
+  if (!normalized.valid) return normalized;
+
+  const existing = new Set(
+    existingFilenames.map((value) => String(value || "").trim().toLowerCase()).filter(Boolean),
+  );
+  if (!existing.has(normalized.value.toLowerCase())) {
+    return normalized;
+  }
+
+  const dot = normalized.value.lastIndexOf(".");
+  const base = dot > 0 ? normalized.value.slice(0, dot) : normalized.value;
+  const ext = dot > 0 ? normalized.value.slice(dot) : "";
+  for (let index = 2; index <= existing.size + 2; index += 1) {
+    const suffix = ` (${index})`;
+    const cap = Math.max(1, GENERATED_FILENAME_MAX - ext.length - suffix.length);
+    const value = `${base.slice(0, cap).trimEnd()}${suffix}${ext}`;
+    if (!existing.has(value.toLowerCase())) {
+      return { ...normalized, value };
+    }
+  }
+
+  return normalized;
 }
 
 // --- Semantic search ---
@@ -370,6 +413,7 @@ export function normalizeReference(ref = {}) {
   return {
     number: ref.citationNumber ?? null,
     documentId: ref.documentId || null,
+    chunkId: ref.chunkId || null,
     title: ref.documentTitle || "Untitled",
     fileType: ref.fileType || null,
     folderName: ref.folderName || null,
@@ -378,6 +422,75 @@ export function normalizeReference(ref = {}) {
     score: ref.similarityScore ?? null,
     usedFor: ref.usedFor || null,
   };
+}
+
+function referenceDedupeKey(ref = {}) {
+  const documentId = ref.documentId || "unknown-document";
+  if (ref.chunkId) return `${documentId}:chunk:${ref.chunkId}`;
+  return `${documentId}:fallback:${ref.locator || ""}:${String(ref.excerpt || "").slice(0, 120)}`;
+}
+
+function expandCitationToken(token = "") {
+  const numbers = [];
+  for (const part of String(token).split(",")) {
+    const trimmed = part.trim();
+    if (!trimmed) continue;
+    const range = /^(\d+)\s*[-–—]\s*(\d+)$/.exec(trimmed);
+    if (range) {
+      const start = Number(range[1]);
+      const end = Number(range[2]);
+      const low = Math.min(start, end);
+      const high = Math.max(start, end);
+      for (let value = low; value <= high; value += 1) numbers.push(value);
+      continue;
+    }
+    const single = Number(trimmed);
+    if (Number.isInteger(single) && single > 0) numbers.push(single);
+  }
+  return numbers;
+}
+
+export function extractCitationNumbers(content = "") {
+  const numbers = [];
+  const seen = new Set();
+  const pattern = /\[((?:\s*\d+\s*(?:[-–—]\s*\d+\s*)?)(?:,\s*\d+\s*(?:[-–—]\s*\d+\s*)?)*)\]/g;
+  let match;
+  while ((match = pattern.exec(String(content || ""))) !== null) {
+    for (const number of expandCitationToken(match[1])) {
+      if (!seen.has(number)) {
+        seen.add(number);
+        numbers.push(number);
+      }
+    }
+  }
+  return numbers;
+}
+
+export function normalizeReferencesForAnswer({ content = "", references = [] } = {}) {
+  const deduped = [];
+  const seen = new Set();
+  for (const raw of references) {
+    const ref = normalizeReference(raw);
+    const key = referenceDedupeKey(ref);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(ref);
+  }
+
+  const citedNumbers = extractCitationNumbers(content);
+  if (citedNumbers.length) {
+    const byNumber = new Map(deduped.map((ref) => [Number(ref.number), ref]));
+    if (citedNumbers.every((number) => byNumber.has(number))) {
+      const cited = citedNumbers.map((number) => byNumber.get(number));
+      const citedSet = new Set(cited.map((ref) => Number(ref.number)));
+      return [
+        ...cited,
+        ...deduped.filter((ref) => !citedSet.has(Number(ref.number))),
+      ];
+    }
+  }
+
+  return deduped;
 }
 
 /**
@@ -404,7 +517,10 @@ export function normalizeChatMessage(dto = {}) {
       folderName: d.folderName || null,
     })),
     attachedFolderNames: attachedFolders.map((f) => f.name || f.title || "").filter(Boolean),
-    references: (dto.referencesUsed || []).map(normalizeReference),
+    references: normalizeReferencesForAnswer({
+      content: dto.content || "",
+      references: dto.referencesUsed || [],
+    }),
     aiMeta: meta
       ? {
           model: meta.generationModel || null,

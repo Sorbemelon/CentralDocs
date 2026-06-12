@@ -132,8 +132,10 @@ test("chat selection dedupes selected IDs and accepts mock/current-session docum
   assert.deepEqual(selection.selectedDocumentIds, ["mock_doc", "user_doc"]);
   assert.deepEqual(selection.selectedFolderIds, ["mock_folder"]);
   assert.equal(selection.attachedDocuments.length, 2);
+  assert.equal(selection.attachedDocuments[0].vectorDocumentId, "mock_doc");
   assert.equal(selection.attachedFolders[0].scope, "mock");
   assert.equal(selection.snapshots.attachedDocumentSnapshot[0].id, "mock_doc");
+  assert.equal("vectorDocumentId" in selection.snapshots.attachedDocumentSnapshot[0], false);
   assert.equal(selection.snapshots.resolvedDocumentSnapshot[0].folderId, "mock_folder");
 });
 
@@ -152,6 +154,59 @@ test("chat selection resolves folders to active ready document snapshots and ded
   assert.deepEqual(selection.snapshots.resolvedDocumentSnapshot[0].resolvedFromFolderIds, [
     "user_folder",
   ]);
+});
+
+test("chat selection prefers persistent seeded mock records for internal vector lookup", async () => {
+  const selection = await resolveChatSelection({
+    demoSessionId: "demo_123",
+    selectedDocumentIds: ["mock_doc"],
+    selectedFolderIds: ["mock_folder"],
+    repositories: {
+      documentRepository: {
+        listAttachableDocuments: async () => [
+          {
+            id: "mock_doc",
+            title: "Manifest Mock Brief",
+            fileKind: "markdown",
+            scope: "mock",
+            sourceType: "mock",
+            folderId: "mock_folder",
+            status: "ready",
+            lifecycleStatus: "active",
+          },
+          {
+            _id: "persistent_doc_1",
+            mockId: "mock_doc",
+            title: "Seeded Mock Brief",
+            fileKind: "markdown",
+            scope: "mock",
+            sourceType: "mock",
+            folderMockId: "mock_folder",
+            status: "ready",
+            lifecycleStatus: "active",
+            contentStats: { chunkCount: 4 },
+          },
+        ],
+      },
+      folderRepository: {
+        listAttachableFolders: async () => [
+          {
+            id: "mock_folder",
+            name: "Mock Folder",
+            scope: "mock",
+            readOnly: true,
+            lifecycleStatus: "active",
+          },
+        ],
+      },
+    },
+  });
+
+  assert.equal(selection.attachedDocuments[0].id, "mock_doc");
+  assert.equal(selection.attachedDocuments[0].vectorDocumentId, "persistent_doc_1");
+  assert.equal(selection.resolvedDocuments[0].vectorDocumentId, "persistent_doc_1");
+  assert.equal(selection.snapshots.attachedDocumentSnapshot[0].id, "mock_doc");
+  assert.equal("vectorDocumentId" in selection.snapshots.attachedDocumentSnapshot[0], false);
 });
 
 test("chat selection rejects trashed and not-ready selected documents", async () => {

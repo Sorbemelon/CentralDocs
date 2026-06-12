@@ -12,6 +12,8 @@ const {
   assertGenerateDocumentInstructionLength,
   assertPromptLength,
   assertSemanticSearchQueryLength,
+  buildChatLifecycleUsageDelta,
+  buildDocumentLifecycleUsageDelta,
   getRemainingLimits,
   getUsageSnapshot,
 } = await import("../src/services/demo/demoUsage.service.js");
@@ -92,4 +94,52 @@ test("usage service applies usage deltas without negative counters", () => {
 
   assert.equal(next.usage.uploadedFiles, 3);
   assert.equal(next.usage.storageBytes, 0);
+});
+
+test("usage service builds create-only lifecycle deltas for uploaded and generated documents", () => {
+  assert.deepEqual(
+    buildDocumentLifecycleUsageDelta({
+      scope: "user",
+      sourceType: "upload",
+      sizeBytes: 120,
+    }, "create"),
+    { uploadedFiles: 1, storageBytes: 120 },
+  );
+  assert.deepEqual(
+    buildDocumentLifecycleUsageDelta({
+      scope: "generated",
+      sourceType: "generated",
+      sizeBytes: 80,
+    }, "create"),
+    { generatedDocuments: 1, storageBytes: 80 },
+  );
+  assert.deepEqual(
+    buildDocumentLifecycleUsageDelta({
+      scope: "user",
+      sourceType: "upload",
+      sizeBytes: 120,
+    }, "delete"),
+    {},
+  );
+  assert.deepEqual(
+    buildDocumentLifecycleUsageDelta({
+      scope: "generated",
+      sourceType: "generated",
+      sizeBytes: 80,
+    }, "restore"),
+    {},
+  );
+  assert.deepEqual(
+    buildDocumentLifecycleUsageDelta({
+      scope: "mock",
+      sourceType: "mock",
+      sizeBytes: 80,
+    }, "delete"),
+    {},
+  );
+});
+
+test("usage service builds lifecycle deltas for chat sessions", () => {
+  assert.deepEqual(buildChatLifecycleUsageDelta("create"), { chatSessions: 1 });
+  assert.deepEqual(buildChatLifecycleUsageDelta("delete"), { chatSessions: -1 });
 });

@@ -54,6 +54,18 @@ export async function countMessagesByChatSession({ chatSessionId, demoSessionId 
   return ChatMessage.countDocuments({ chatSessionId, demoSessionId });
 }
 
+export async function deleteMessageById({ messageId, chatSessionId, demoSessionId } = {}) {
+  requirePersistence();
+
+  const result = await ChatMessage.deleteOne({
+    _id: messageId,
+    chatSessionId,
+    demoSessionId,
+  });
+
+  return { deletedCount: result.deletedCount || 0 };
+}
+
 export async function softDeleteMessagesByChatSession() {
   return { status: "reserved_for_cleanup", modifiedCount: 0 };
 }
@@ -126,6 +138,19 @@ export function createMemoryChatMessageRepository({ seed = [], now = () => new D
       return (
         await this.listMessagesByChatSession({ chatSessionId, demoSessionId })
       ).length;
+    },
+    async deleteMessageById({ messageId, chatSessionId, demoSessionId }) {
+      const id = String(messageId || "");
+      const message = messages.get(id);
+      if (
+        !message ||
+        String(message.chatSessionId) !== String(chatSessionId) ||
+        message.demoSessionId !== demoSessionId
+      ) {
+        return { deletedCount: 0 };
+      }
+      messages.delete(id);
+      return { deletedCount: 1 };
     },
     async softDeleteMessagesByChatSession() {
       return { status: "reserved_for_cleanup", modifiedCount: 0 };

@@ -1,4 +1,8 @@
 import { DEMO_LIMITS, EMPTY_DEMO_USAGE } from "../../config/limits.js";
+import {
+  DOCUMENT_SCOPE,
+  SOURCE_TYPE,
+} from "../../constants/document.constants.js";
 import { createHttpError } from "../../utils/httpError.js";
 
 const USAGE_KEYS = Object.freeze(Object.keys(EMPTY_DEMO_USAGE));
@@ -117,5 +121,41 @@ export function applyUsageDelta(session = {}, delta = {}) {
   return {
     ...session,
     usage: nextUsage,
+  };
+}
+
+export function buildDocumentLifecycleUsageDelta(document = {}, direction = "delete") {
+  if (direction !== "create") {
+    return {};
+  }
+
+  const sizeBytes = toNonNegativeNumber(document.sizeBytes);
+
+  if (
+    document.sourceType === SOURCE_TYPE.UPLOAD &&
+    document.scope === DOCUMENT_SCOPE.USER
+  ) {
+    return {
+      uploadedFiles: 1,
+      storageBytes: sizeBytes,
+    };
+  }
+
+  if (
+    document.sourceType === SOURCE_TYPE.GENERATED ||
+    document.scope === DOCUMENT_SCOPE.GENERATED
+  ) {
+    return {
+      generatedDocuments: 1,
+      storageBytes: sizeBytes,
+    };
+  }
+
+  return {};
+}
+
+export function buildChatLifecycleUsageDelta(direction = "delete") {
+  return {
+    chatSessions: direction === "restore" || direction === "create" ? 1 : -1,
   };
 }

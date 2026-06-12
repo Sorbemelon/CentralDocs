@@ -154,3 +154,37 @@ test("RAG answer service enforces AI prompt limit before provider call", async (
   );
   assert.equal(generatorCalled, false);
 });
+
+test("RAG answer service rolls back accepted user message on provider failure", async () => {
+  const deps = dependencies();
+
+  await assert.rejects(
+    () =>
+      answerChatMessageWithRag({
+        chatId: "chat_1",
+        demoSessionId: "demo_123",
+        content: "Question",
+        userMessage: { _id: "message_user", chatSessionId: "chat_1", demoSessionId: "demo_123", role: "user", content: "Question", status: "complete" },
+        chatSession: { _id: "chat_1", demoSessionId: "demo_123", currentSelectedDocumentIds: ["doc_1"], aiPromptCount: 0, messageCount: 1 },
+        ragContext: baseContext(),
+        dependencies: {
+          ...deps,
+          historyLoader: async () => ({ rollingSummary: null, recentMessages: [] }),
+          generator: async () => {
+            throw new Error("provider exploded with unsafe details");
+          },
+        },
+      }),
+    { code: "RAG_ANSWER_FAILED" },
+  );
+
+  const messages = await deps.chatMessageRepository.listMessagesByChatSession({
+    chatSessionId: "chat_1",
+    demoSessionId: "demo_123",
+  });
+  const chat = deps.chatSessionRepository._unsafeSnapshot()[0];
+
+  assert.equal(messages.length, 0);
+  assert.equal(chat.messageCount, 0);
+  assert.equal(chat.aiPromptCount, 1);
+});

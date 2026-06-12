@@ -1,9 +1,17 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-const { normalizeGeneratedDocumentFilename } = await import(
+const {
+  buildUniqueGeneratedDocumentFilename,
+  normalizeGeneratedDocumentFilename,
+} = await import(
   "../src/services/generatedDocuments/generatedDocumentFilename.service.js"
 );
+
+test("generated document filename defaults empty values to summary.md", () => {
+  assert.equal(normalizeGeneratedDocumentFilename("").filename, "summary.md");
+  assert.equal(normalizeGeneratedDocumentFilename(undefined).filename, "summary.md");
+});
 
 test("generated document filename defaults to Markdown", () => {
   const result = normalizeGeneratedDocumentFilename("orchid brief");
@@ -47,4 +55,23 @@ test("generated document filename sanitizes unsafe characters and caps length", 
   assert.equal(unsafe.filename, "Q2_rollout_brief_final_.md");
   assert.equal(long.filename.length, 120);
   assert.equal(long.filename.endsWith(".txt"), true);
+});
+
+test("generated document filename adds a number when the name already exists", () => {
+  assert.equal(
+    normalizeGeneratedDocumentFilename("summary.md", {
+      existingFilenames: ["summary.md"],
+    }).filename,
+    "summary (2).md",
+  );
+  assert.equal(
+    normalizeGeneratedDocumentFilename("summary.md", {
+      existingFilenames: ["summary.md", "summary (2).md"],
+    }).filename,
+    "summary (3).md",
+  );
+  assert.equal(
+    buildUniqueGeneratedDocumentFilename("brief.txt", ["brief.txt"]),
+    "brief (2).txt",
+  );
 });

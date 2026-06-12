@@ -1,6 +1,7 @@
 import { AI_ACTION_TYPE } from "../../constants/ai.constants.js";
 import { DEMO_LIMITS, EMPTY_DEMO_USAGE } from "../../config/limits.js";
 import {
+  GENERATED_DOCUMENT_DEFAULT_INSTRUCTION,
   GENERATED_DOCUMENT_ERROR_CODE,
 } from "../../constants/generatedDocument.constants.js";
 import { createHttpError, HttpError } from "../../utils/httpError.js";
@@ -25,6 +26,7 @@ import {
   createGeneratedDocumentId,
   createGeneratedDocumentRecord,
   countGeneratedDocumentsByDemoSession,
+  listGeneratedDocumentFilenamesByDemoSession,
   updateGeneratedDocumentIndexingFields,
 } from "./generatedDocument.repository.js";
 import { normalizeGeneratedDocumentFilename } from "./generatedDocumentFilename.service.js";
@@ -48,6 +50,7 @@ const defaultDependencies = Object.freeze({
     createDocumentId: createGeneratedDocumentId,
     createGeneratedDocumentRecord,
     countGeneratedDocumentsByDemoSession,
+    listGeneratedDocumentFilenamesByDemoSession,
     updateGeneratedDocumentIndexingFields,
   },
   payloadBuilder: buildGeneratedDocumentPayload,
@@ -85,13 +88,6 @@ function assertChatFound(chat) {
 
 function validateInstruction(instruction) {
   const trimmed = String(instruction || "").trim();
-  if (!trimmed) {
-    throw createHttpError(
-      400,
-      "Generated document instruction is required.",
-      GENERATED_DOCUMENT_ERROR_CODE.INSTRUCTION_EMPTY,
-    );
-  }
   if (trimmed.length > DEMO_LIMITS.maxGenerateDocumentInstructionLengthChars) {
     throw createHttpError(
       400,
@@ -100,7 +96,7 @@ function validateInstruction(instruction) {
     );
   }
 
-  return trimmed;
+  return trimmed || GENERATED_DOCUMENT_DEFAULT_INSTRUCTION;
 }
 
 function getChatId(chat = {}) {
@@ -275,6 +271,47 @@ async function updateUsageAfterSave({
   return updated;
 }
 
+async function safeUpdateUsageAfterSave(args = {}) {
+  try {
+    return {
+      session: await updateUsageAfterSave(args),
+      warning: null,
+    };
+  } catch {
+    return {
+      session: args.usageSession,
+      warning: "GENERATED_DOCUMENT_USAGE_UPDATE_FAILED",
+    };
+  }
+}
+
+async function safeIndexGeneratedDocument({
+  deps,
+  document,
+  content,
+} = {}) {
+  try {
+    return await deps.indexer({
+      document,
+      content,
+      embedder: deps.embedder,
+      repositories: deps.indexingRepositories,
+      options: deps.indexingOptions || {},
+    });
+  } catch (error) {
+    return {
+      indexed: false,
+      contentStats: null,
+      warnings: [
+        {
+          code: GENERATED_DOCUMENT_ERROR_CODE.INDEXING_FAILED,
+          reason: error?.code || "INDEXING_FAILED",
+        },
+      ],
+    };
+  }
+}
+
 function safeGenerationWarnings(generationWarnings = [], indexingWarnings = []) {
   return [...generationWarnings, ...indexingWarnings].map((warning) => {
     if (typeof warning === "string") {
@@ -293,7 +330,6 @@ export async function generateDocumentFromChat({
   requireDemoSessionId(demoSessionId);
   const deps = getDependencies(dependencies);
   const instruction = validateInstruction(body.instruction);
-  const filenameMeta = deps.filenameNormalizer(body.filename);
   const includeReferences = normalizeBoolean(body.includeReferences, true);
   const includeCurrentSelectedDocuments = normalizeBoolean(
     body.includeCurrentSelectedDocuments,
@@ -311,6 +347,11 @@ export async function generateDocumentFromChat({
 
   const usageSession = await getUsageSession({ deps, demoSessionId });
   assertGeneratedDocumentLimit(usageSession);
+  const existingFilenames =
+    (await deps.generatedDocumentRepository.listGeneratedDocumentFilenamesByDemoSession?.({
+      demoSessionId,
+    })) || [];
+  const filenameMeta = deps.filenameNormalizer(body.filename, { existingFilenames });
 
   const selection = await resolveSelectedContext({
     deps,
@@ -403,12 +444,10 @@ export async function generateDocumentFromChat({
     );
   }
 
-  const indexing = await deps.indexer({
+  const indexing = await safeIndexGeneratedDocument({
+    deps,
     document,
     content: generatedText,
-    embedder: deps.embedder,
-    repositories: deps.indexingRepositories,
-    options: deps.indexingOptions || {},
   });
   const finalDocument = await maybeUpdateIndexingFields({
     deps,
@@ -416,13 +455,19 @@ export async function generateDocumentFromChat({
     demoSessionId,
     indexing,
   });
-  const updatedSession = await updateUsageAfterSave({
+  const usageUpdate = await safeUpdateUsageAfterSave({
     deps,
     demoSessionId,
     usageSession,
     sizeBytes,
   });
-  const warnings = safeGenerationWarnings(generation.warnings, indexing.warnings);
+  const warnings = safeGenerationWarnings(
+    generation.warnings,
+    [
+      ...(indexing.warnings || []),
+      usageUpdate.warning,
+    ].filter(Boolean),
+  );
 
   let download = {
     available: false,
@@ -460,7 +505,7 @@ export async function generateDocumentFromChat({
       warnings,
     },
     download,
-    usage: getUsageSnapshot(updatedSession),
-    remaining: getRemainingLimits(updatedSession),
+    usage: getUsageSnapshot(usageUpdate.session),
+    remaining: getRemainingLimits(usageUpdate.session),
   });
 }

@@ -14,7 +14,7 @@ export const SEARCH_SCOPES = Object.freeze(Object.values(SEARCH_SCOPE));
 export const SEARCH_LIMITS = Object.freeze({
   maxQueryLengthChars: DEMO_LIMITS.maxSemanticSearchQueryLengthChars,
   defaultTopK: DEMO_LIMITS.topKRetrieval,
-  maxTopK: 10,
+  maxTopK: Math.max(10, DEMO_LIMITS.topKRetrieval),
   excerptPreviewChars: 300,
 });
 

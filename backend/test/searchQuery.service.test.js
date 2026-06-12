@@ -7,7 +7,7 @@ test("search query service trims query and applies defaults", () => {
   const request = buildSearchRequest({ query: "  document search pain points  " });
 
   assert.equal(request.query, "document search pain points");
-  assert.equal(request.topK, 6);
+  assert.equal(request.topK, 15);
   assert.equal(request.scope, "all");
   assert.deepEqual(request.selectedDocumentIds, []);
   assert.deepEqual(request.selectedFolderIds, []);
@@ -25,11 +25,11 @@ test("search query service rejects empty and over-long queries", () => {
 });
 
 test("search query service validates topK", () => {
-  assert.equal(buildSearchRequest({ query: "risk", topK: 10 }).topK, 10);
+  assert.equal(buildSearchRequest({ query: "risk", topK: 15 }).topK, 15);
   assert.throws(() => buildSearchRequest({ query: "risk", topK: 0 }), {
     code: "INVALID_SEARCH_TOP_K",
   });
-  assert.throws(() => buildSearchRequest({ query: "risk", topK: 11 }), {
+  assert.throws(() => buildSearchRequest({ query: "risk", topK: 16 }), {
     code: "INVALID_SEARCH_TOP_K",
   });
 });

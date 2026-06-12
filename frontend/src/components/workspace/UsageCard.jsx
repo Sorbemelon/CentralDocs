@@ -25,6 +25,7 @@ function UsageCard({ ws }) {
     <div className="flex flex-col gap-1.5">
       <UsageRow label="Uploads" used={u.uploads.used} limit={u.uploads.limit} />
       <UsageRow label="Chats" used={u.chats.used} limit={u.chats.limit} />
+      <UsageRow label="Folders" used={u.folders.used} limit={u.folders.limit} />
       <UsageRow label="Prompts" used={u.prompts.used} limit={u.prompts.limit} />
       <UsageRow label="Generated" used={u.generated.used} limit={u.generated.limit} />
       <UsageRow label="Storage" used={u.storageMb.used} limit={u.storageMb.limit} unit="MB" />

@@ -57,12 +57,19 @@ function ChatRow({ ws, chat }) {
         </span>
       </button>
       <IconButton
+        icon={Pencil}
+        label="Rename chat"
+        size="icon-xs"
+        onClick={() => ws.requestRename({ kind: "chat", target: chat.id, title: chat.title })}
+        className="shrink-0 text-muted-foreground opacity-70 hover:text-primary hover:opacity-100"
+      />
+      <IconButton
         icon={Sparkles}
         label={generateReason}
         size="icon-xs"
         onClick={openGenerate}
         disabled={!canGenerate}
-        className={cn("opacity-0 group-focus-within:opacity-100 group-hover:opacity-100", canGenerate && "text-teal")}
+        className={cn("shrink-0 text-muted-foreground hover:text-teal", canGenerate && "text-teal")}
       />
       <DropdownMenu
         trigger={
@@ -76,9 +83,6 @@ function ChatRow({ ws, chat }) {
           </Button>
         }
       >
-        <DropdownMenuItem onClick={() => ws.requestRename({ kind: "chat", target: chat.id, title: chat.title })}>
-          <Pencil /> Rename
-        </DropdownMenuItem>
         <DropdownMenuItem onClick={() => ws.archiveChat(chat.id)}>
           <Archive /> Archive
         </DropdownMenuItem>

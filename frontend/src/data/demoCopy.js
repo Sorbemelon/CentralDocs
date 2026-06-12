@@ -46,11 +46,53 @@ export const DEMO_FLOW_DETAILS = Object.freeze([
   { step: "Download the file", detail: "Generated documents are normal, reusable sources." },
 ]);
 
-/** Exactly three simple workspace guide prompts (kept beginner-friendly). */
+/** Exactly three mock-corpus prompts shared by the right guide and new-chat empty state. */
 export const GUIDE_QUESTIONS = Object.freeze([
-  "What is this project trying to improve?",
-  "What are the main risks or problems mentioned?",
-  "Summarize the selected documents in simple terms.",
+  {
+    text: "What are the main rollout risks?",
+    documentIds: [
+      "mock_document_01_strategy_rollout_centraldocs_transformation_brief_md",
+      "mock_document_01_strategy_rollout_digital_workspace_rollout_plan_pptx",
+      "mock_document_05_meeting_evidence_rollout_risk_discussion_mp3",
+      "mock_document_05_meeting_evidence_rollout_risk_discussion_transcript_md",
+    ],
+    documentTitles: [
+      "CentralDocs Transformation Brief",
+      "Digital Workspace Rollout Plan",
+      "Rollout Risk Discussion",
+      "Rollout Risk Discussion Transcript",
+    ],
+  },
+  {
+    text: "Why are support teams having trouble finding answers?",
+    documentIds: [
+      "mock_document_04_customer_support_signals_customer_feedback_export_csv",
+      "mock_document_04_customer_support_signals_support_ticket_summary_md",
+      "mock_document_02_document_operations_support_knowledge_playbook_tsv",
+    ],
+    documentTitles: [
+      "Customer Feedback Export",
+      "Support Ticket Summary",
+      "Support Knowledge Playbook",
+    ],
+  },
+  {
+    text: "What approval steps are required?",
+    documentIds: [
+      "mock_document_02_document_operations_document_management_policy_pdf",
+      "mock_document_02_document_operations_remote_approval_sop_docx",
+      "mock_document_03_finance_vendors_vendor_onboarding_checklist_docx",
+      "mock_document_03_finance_vendors_invoice_tracking_sample_xlsx",
+      "mock_document_03_finance_vendors_expense_reimbursement_guide_pdf",
+    ],
+    documentTitles: [
+      "Document Management Policy",
+      "Remote Approval SOP",
+      "Vendor Onboarding Checklist",
+      "Invoice Tracking Sample",
+      "Expense Reimbursement Guide",
+    ],
+  },
 ]);
 
 export const SAMPLE_QUESTIONS = Object.freeze([
@@ -61,59 +103,14 @@ export const SAMPLE_QUESTIONS = Object.freeze([
   "Create a concise internal briefing from this chat.",
 ]);
 
-/** Sample questions surfaced in the Chat tab's empty state (reuses the demo questions). */
-export const CHAT_SAMPLE_QUESTIONS = SAMPLE_QUESTIONS;
-
-/**
- * Offline/local-chat fallback conversation (already in the normalized message shape).
- * Shown only when the backend is offline or the active chat is a local placeholder.
- */
-export const FALLBACK_CHAT_MESSAGES = Object.freeze([
-  {
-    id: "fallback-user-1",
-    role: "user",
-    content: "What are the rollout risks?",
-    status: "complete",
-    createdAt: null,
-    contextDocs: [
-      { title: "Digital Workspace Rollout Plan", folderName: "Strategy & Rollout" },
-      { title: "Rollout Risk Discussion Transcript", folderName: "Strategy & Rollout" },
-    ],
-    attachedFolderNames: ["Strategy & Rollout"],
-    references: [],
-    aiMeta: null,
-  },
-  {
-    id: "fallback-assistant-1",
-    role: "assistant",
-    content:
-      "Connect to the backend to get grounded answers. Live responses cite the attached sources with inline markers like [1].",
-    status: "complete",
-    createdAt: null,
-    contextDocs: [],
-    attachedFolderNames: [],
-    references: [
-      {
-        number: 1,
-        documentId: "fallback-reference-1",
-        title: "Digital Workspace Rollout Plan",
-        fileType: "md",
-        folderName: "Strategy & Rollout",
-        locator: "rollout risks",
-        excerpt: "",
-        score: null,
-        usedFor: "demo preview",
-      },
-    ],
-    aiMeta: null,
-  },
-]);
+/** Sample questions surfaced in the Chat tab's empty state. */
+export const CHAT_SAMPLE_QUESTIONS = GUIDE_QUESTIONS;
 
 /** Generate Document modal defaults. */
-export const GENERATED_DEFAULT_FILENAME = "orchid-rollout-brief.md";
+export const GENERATED_DEFAULT_FILENAME = "summary.md";
 
 export const GENERATED_INSTRUCTION_PLACEHOLDER =
-  "Write a concise internal briefing with background, findings, risks, decisions, next steps, and references.";
+  "Optional: write a concise internal briefing with background, findings, risks, decisions, next steps, and references.";
 
 /** Cosmetic generation steps (backend answers in one request). */
 export const GENERATED_DOC_STEPS = Object.freeze([

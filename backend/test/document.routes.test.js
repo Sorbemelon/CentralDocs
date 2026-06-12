@@ -62,6 +62,7 @@ test("GET /api/documents/:mockDocumentId/preview returns manifest-derived previe
   assert.equal(response.body.preview.fileKind, "markdown");
   assert.equal(response.body.preview.folderName, "Strategy & Rollout");
   assert.equal(response.body.preview.previewUnavailable, false);
+  assert.match(response.body.preview.previewText, /Transformation goal/);
   assert.ok(response.body.preview.demoQuestions.length > 0);
 });
 

@@ -41,6 +41,27 @@ function validateFolderName(name) {
   return trimmed;
 }
 
+export function buildUniqueFolderName(baseName, existingNames = [], maxLength = MAX_FOLDER_NAME_LENGTH) {
+  const base = String(baseName || "").trim();
+  const normalizedExisting = new Set(existingNames.map((name) => String(name || "").trim().toLowerCase()));
+  if (!normalizedExisting.has(base.toLowerCase())) {
+    return base;
+  }
+
+  for (let index = 2; index <= existingNames.length + 2; index += 1) {
+    const suffix = ` (${index})`;
+    const stem = base.length + suffix.length <= maxLength
+      ? base
+      : base.slice(0, Math.max(1, maxLength - suffix.length)).trimEnd();
+    const candidate = `${stem}${suffix}`;
+    if (!normalizedExisting.has(candidate.toLowerCase())) {
+      return candidate;
+    }
+  }
+
+  throw createHttpError(409, "Could not create a unique folder name.", "INVALID_FOLDER_NAME");
+}
+
 function validateScope(scope) {
   if (!scope) {
     return null;
@@ -166,12 +187,22 @@ export async function createFolder({ demoSessionId, name, parentFolderId = null 
     );
   }
 
+  const siblings = await Folder.find({
+    demoSessionId,
+    scope: FOLDER_SCOPE.USER,
+    parentFolderId: parentFolderId || null,
+    lifecycleStatus: LIFECYCLE_STATUS.ACTIVE,
+  })
+    .select({ name: 1 })
+    .lean();
+  const uniqueFolderName = buildUniqueFolderName(folderName, siblings.map((folder) => folder.name));
+
   const created = await Folder.create({
     demoSessionId,
     scope: FOLDER_SCOPE.USER,
-    name: folderName,
+    name: uniqueFolderName,
     parentFolderId,
-    path: `/${folderName}`,
+    path: `/${uniqueFolderName}`,
     readOnly: false,
     lifecycleStatus: LIFECYCLE_STATUS.ACTIVE,
   });

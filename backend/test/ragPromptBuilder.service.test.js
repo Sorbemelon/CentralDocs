@@ -33,6 +33,7 @@ test("RAG prompt builder includes question, history, selection, references, and 
   assert.ok(combined.includes("[1]"));
   assert.ok(combined.includes("Do not invent"));
   assert.ok(combined.includes("Cite document evidence inline"));
+  assert.ok(combined.includes("do not stop at five sources"));
   assert.equal(combined.includes("objectKey"), false);
   assert.equal(combined.includes("embedding"), false);
   assert.equal(combined.includes("mock/secret"), false);

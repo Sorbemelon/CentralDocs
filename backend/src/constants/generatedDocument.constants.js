@@ -7,6 +7,8 @@ export const GENERATED_DOCUMENT_FORMATS = Object.freeze(
   Object.values(GENERATED_DOCUMENT_FORMAT),
 );
 
+export const GENERATED_DOCUMENT_DEFAULT_FILENAME = "summary.md";
+
 export const GENERATED_DOCUMENT_MIME_TYPE = Object.freeze({
   [GENERATED_DOCUMENT_FORMAT.MARKDOWN]: "text/markdown",
   [GENERATED_DOCUMENT_FORMAT.TEXT]: "text/plain",
@@ -32,10 +34,12 @@ export const GENERATED_DOCUMENT_LIMITS = Object.freeze({
   previewChars: 2000,
 });
 
+export const GENERATED_DOCUMENT_DEFAULT_INSTRUCTION =
+  "Summarize this chat into a clear reusable document with key points, decisions, risks, next steps, and references when available.";
+
 export const GENERATED_DOCUMENT_ERROR_CODE = Object.freeze({
   CHAT_NOT_FOUND: "CHAT_NOT_FOUND",
   CHAT_HAS_NO_MESSAGES: "CHAT_HAS_NO_MESSAGES",
-  INSTRUCTION_EMPTY: "GENERATED_DOCUMENT_INSTRUCTION_EMPTY",
   INSTRUCTION_TOO_LONG: "GENERATED_DOCUMENT_INSTRUCTION_TOO_LONG",
   UNSUPPORTED_FORMAT: "GENERATED_DOCUMENT_UNSUPPORTED_FORMAT",
   LIMIT_REACHED: "GENERATED_DOCUMENT_LIMIT_REACHED",

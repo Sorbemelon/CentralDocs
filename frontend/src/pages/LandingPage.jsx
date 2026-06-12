@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import {
@@ -22,7 +22,8 @@ import { cn } from "@/lib/cn";
 import { useBackendStatus } from "@/lib/useBackendStatus";
 import { ARCHITECTURE, DEMO_FLOW_DETAILS, DEMO_LIMITS_SUMMARY, HERO, PROBLEM_SOLUTION } from "@/data/demoCopy";
 import { warmBackend } from "@/services/healthApi";
-import { bootstrapDemo, createOrResumeSession } from "@/services/demoApi";
+import { bootstrapDemo, createOrResumeSession, getDemoSession } from "@/services/demoApi";
+import { clearDemoSessionId, getDemoSessionId } from "@/lib/apiClient";
 
 const ICON_SRC = "/brand/centraldocs_icon_light_transparent.png";
 
@@ -77,6 +78,30 @@ function LandingPage() {
   const navigate = useNavigate();
   const { status } = useBackendStatus({ auto: true });
   const [launching, setLaunching] = useState(false);
+  const [hasExistingSession, setHasExistingSession] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function checkSession() {
+      if (!getDemoSessionId()) {
+        setHasExistingSession(false);
+        return;
+      }
+      try {
+        const result = await getDemoSession();
+        if (cancelled) return;
+        const active = result?.session?.status === "active" || result?.session?.status === "ACTIVE";
+        setHasExistingSession(Boolean(active));
+        if (!active) clearDemoSessionId();
+      } catch {
+        if (!cancelled) setHasExistingSession(false);
+      }
+    }
+    checkSession();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Best-effort warm/session/bootstrap, then enter the workspace either way.
   const launchDemo = async () => {
@@ -89,6 +114,7 @@ function LandingPage() {
     try {
       await createOrResumeSession();
       await bootstrapDemo();
+      setHasExistingSession(true);
     } catch {
       toast("Starting in offline mode", {
         description: "The backend is cold or unavailable; the workspace will show demo data.",
@@ -97,6 +123,9 @@ function LandingPage() {
     setLaunching(false);
     navigate("/workspace");
   };
+
+  const launchLabel = hasExistingSession ? "Continue Workspace" : "Launch Demo Workspace";
+  const shortLaunchLabel = hasExistingSession ? "Continue" : "Launch Demo";
 
   return (
     <div className="landing-bg flex min-h-dvh flex-col text-foreground lg:h-dvh lg:overflow-hidden">
@@ -107,7 +136,7 @@ function LandingPage() {
         actionsAfterTheme={
           <Button size="sm" onClick={launchDemo} disabled={launching}>
             {launching ? <Loader2 className="animate-spin" /> : null}
-            Launch Demo
+            {shortLaunchLabel}
           </Button>
         }
       />
@@ -163,7 +192,7 @@ function LandingPage() {
             <div className="flex flex-wrap items-center gap-3 pt-0.5">
               <Button size="lg" onClick={launchDemo} disabled={launching}>
                 {launching ? <Loader2 className="animate-spin" /> : <Sparkles />}
-                Launch Demo Workspace
+                {launchLabel}
               </Button>
               <p className="text-xs text-muted-foreground">No account needed · anonymous 3-day demo session</p>
             </div>

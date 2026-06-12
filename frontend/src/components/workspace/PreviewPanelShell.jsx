@@ -18,6 +18,15 @@ function FlagChip({ on, label }) {
   );
 }
 
+function normalizePreviewBody(value = "") {
+  const text = String(value || "");
+  if (!text) return "";
+  const withRealNewlines = !text.includes("\n") && text.includes("\\n")
+    ? text.replace(/\\r\\n|\\n|\\r/g, "\n")
+    : text;
+  return withRealNewlines.replace(/\r\n?/g, "\n").trim();
+}
+
 /** Preview tab. Fetches detail + preview + status when online; safe fields only. */
 function PreviewPanelShell({ ws }) {
   const id = ws.previewDocId;
@@ -43,7 +52,7 @@ function PreviewPanelShell({ ws }) {
     };
   }, [id, ws.online]);
 
-  const doc = listDoc || state.fetchedDoc;
+  const doc = state.fetchedDoc || listDoc;
 
   if (!doc) {
     if (state.loading) {
@@ -68,7 +77,12 @@ function PreviewPanelShell({ ws }) {
   const chunkCount = status?.contentStats?.chunkCount ?? doc.chunkCount ?? 0;
   const statusMessage = status?.statusMessage ?? doc.statusMessage;
   const previewUnavailable = preview?.previewUnavailable;
-  const body = preview?.extractedTextPreview || preview?.previewText || doc.excerpt;
+  const body = normalizePreviewBody(
+    preview?.extractedTextPreview ||
+      preview?.previewText ||
+      state.fetchedDoc?.excerpt ||
+      (!ws.online ? listDoc?.excerpt : ""),
+  );
 
   return (
     <div className="flex flex-col gap-3">
@@ -132,8 +146,15 @@ function PreviewPanelShell({ ws }) {
           <p className="mt-1.5 text-[12px] text-muted-foreground">Loading preview…</p>
         ) : previewUnavailable ? (
           <p className="mt-1.5 text-[12px] text-muted-foreground">Preview not available for this document yet.</p>
+        ) : body ? (
+          <div
+            className="mt-1.5 max-h-[52vh] overflow-auto rounded-md bg-muted/30 px-2.5 py-2 text-[13px] leading-relaxed text-foreground"
+            style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}
+          >
+            {body}
+          </div>
         ) : (
-          <p className="mt-1.5 whitespace-pre-wrap text-[13px] leading-relaxed text-foreground">{body}</p>
+          <p className="mt-1.5 text-[12px] text-muted-foreground">No preview text is available for this document yet.</p>
         )}
         {!ws.online && (
           <p className="mt-2 text-[12px] text-muted-foreground">Connect to the backend for the full text preview.</p>

@@ -67,7 +67,7 @@ function GenerateDocumentModalShell({ ws, open, onOpenChange }) {
   const insLen = gen.instruction.length;
   const showInsCount = insLen > insMax * 0.8;
   const insV = gen.validateGeneratedInstruction(gen.instruction);
-  const fnV = gen.validateGeneratedFilename(gen.filename);
+  const fnV = gen.resolvedFilename || gen.validateGeneratedFilename(gen.filename);
 
   const blockReason = !online
     ? "Backend is offline. Generation requires the backend."
@@ -136,7 +136,11 @@ function GenerateDocumentModalShell({ ws, open, onOpenChange }) {
               >
                 <Check /> {attached ? "Attached" : "Attach"}
               </Button>
-              <Button variant="teal" size="sm" onClick={() => onOpenChange(false)}>
+              <Button
+                size="sm"
+                className="bg-[linear-gradient(100deg,var(--primary)_0%,var(--primary)_38%,var(--teal)_100%)] text-primary-foreground hover:opacity-95"
+                onClick={() => onOpenChange(false)}
+              >
                 Done
               </Button>
             </DialogFooter>
@@ -146,7 +150,7 @@ function GenerateDocumentModalShell({ ws, open, onOpenChange }) {
             <DialogBody className="flex flex-col gap-3">
               <div className="flex flex-col gap-1.5">
                 <label htmlFor="gen-instruction" className="text-[12px] font-medium text-foreground">
-                  Instruction
+                  Instruction <span className="text-muted-foreground">(optional)</span>
                 </label>
                 <Textarea
                   id="gen-instruction"
@@ -238,7 +242,12 @@ function GenerateDocumentModalShell({ ws, open, onOpenChange }) {
               <Button variant="outline" size="sm" onClick={() => onOpenChange(false)} disabled={gen.isGenerating}>
                 Cancel
               </Button>
-              <Button variant="teal" size="sm" onClick={() => gen.generateDocument()} disabled={!canGenerate}>
+              <Button
+                size="sm"
+                onClick={() => gen.generateDocument()}
+                disabled={!canGenerate}
+                className="bg-[linear-gradient(100deg,var(--primary)_0%,var(--primary)_38%,var(--teal)_100%)] text-primary-foreground hover:opacity-95"
+              >
                 {gen.isGenerating ? <Loader2 className="animate-spin" /> : <Sparkles />} Generate
               </Button>
             </DialogFooter>

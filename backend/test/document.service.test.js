@@ -35,9 +35,12 @@ test("document service returns mock detail and preview", async () => {
   assert.equal(detail.id, briefDocumentId);
   assert.equal(detail.status, "ready");
   assert.equal(detail.scope, "mock");
+  assert.match(detail.extractedTextPreview, /Transformation goal/);
   assert.ok(!("objectKey" in detail));
   assert.equal(preview.previewUnavailable, false);
   assert.equal(preview.folderName, "Strategy & Rollout");
+  assert.match(preview.previewText, /Transformation goal/);
+  assert.match(preview.previewText, /Known risks/);
 });
 
 test("document service rejects read-only mock move", async () => {

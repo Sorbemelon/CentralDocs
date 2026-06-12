@@ -48,12 +48,13 @@ function baseMessages() {
 function dependencies({
   messages = baseMessages(),
   sessionUsage = {},
+  generatedSeed = [],
   generatedOutput = "# Brief\n\nApproval ownership is the main risk.",
   indexer,
   storageSaver,
   generator,
 } = {}) {
-  const generatedDocumentRepository = createMemoryGeneratedDocumentRepository();
+  const generatedDocumentRepository = createMemoryGeneratedDocumentRepository({ seed: generatedSeed });
   const chatSessionRepository = createMemoryChatSessionRepository({
     seed: [
       {
@@ -172,18 +173,16 @@ test("generated document service creates saved downloadable generated document",
   );
 });
 
-test("generated document service validates instruction, filename, and chat messages", async () => {
+test("generated document service accepts empty instruction with default and validates filename and chat messages", async () => {
   const ctx = dependencies();
-  await assert.rejects(
-    () =>
-      generateDocumentFromChat({
-        chatId: "chat_1",
-        demoSessionId: "demo_123",
-        body: { instruction: "" },
-        dependencies: ctx.deps,
-      }),
-    { code: "GENERATED_DOCUMENT_INSTRUCTION_EMPTY" },
-  );
+  const defaultInstruction = await generateDocumentFromChat({
+    chatId: "chat_1",
+    demoSessionId: "demo_123",
+    body: { instruction: "", filename: "brief.md" },
+    dependencies: ctx.deps,
+  });
+  assert.match(defaultInstruction.document.generatedMeta.generationInstruction, /Summarize this chat/i);
+
   await assert.rejects(
     () =>
       generateDocumentFromChat({
@@ -216,6 +215,31 @@ test("generated document service validates instruction, filename, and chat messa
       }),
     { code: "CHAT_HAS_NO_MESSAGES" },
   );
+});
+
+test("generated document service defaults to a unique summary filename", async () => {
+  const ctx = dependencies({
+    generatedSeed: [
+      {
+        id: "generated_existing",
+        demoSessionId: "demo_123",
+        scope: "generated",
+        sourceType: "generated",
+        lifecycleStatus: "active",
+        originalFilename: "summary.md",
+        downloadFilename: "summary.md",
+      },
+    ],
+  });
+
+  const result = await generateDocumentFromChat({
+    chatId: "chat_1",
+    demoSessionId: "demo_123",
+    body: { instruction: "", filename: "" },
+    dependencies: ctx.deps,
+  });
+
+  assert.equal(result.document.downloadFilename, "summary (2).md");
 });
 
 test("generated document service enforces generated-document and storage limits", async () => {
@@ -314,4 +338,22 @@ test("generated document service handles provider, storage, and indexing failure
   assert.equal(result.generation.indexed, false);
   assert.deepEqual(result.generation.warnings, ["GENERATED_DOCUMENT_INDEXING_FAILED"]);
   assert.equal(result.document.statusMessage.includes("indexing"), true);
+
+  const indexingThrow = dependencies({
+    indexer: async () => {
+      const error = new Error("provider stack trace should stay private");
+      error.code = "EMBEDDING_PROVIDER_ERROR";
+      throw error;
+    },
+  });
+  const savedWithWarning = await generateDocumentFromChat({
+    chatId: "chat_1",
+    demoSessionId: "demo_123",
+    body: { instruction: "Create brief", filename: "brief.md" },
+    dependencies: indexingThrow.deps,
+  });
+  assert.equal(savedWithWarning.generation.indexed, false);
+  assert.deepEqual(savedWithWarning.generation.warnings, ["GENERATED_DOCUMENT_INDEXING_FAILED"]);
+  assert.equal(savedWithWarning.document.statusMessage.includes("indexing"), true);
+  assert.equal(indexingThrow.generatedDocumentRepository._unsafeSnapshot().length, 1);
 });

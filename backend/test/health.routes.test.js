@@ -45,6 +45,13 @@ test("GET /api/health/warm returns awake status", async () => {
   assert.match(response.body.timestamp, /^\d{4}-\d{2}-\d{2}T/);
 });
 
+test("health routes are not blocked by the general API rate limit", async () => {
+  for (let i = 0; i < 305; i += 1) {
+    const response = await request(app).get("/api/health").expect(200);
+    assert.equal(response.body.status, "ok");
+  }
+});
+
 test("GET /api/health/dependencies returns safe dependency statuses", async () => {
   const response = await request(app).get("/api/health/dependencies").expect(200);
 

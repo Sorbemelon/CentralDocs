@@ -45,8 +45,8 @@ test("demo limits match locked CentralDocs decisions", () => {
   assert.equal(DEMO_LIMITS.maxPromptLengthChars, 1500);
   assert.equal(DEMO_LIMITS.maxGenerateDocumentInstructionLengthChars, 2000);
   assert.equal(DEMO_LIMITS.maxSemanticSearchQueryLengthChars, 500);
-  assert.equal(DEMO_LIMITS.topKRetrieval, 6);
-  assert.equal(DEMO_LIMITS.visibleReferences, 5);
+  assert.equal(DEMO_LIMITS.topKRetrieval, 15);
+  assert.equal(DEMO_LIMITS.visibleReferences, 10);
   assert.equal(DEMO_LIMITS.recentChatHistoryMessages, 8);
 });
 

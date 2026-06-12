@@ -1,5 +1,8 @@
 import { apiClient } from "@/lib/apiClient";
 
+const CHAT_ANSWER_TIMEOUT_MS = 120000;
+const GENERATED_DOCUMENT_TIMEOUT_MS = 180000;
+
 /** GET /chats — list saved chats. */
 export function listChats() {
   return apiClient.get("/chats");
@@ -36,7 +39,10 @@ export function updateChatSelection(chatId, payload) {
  * Response: { chat, userMessage, assistantMessage, references, usage, remaining }.
  */
 export function sendChatMessage(chatId, payload, options) {
-  return apiClient.post(`/chats/${chatId}/messages`, payload || {}, options);
+  return apiClient.post(`/chats/${chatId}/messages`, payload || {}, {
+    timeoutMs: CHAT_ANSWER_TIMEOUT_MS,
+    ...options,
+  });
 }
 
 /**
@@ -45,5 +51,8 @@ export function sendChatMessage(chatId, payload, options) {
  * Response: { document, generation, download, usage, remaining }.
  */
 export function generateDocumentFromChat(chatId, payload, options) {
-  return apiClient.post(`/chats/${chatId}/generated-documents`, payload || {}, options);
+  return apiClient.post(`/chats/${chatId}/generated-documents`, payload || {}, {
+    timeoutMs: GENERATED_DOCUMENT_TIMEOUT_MS,
+    ...options,
+  });
 }

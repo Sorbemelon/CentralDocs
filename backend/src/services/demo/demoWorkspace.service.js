@@ -13,8 +13,10 @@ import {
 } from "../mockData/mockStorageMetadata.service.js";
 import { toDocumentDtos } from "../documents/document.dto.js";
 import { toFolderDtos } from "../folders/folder.dto.js";
+import { extractMockDocument } from "../extraction/extractionRegistry.service.js";
 
 const DIRECT_MULTIMODAL_INDEXING_MODE = "direct_multimodal_seed_cached";
+const PREVIEW_TEXT_LIMIT = 8000;
 
 function toIsoDate(value) {
   if (!value) {
@@ -40,6 +42,21 @@ function describeMockDocument(document) {
   }
 
   return document.title || document.filename || "Mock document";
+}
+
+function capPreviewText(text = "") {
+  return String(text || "").slice(0, PREVIEW_TEXT_LIMIT);
+}
+
+async function getExtractedMockPreviewText(document = {}) {
+  try {
+    const extraction = await extractMockDocument({
+      documentIdOrSlug: document.id || document.mockId || document.originalFilename || document.title,
+    });
+    return capPreviewText(extraction.optimizedText || extraction.extractedText || "");
+  } catch {
+    return null;
+  }
 }
 
 function buildFolderDocumentCounts(documents = []) {
@@ -310,6 +327,9 @@ export async function getMockDocumentPreview(documentId) {
     return null;
   }
 
+  const extractedPreview = await getExtractedMockPreviewText(document);
+  const fallbackPreview = document.previewText || document.extractedTextPreview || document.description || null;
+
   return {
     id: document.id,
     title: document.title,
@@ -317,9 +337,9 @@ export async function getMockDocumentPreview(documentId) {
     demoQuestions: document.demoQuestions,
     fileKind: document.fileKind,
     folderName: document.folderName,
-    previewText: document.previewText,
-    previewUnavailable: false,
+    previewText: extractedPreview || fallbackPreview,
+    previewUnavailable: !(extractedPreview || fallbackPreview),
     extractionStatus: "not_started",
-    phaseLimit: "Phase 3A uses manifest or seeded metadata for mock previews only.",
+    phaseLimit: null,
   };
 }

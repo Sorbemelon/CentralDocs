@@ -38,7 +38,9 @@ export const DEMO_LIMITS = Object.freeze({
   promptLength: 1500,
   generateInstructionLength: 2000,
   searchQueryLength: 500,
-  retrievalTopK: 6,
+  retrievalTopK: 15,
+  visibleReferences: 10,
+  contextSelectionDocumentLimit: 10,
 });
 
 /** Center work area tabs (components, not routes). */

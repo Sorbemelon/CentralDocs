@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { AlertTriangle, Loader2, Upload, X } from "lucide-react";
+import { AlertTriangle, Loader2, Paperclip, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/cn";
@@ -68,7 +68,7 @@ function SourceUploadCard({ ws, className }) {
     </Button>
   ) : (
     <Button size="xs" variant="secondary" onClick={pickFile} disabled={uploading} className="h-10 w-full">
-      <Upload /> Upload File
+      <Paperclip /> Browse
     </Button>
   );
 

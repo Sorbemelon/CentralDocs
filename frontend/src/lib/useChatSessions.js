@@ -1,21 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createChat, deleteChat, getChat, listChats, updateChat } from "@/services/chatApi";
 import { isLocalChatId, normalizeChat } from "./workspaceData";
-import { FALLBACK_CHATS } from "@/data/mockWorkspaceFallback";
-
-function toLocalChat(c) {
-  return {
-    id: c.id,
-    title: c.title,
-    contextCount: c.contextCount ?? 0,
-    docCount: c.contextCount ?? 0,
-    folderCount: 0,
-    messageCount: c.messageCount ?? 0,
-    selectedDocumentIds: c.selectedDocumentIds || [],
-    selectedFolderIds: c.selectedFolderIds || [],
-    local: true,
-  };
-}
 
 function selectionFromChat(chat) {
   return {
@@ -25,14 +10,38 @@ function selectionFromChat(chat) {
   };
 }
 
+const CHAT_TITLE_MAX_LENGTH = 120;
+
+function buildUniqueChatTitle(baseTitle = "New chat", existingChats = [], { excludeChatId = null } = {}) {
+  const base = String(baseTitle || "New chat").trim() || "New chat";
+  const excluded = excludeChatId ? String(excludeChatId) : null;
+  const existing = new Set(
+    existingChats
+      .filter((chat) => !excluded || String(chat.id) !== excluded)
+      .map((chat) => String(chat.title || "").trim().toLowerCase())
+      .filter(Boolean),
+  );
+
+  if (!existing.has(base.toLowerCase())) return base;
+
+  for (let index = 2; index <= existing.size + 2; index += 1) {
+    const suffix = ` (${index})`;
+    const candidate = `${base.slice(0, CHAT_TITLE_MAX_LENGTH - suffix.length).trimEnd()}${suffix}`;
+    if (!existing.has(candidate.toLowerCase())) return candidate;
+  }
+
+  const suffix = ` (${Date.now()})`;
+  return `${base.slice(0, CHAT_TITLE_MAX_LENGTH - suffix.length).trimEnd()}${suffix}`;
+}
+
 /**
  * Chat session list + active chat. Backend-driven when online, local temporary
  * chats when offline. Exposes the active chat's persisted selection so the
  * workspace can hydrate the selected context.
  */
 export function useChatSessions({ online }) {
-  const [chats, setChats] = useState(() => FALLBACK_CHATS.map(toLocalChat));
-  const [activeChatId, setActiveChatId] = useState(() => FALLBACK_CHATS[0]?.id || null);
+  const [chats, setChats] = useState(() => []);
+  const [activeChatId, setActiveChatId] = useState(null);
   const [activeSelection, setActiveSelection] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -51,7 +60,9 @@ export function useChatSessions({ online }) {
 
   const load = useCallback(async () => {
     if (!online) {
-      setChats(FALLBACK_CHATS.map(toLocalChat));
+      setChats([]);
+      setActiveChatId(null);
+      setActiveSelection(null);
       return;
     }
     setLoading(true);
@@ -63,7 +74,12 @@ export function useChatSessions({ online }) {
       setChats(list);
       setActiveChatId((prev) => (prev && list.some((c) => c.id === prev) ? prev : list[0]?.id || null));
     } catch (err) {
-      if (mounted.current) setError(err); // keep fallback chats
+      if (mounted.current) {
+        setError(err);
+        setChats([]);
+        setActiveChatId(null);
+        setActiveSelection(null);
+      }
     } finally {
       if (mounted.current) setLoading(false);
     }
@@ -113,9 +129,10 @@ export function useChatSessions({ online }) {
   const setActiveChat = useCallback((id) => setActiveChatId(id), []);
 
   const newChat = useCallback(async ({ selectedDocumentIds = [], selectedFolderIds = [] } = {}) => {
+    const title = buildUniqueChatTitle("New chat", chatsRef.current);
     if (online) {
       try {
-        const res = await createChat({ title: "New chat", selectedDocumentIds, selectedFolderIds });
+        const res = await createChat({ title, selectedDocumentIds, selectedFolderIds });
         const chat = normalizeChat(res.chat);
         setChats((prev) => [chat, ...prev]);
         setActiveChatId(chat.id);
@@ -126,7 +143,7 @@ export function useChatSessions({ online }) {
     }
     const localChat = {
       id: `local-${Date.now()}`,
-      title: "New chat",
+      title: online ? buildUniqueChatTitle("Unsaved chat", chatsRef.current) : title,
       contextCount: selectedDocumentIds.length + selectedFolderIds.length,
       docCount: selectedDocumentIds.length,
       folderCount: selectedFolderIds.length,
@@ -142,11 +159,13 @@ export function useChatSessions({ online }) {
 
   const removeChat = useCallback(
     async (id) => {
+      let response = null;
       if (online && !isLocalChatId(id)) {
-        await deleteChat(id);
+        response = await deleteChat(id);
       }
       setChats((prev) => prev.filter((c) => c.id !== id));
       setActiveChatId((prev) => (prev === id ? chatsRef.current.find((c) => c.id !== id)?.id || null : prev));
+      return response;
     },
     [online],
   );
@@ -158,7 +177,19 @@ export function useChatSessions({ online }) {
       const idx = prev.findIndex((c) => c.id === chat.id);
       if (idx === -1) return prev;
       const next = prev.slice();
-      next[idx] = { ...next[idx], ...chat };
+      const previous = next[idx];
+      next[idx] = {
+        ...previous,
+        ...chat,
+        selectedDocumentIds:
+          chat.selectedDocumentIds?.length || !previous.selectedDocumentIds?.length
+            ? chat.selectedDocumentIds || []
+            : previous.selectedDocumentIds,
+        selectedFolderIds:
+          chat.selectedFolderIds?.length || !previous.selectedFolderIds?.length
+            ? chat.selectedFolderIds || []
+            : previous.selectedFolderIds,
+      };
       return next;
     });
   }, []);
@@ -166,7 +197,7 @@ export function useChatSessions({ online }) {
   // Rename a chat (backend when online + saved; local otherwise).
   const renameChat = useCallback(
     async (id, title) => {
-      const name = String(title || "").trim();
+      const name = buildUniqueChatTitle(title, chatsRef.current, { excludeChatId: id });
       if (!id || !name) return;
       if (online && !isLocalChatId(id)) {
         const res = await updateChat(id, { title: name });

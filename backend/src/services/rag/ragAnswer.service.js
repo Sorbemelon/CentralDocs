@@ -3,6 +3,7 @@ import { CHAT_MESSAGE_STATUS, CHAT_ROLE } from "../../constants/chat.constants.j
 import { CHAT_SESSION_ERROR_CODE } from "../../constants/chatSession.constants.js";
 import { createHttpError, HttpError } from "../../utils/httpError.js";
 import { assertCanSendAiPrompt } from "../demo/demoUsage.service.js";
+import { applyDemoSessionUsageDelta, getDemoSession } from "../demo/demoSession.service.js";
 import * as defaultChatMessageRepository from "../chats/chatMessage.repository.js";
 import { toChatMessageDto } from "../chats/chatMessage.dto.js";
 import * as defaultChatSessionRepository from "../chats/chatSession.repository.js";
@@ -13,6 +14,7 @@ import { buildRagContext } from "./ragContext.service.js";
 import { loadRagHistory } from "./ragHistory.service.js";
 import { buildRagPrompt } from "./ragPromptBuilder.service.js";
 import { toRagAnswerResponseDto } from "./ragAnswer.dto.js";
+import { formatReferencesForChatAnswer } from "./ragReferenceFormatter.service.js";
 
 const NO_EVIDENCE_MESSAGE =
   "I could not find relevant source evidence in the selected documents for that question. Try selecting a different document or folder, or ask about material that appears in the selected context.";
@@ -24,6 +26,8 @@ const defaultDependencies = Object.freeze({
   historyLoader: loadRagHistory,
   promptBuilder: buildRagPrompt,
   generator: generateTextWithLane,
+  demoSessionReader: getDemoSession,
+  demoSessionUsageUpdater: applyDemoSessionUsageDelta,
   now: () => new Date(),
 });
 
@@ -58,22 +62,28 @@ function toAiPromptLimitError(error) {
   return error;
 }
 
-function assertAiPromptAvailable(chat = {}) {
+function assertAiPromptAvailable(usageSource = {}) {
   try {
-    assertCanSendAiPrompt({ usage: { aiPrompts: chat.aiPromptCount || 0 } });
+    assertCanSendAiPrompt(usageSource);
   } catch (error) {
     throw toAiPromptLimitError(error);
   }
 }
 
-function usageFromChat(chat = {}) {
+async function assertAiPromptAvailableForDemoSession({ deps, demoSessionId, chat } = {}) {
+  const session = (await deps.demoSessionReader?.(demoSessionId)) || null;
+  assertAiPromptAvailable(session || { usage: { aiPrompts: chat.aiPromptCount || 0 } });
+}
+
+function usageFromChat(chat = {}, usageSession = null) {
+  const usage = usageSession?.usage || {};
   return {
-    uploadedFiles: 0,
-    chatSessions: 0,
-    aiPrompts: chat.aiPromptCount || 0,
-    generatedDocuments: 0,
-    userFolders: 0,
-    storageBytes: 0,
+    uploadedFiles: usage.uploadedFiles || 0,
+    chatSessions: usage.chatSessions || 0,
+    aiPrompts: usage.aiPrompts ?? chat.aiPromptCount ?? 0,
+    generatedDocuments: usage.generatedDocuments || 0,
+    userFolders: usage.userFolders || 0,
+    storageBytes: usage.storageBytes || 0,
   };
 }
 
@@ -113,6 +123,35 @@ async function createAssistantMessage({
   });
 }
 
+async function rollbackAcceptedUserMessage({ deps, chatId, demoSessionId, userMessage } = {}) {
+  const messageId = userMessage?._id || userMessage?.id;
+  if (!messageId || typeof deps.chatMessageRepository.deleteMessageById !== "function") {
+    return;
+  }
+
+  const deleted = await deps.chatMessageRepository.deleteMessageById({
+    messageId,
+    chatSessionId: chatId,
+    demoSessionId,
+  });
+  if ((deleted?.deletedCount || 0) > 0) {
+    await deps.chatSessionRepository.incrementMessageCount({
+      chatId,
+      demoSessionId,
+      at: deps.now(),
+      delta: -1,
+    });
+  }
+}
+
+async function recordAiPromptUsage({ deps, demoSessionId } = {}) {
+  try {
+    return (await deps.demoSessionUsageUpdater?.(demoSessionId, { aiPrompts: 1 })) || null;
+  } catch {
+    return null;
+  }
+}
+
 export async function answerChatMessageWithRag({
   chatId,
   demoSessionId,
@@ -138,6 +177,7 @@ export async function answerChatMessageWithRag({
       semanticSearcher: deps.semanticSearcher,
       selectionRepositories: deps.selectionRepositories || {},
       searchDependencies: deps.searchDependencies || {},
+      chunkRepository: deps.chunkRepository,
     }));
 
   if (context.hasOverride) {
@@ -177,7 +217,7 @@ export async function answerChatMessageWithRag({
     });
   }
 
-  assertAiPromptAvailable(chat);
+  await assertAiPromptAvailableForDemoSession({ deps, demoSessionId, chat });
   const history = await deps.historyLoader({
     chatSession: chat,
     chatSessionId: chatId,
@@ -206,20 +246,8 @@ export async function answerChatMessageWithRag({
       demoSessionId,
       at: deps.now(),
     });
-    const failedAssistant = await createAssistantMessage({
-      deps,
-      chat,
-      demoSessionId,
-      content: "The assistant answer could not be generated safely. Please try again.",
-      status: CHAT_MESSAGE_STATUS.FAILED,
-      referencesUsed: context.references,
-      aiMeta: null,
-    });
-    await deps.chatSessionRepository.incrementMessageCount({
-      chatId,
-      demoSessionId,
-      at: deps.now(),
-    });
+    await recordAiPromptUsage({ deps, demoSessionId });
+    await rollbackAcceptedUserMessage({ deps, chatId, demoSessionId, userMessage });
 
     if (error instanceof HttpError) {
       throw error;
@@ -228,10 +256,14 @@ export async function answerChatMessageWithRag({
       502,
       "RAG chat answer generation failed.",
       CHAT_SESSION_ERROR_CODE.RAG_ANSWER_FAILED,
-      { assistantMessageId: failedAssistant._id || failedAssistant.id },
     );
   }
 
+  const referencesUsed = formatReferencesForChatAnswer({
+    references: context.references,
+    answerText: generation.text,
+  });
+  const promptUsageSession = await recordAiPromptUsage({ deps, demoSessionId });
   await deps.chatSessionRepository.incrementAiPromptCount({
     chatId,
     demoSessionId,
@@ -242,7 +274,7 @@ export async function answerChatMessageWithRag({
     chat,
     demoSessionId,
     content: generation.text,
-    referencesUsed: context.references,
+    referencesUsed,
     aiMeta: buildAiMeta(generation),
   });
   const updatedChat = assertChatFound(
@@ -259,7 +291,7 @@ export async function answerChatMessageWithRag({
     }),
     userMessage: toChatMessageDto(userMessage),
     assistantMessage: toChatMessageDto(assistant),
-    references: context.references,
-    usage: usageFromChat(updatedChat),
+    references: referencesUsed,
+    usage: usageFromChat(updatedChat, promptUsageSession),
   });
 }
