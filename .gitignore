@@ -51,6 +51,11 @@ __pycache__/
 .claude/settings.local.json
 *.local.json
 .scopian/
+.tmp*
+
+# Impeccable local files
+DESIGN.md
+PRODUCT.md
 
 # Scopian local/generated files
 docs/scopian/views/**/checks/

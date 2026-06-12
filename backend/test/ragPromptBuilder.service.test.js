@@ -13,17 +13,18 @@ test("RAG prompt builder includes question, history, selection, references, and 
       rollingSummary: "We discussed adoption blockers.",
       recentMessages: [{ role: "user", content: "Earlier question", createdAt: null }],
     },
-    references: [
-      {
-        citationNumber: 1,
-        documentTitle: "Rollout Plan",
-        fileType: "pptx",
-        folderName: "Strategy",
-        excerptPreview: "Training adoption is a risk.",
-        objectKey: "mock/secret",
-        embedding: [0.1],
-      },
-    ],
+    references: Array.from({ length: 6 }, (_, index) => ({
+      citationNumber: index + 1,
+      documentTitle: index === 0 ? "Rollout Plan" : `Evidence Source ${index + 1}`,
+      fileType: index === 0 ? "pptx" : "md",
+      folderName: "Strategy",
+      excerptPreview:
+        index === 0
+          ? "Training adoption is a risk."
+          : `Relevant evidence from source ${index + 1}.`,
+      objectKey: "mock/secret",
+      embedding: [0.1],
+    })),
   });
   const combined = `${built.systemInstruction}\n${built.prompt}`;
 
@@ -31,9 +32,11 @@ test("RAG prompt builder includes question, history, selection, references, and 
   assert.ok(combined.includes("We discussed adoption blockers."));
   assert.ok(combined.includes("Rollout Plan"));
   assert.ok(combined.includes("[1]"));
+  assert.ok(combined.includes("[6]"));
+  assert.ok(combined.includes("Evidence Source 6"));
   assert.ok(combined.includes("Do not invent"));
   assert.ok(combined.includes("Cite document evidence inline"));
-  assert.ok(combined.includes("do not stop at five sources"));
+  assert.ok(combined.includes("For broad summaries, use evidence across all of the selected documents."));
   assert.equal(combined.includes("objectKey"), false);
   assert.equal(combined.includes("embedding"), false);
   assert.equal(combined.includes("mock/secret"), false);
