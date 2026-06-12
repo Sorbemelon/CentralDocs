@@ -2,43 +2,24 @@
 
 ## Story
 
-The mock workspace is a fictional business scenario called Orchid Retail Digital Transformation. Orchid Retail is replacing scattered documents, spreadsheets, meeting notes, and support knowledge with CentralDocs.
+The mock workspace uses a fictional business scenario called Orchid Retail Digital Transformation. Orchid Retail is a demo corpus only; it is not the CentralDocs product identity.
 
-All mock files must relate to the same story so semantic search, chat, references, and generated documents feel useful.
+All mock files should relate to the same story so semantic search, RAG chat, citations, and generated documents feel connected.
 
-## Folders and files
+## Seeded corpus
 
-1. Strategy & Rollout
-   - CentralDocs Transformation Brief.md
-   - Digital Workspace Rollout Plan.pptx
-   - Intake-to-AI-Search Workflow.png
+The current seeded corpus contains 16 mock documents across stable folders.
 
-2. Document Operations
-   - Document Management Policy.pdf
-   - Remote Approval SOP.docx
-   - Support Knowledge Playbook.tsv
+Representative folders:
 
-3. Finance & Vendors
-   - Vendor Onboarding Checklist.docx
-   - Invoice Tracking Sample.xlsx
-   - Expense Reimbursement Guide.pdf
+- Strategy & Rollout
+- Document Operations
+- Finance & Vendors
+- Customer & Support Signals
+- Meeting Evidence
+- Generated Examples
 
-4. Customer & Support Signals
-   - Customer Feedback Export.csv
-   - Support Ticket Summary.md
-
-5. Meeting Evidence
-   - Rollout Risk Discussion.mp3
-   - Rollout Risk Discussion Transcript.md
-   - Staff Training Demo.mp4
-   - Staff Training Demo Notes.md
-
-6. Generated Examples
-   - Example Chat Summary.md
-
-## File support demonstration
-
-The mock data shows these file types:
+Representative file types:
 
 - Markdown
 - PDF
@@ -51,12 +32,48 @@ The mock data shows these file types:
 - MP3
 - MP4
 
-Public upload remains limited to lightweight document/text types.
+Public upload remains limited to lightweight document/text formats. Rich media, XLSX, and PPTX appear only through controlled mock seed data.
 
-## Media indexing rule
+## Stable identity
 
-Audio/video mock files are real files and downloadable. Their intended indexing path is direct Gemini multimodal embedding once during seeding, then cached vector use in the demo. Transcript/notes are included for fallback preview and user verification.
+Mock folders/documents use stable public identity so seeded data can be reloaded without breaking frontend references.
 
-## Manifest
+Required identity behavior:
 
-`backend/mock-data/manifest.json` should include file title, folder, filename, file kind, MIME type, source type, read-only flag, indexing mode, demo questions, expected topics, and relationships.
+- stable mock document IDs.
+- stable mock folder IDs.
+- `folderMockId` links documents to seeded mock folders.
+- mock folders are read-only.
+- mock documents are read-only.
+- mock data is preserved on Clear Session and expired session cleanup.
+
+## Media and sidecar data
+
+Mock audio/video/image files are real files and downloadable after seeding.
+
+Media indexing behavior:
+
+- Direct Gemini multimodal embedding can run during controlled seed/index work.
+- Cached `media_direct` chunks are stored in MongoDB.
+- Runtime demo prompts reuse cached media chunks.
+- Transcript or notes files can exist beside media for preview and verification.
+
+## Manifest expectations
+
+The mock manifest should describe:
+
+- title.
+- folder slug or folder mock ID.
+- filename.
+- file kind.
+- MIME type.
+- source type.
+- read-only flag.
+- indexing mode.
+- sidecar extraction file when present.
+- demo topics.
+- suggested question relationships.
+
+## Demo questions
+
+Suggested questions should be short, easy to understand, and tied to actual mock files. When a suggested question is clicked, the frontend may select associated mock files and clear unrelated selections.

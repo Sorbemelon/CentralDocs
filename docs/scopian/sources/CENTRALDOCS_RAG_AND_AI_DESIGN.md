@@ -1,124 +1,142 @@
 # CentralDocs RAG and AI Design
 
-## AI layers
+## AI provider and configuration
 
-CentralDocs separates embeddings from generation.
+CentralDocs uses Gemini for embeddings and generation. Runtime AI and vector-search configuration is centralized in backend environment config.
 
-Embedding lane:
+Required configuration variables:
 
-- Model: `gemini-embedding-2`
-- Dimensions: `768`
-- Purpose: semantic search, chat retrieval, generated document indexing, mock media cached embeddings.
+- `AI_PROVIDER`
+- `GEMINI_EMBEDDING_MODEL`
+- `GEMINI_EMBEDDING_DIMENSIONS`
+- `GEMINI_GENERATION_PRIMARY_MODEL`
+- `GEMINI_GENERATION_FALLBACK_MODEL_1`
+- `GEMINI_GENERATION_FALLBACK_MODEL_2`
+- `MONGODB_VECTOR_INDEX_NAME`
+- `MONGODB_VECTOR_PATH`
 
-Generation lane:
+Defaults:
 
-- Primary: `gemini-3.5-flash`
-- Fallback 1: `gemini-3-flash-preview`
-- Fallback 2: `gemini-2.5-flash`
+- Embedding model: `gemini-embedding-2`
+- Embedding dimensions: `768`
+- Generation primary model: `gemini-3.5-flash`
+- Generation fallback 1: `gemini-3-flash-preview`
+- Generation fallback 2: `gemini-2.5-flash`
+- Vector index: `document_chunks_vector_index`
+- Vector path: `embedding`
 
-Failure handling:
+Model names and vector metadata may be shown in safe dependency summaries. API keys, raw provider requests, hidden prompts, and raw provider errors must not be exposed.
 
-1. Try current key slot and primary model.
-2. If rate-limited, rotate key slots on same model.
-3. If all key slots fail, use fallback model 1.
-4. If still failing, use fallback model 2.
-5. If all fail, return graceful demo-limit response.
+## Embedding lane
 
-Key rotation only helps when keys belong to separate quota pools/projects. Do not expose key information in UI.
+Embedding is used for:
 
-## Extraction optimization
+- mock document indexing.
+- uploaded document indexing.
+- generated document indexing.
+- semantic search query vectors.
+- RAG retrieval.
+- controlled direct mock media embedding cache.
 
-Do not embed raw full documents blindly.
+Embedding validation uses the configured dimensions. Current production/demo behavior expects 768 dimensions.
+
+## Generation lane
+
+Generation uses a primary model plus configured fallback models. The lane supports key-slot rotation and fallback when rate limits or provider errors occur.
+
+Generation actions include:
+
+- RAG chat answers.
+- generated Markdown documents from chat.
+
+Provider failures should return safe errors. The frontend should not create fake assistant answers for provider failures.
+
+## Extraction and chunking
+
+CentralDocs should avoid embedding raw full documents when optimized text is available.
 
 Keep:
 
 - headings.
 - section titles.
 - important paragraphs.
-- table headers.
-- compact table rows.
-- page/slide/sheet/row/timestamp locators.
-- short media descriptions.
+- table headers and compact row summaries.
+- page, slide, sheet, row, and media timestamp locators.
+- useful media descriptions.
 
-Remove/compress:
+Compress or remove:
 
 - repeated headers/footers.
-- duplicate whitespace.
+- duplicated whitespace.
 - boilerplate repeated across pages.
-- very long rows.
 - styling-only text.
 - OCR duplicates.
 
-Budgets:
-
-- max optimized text per uploaded file: 24,000 characters.
-- target chunk: 700-900 tokens.
-- overlap: ~80 tokens.
-- max chunks per uploaded file: 10.
-- max chunks per generated document: 8.
-- topK retrieval per chat answer: 6.
+Chunk records keep source locators so answers can cite document sections, pages, sheets, rows, slides, or media timestamps.
 
 ## Retrieval behavior
 
-Chat retrieval always filters by the resolved document snapshot for the prompt. It excludes trashed documents/folders and non-ready documents.
+RAG retrieval uses the selected document/folder context for the prompt. It excludes trashed and non-ready documents.
 
-Search filter fields:
+Current retrieval limits:
 
-- demoSessionId
-- documentId
-- folderId
-- scope
-- fileKind
-- lifecycleStatus
-- status
+- `topKRetrieval`: 15
+- `visibleReferences`: 10
+- selected-document reference backfill can add one indexed chunk per selected document when retrieval misses an explicitly selected source.
 
-## Chat context
+The prompt builder should encourage use of all available relevant evidence and should not artificially stop at a lower source count when more relevant references are available.
 
-Use:
+## Search behavior
+
+Semantic search accepts query text, selected document IDs, selected folder IDs, scope, and topK. Search results return citation-shaped source references without raw vectors.
+
+Search and RAG share vector-search metadata:
+
+- configured vector index name.
+- configured vector path.
+- configured embedding dimensions.
+
+## Chat prompt context
+
+Prompt context includes:
 
 - current user prompt.
-- resolved document selection.
+- selected document IDs.
+- selected folder IDs resolved to documents.
 - retrieved source chunks.
-- recent 8 messages.
-- rolling summary for long chats.
+- selected-document backfill references where needed.
+- recent chat messages and rolling summary when present.
 
-Keep chat memory separate from document evidence. Document evidence drives references.
+Chat memory supports continuity, but document evidence drives answer grounding and references.
 
-## References used
+## Reference formatting
 
-Every assistant answer should save and show references used.
+References are deduped at source/chunk level. When possible, dedupe by document ID and chunk ID. If chunk ID is missing, dedupe by document ID, source locator, and excerpt preview.
 
-Reference object includes:
+Citation parsing supports:
 
-- citation number.
-- document title.
-- file type.
-- folder.
-- chunk ID.
-- source locator: page, slide, sheet, row range, media timestamp.
-- excerpt preview.
-- similarity score.
-- used-for note.
+- `[1]`
+- `[1, 2]`
+- `[1-3]`
+- `[1-3,5]`
+- `[1-3,5-8]`
 
-UI default:
+If the model cites specific numbers, displayed references should match those cited numbers when safe. If the model does not cite, display the deduped evidence references supplied to the model.
 
-```text
-▸ References used: 3
-```
+The same source/chunk should not appear under multiple citation numbers in a single answer.
 
-## Mock media indexing
+## Assistant rendering
 
-Mock audio/video files must be real downloadable files. For demo efficiency, direct Gemini multimodal embedding for mock media should run only during mock-data seeding or controlled pre-indexing. Store the resulting media embeddings/chunks in MongoDB and reuse them in demo. Do not re-embed mock media on each user prompt.
-
-Implementation rule:
-
-```text
-Seed/build step: direct Gemini multimodal embedding once -> save cached embeddings.
-Runtime demo: use cached media embeddings and source locators.
-```
-
-Include transcript/notes beside media for fallback previews and human verification, but the intended demo indexing path for media is direct multimodal embedding once, then cached use.
+Assistant answers are Markdown and should render safely in the frontend without raw HTML execution. Supported visible formats include paragraphs, lists, bold text, inline code, code blocks, blockquotes, and tables when the renderer supports GFM.
 
 ## Generated documents
 
-Generated documents are produced through a separate Generate Document action with free-form instruction. Output defaults to Markdown. The generated file is uploaded to S3, stored as a Document, indexed, and can be cited in future answers.
+Generated documents are produced through explicit Generate Document actions. The instruction is optional. Empty instruction uses the default summary behavior: create a clear reusable document with key points, decisions, risks, next steps, and references when available.
+
+Generated output defaults to Markdown, is stored in S3, registered as a Document, indexed, previewable, downloadable, attachable, and searchable.
+
+## Mock media indexing
+
+Mock audio/video/image assets are real files. Controlled seed/index workflows can use direct Gemini multimodal embedding once and cache `media_direct` chunks in MongoDB. Runtime demo prompts should reuse cached media chunks and source locators instead of re-embedding media each time.
+
+Transcripts/notes may exist beside media files for fallback preview and human verification.

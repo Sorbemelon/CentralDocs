@@ -2,72 +2,72 @@ sources:
   - id: SRC-autumdata-reference-boundary
     path: docs/scopian/sources/AUTUMDATA_REFERENCE_BOUNDARY.md
     status: active
-    content_hash: sha256:1ca18870b63cf2308ecd97b40ce82d02d3e593b8a60c493471c497956b805970
+    content_hash: sha256:257347d3cfafecd0b29375bbf14058995253f1ff9cb84ae3396894ac68a53deb
     registered_at: 2026-06-09T02:42:04+07:00
-    updated_at: 2026-06-09T02:42:04+07:00
+    updated_at: 2026-06-12T20:40:18+07:00
   - id: SRC-centraldocs-agent-protocol
     path: docs/scopian/sources/CENTRALDOCS_AGENT_PROTOCOL.md
     status: active
-    content_hash: sha256:050f94c5b292d834ca9b6a1a3eb1811ab3bab8c7f28ae1995f602e41a74a58fe
+    content_hash: sha256:ff1103a716313cb9d1d891ba7025bfddd066d9647f50b1f014d71bec45fa18d1
     registered_at: 2026-06-09T02:42:04+07:00
-    updated_at: 2026-06-09T02:42:04+07:00
+    updated_at: 2026-06-12T20:40:18+07:00
   - id: SRC-centraldocs-api-contract
     path: docs/scopian/sources/CENTRALDOCS_API_CONTRACT.md
     status: active
-    content_hash: sha256:69e59d6309e5580e0fdd058bc5079bc09e2e122bddc94f845c8e65d5d8326365
+    content_hash: sha256:7946ba91ea32b6da98bf48f3ce824dbc2dcbc4ec6fc9291b4e42ceeab612b05d
     registered_at: 2026-06-09T02:42:04+07:00
-    updated_at: 2026-06-09T02:42:04+07:00
+    updated_at: 2026-06-12T20:40:18+07:00
   - id: SRC-centraldocs-architecture
     path: docs/scopian/sources/CENTRALDOCS_ARCHITECTURE.md
     status: active
-    content_hash: sha256:905e747805c68d63b389571a8c0f745cdf71d06f2b9b099d48b4b7c3e717e569
+    content_hash: sha256:4e451e6f0f741afbc5a4e68440d5eb2e8916d19bd6e74475f517e68c3e77c1a9
     registered_at: 2026-06-09T02:42:04+07:00
-    updated_at: 2026-06-09T02:42:04+07:00
+    updated_at: 2026-06-12T20:40:18+07:00
   - id: SRC-centraldocs-data-model
     path: docs/scopian/sources/CENTRALDOCS_DATA_MODEL.md
     status: active
-    content_hash: sha256:4d7d6556237d4ff5a50c2ad37778a7ad9876c714c711d649a13db5da7f2aeaca
+    content_hash: sha256:971551fcdebb2eb4189a80215d73113e93e3cd30683ccad295a6d11606b365d9
     registered_at: 2026-06-09T02:42:04+07:00
-    updated_at: 2026-06-09T02:42:04+07:00
+    updated_at: 2026-06-12T20:40:18+07:00
   - id: SRC-centraldocs-demo-mode
     path: docs/scopian/sources/CENTRALDOCS_DEMO_MODE.md
     status: active
-    content_hash: sha256:560745ee7b5f668f5ecae75e5ac084f3a37443768fb8711aa36003acb8e714e6
+    content_hash: sha256:46a8c50f4e5df4991be3a2ca2e1fd4b2cba880433780fba368202317bb06b080
     registered_at: 2026-06-09T02:42:04+07:00
-    updated_at: 2026-06-09T02:42:04+07:00
+    updated_at: 2026-06-12T20:40:18+07:00
   - id: SRC-centraldocs-mock-data-spec
     path: docs/scopian/sources/CENTRALDOCS_MOCK_DATA_SPEC.md
     status: active
-    content_hash: sha256:8b16910718fc8262ada5e8eb613bbb395a743872f057f4ff2829c4360d7dc2cf
+    content_hash: sha256:5cf902dcbd135e9729fdb49a8454721d1c3c88a3a1ee62ffbc642d994992d14c
     registered_at: 2026-06-09T02:42:04+07:00
-    updated_at: 2026-06-09T02:42:04+07:00
+    updated_at: 2026-06-12T20:40:18+07:00
   - id: SRC-centraldocs-product-scope
     path: docs/scopian/sources/CENTRALDOCS_PRODUCT_SCOPE.md
     status: active
-    content_hash: sha256:aeb20a292cf5656a9ede4c53b5c6e7d1fa5b4fc39ec3a91efba96cd3869af373
+    content_hash: sha256:c5e81aed187d201b4f0f510cb25dbebaea57a830251c9c3a7219fe6137c1fa41
     registered_at: 2026-06-09T02:42:04+07:00
-    updated_at: 2026-06-09T02:42:04+07:00
+    updated_at: 2026-06-12T20:40:18+07:00
   - id: SRC-centraldocs-public-private-boundary
     path: docs/scopian/sources/CENTRALDOCS_PUBLIC_PRIVATE_BOUNDARY.md
     status: active
-    content_hash: sha256:a492c982fd3c9045ac7d27dd7cf0a9f480cee06f65c8318ddb53fd3d4dcb292e
+    content_hash: sha256:77dc5905356e3d3702fdc5a2b6a2f914ed89cf330fd46bf964e1c05a4e4679c3
     registered_at: 2026-06-09T02:42:04+07:00
-    updated_at: 2026-06-09T02:42:04+07:00
+    updated_at: 2026-06-12T20:40:18+07:00
   - id: SRC-centraldocs-rag-and-ai-design
     path: docs/scopian/sources/CENTRALDOCS_RAG_AND_AI_DESIGN.md
     status: active
-    content_hash: sha256:3109a796ed13b76078f4f8ea7be38d81de51c772a7bf86b1374ef256c9f79d04
+    content_hash: sha256:aadcbe9cbb36a1bff7e576dee1f67739b37a2c715709c0785d605cbff1cd4d43
     registered_at: 2026-06-09T02:42:04+07:00
-    updated_at: 2026-06-09T02:42:04+07:00
+    updated_at: 2026-06-12T20:40:18+07:00
   - id: SRC-centraldocs-storage-design
     path: docs/scopian/sources/CENTRALDOCS_STORAGE_DESIGN.md
     status: active
-    content_hash: sha256:cf87f44d00c544ef4961b2af46cfb21d66e18aae74ad6ab33be0f5f73ff603ec
+    content_hash: sha256:f4c4df6afa37da662397c95681d86db2bf13dd1b03cab011221d0f296180295f
     registered_at: 2026-06-09T02:42:04+07:00
-    updated_at: 2026-06-09T02:42:04+07:00
+    updated_at: 2026-06-12T20:40:18+07:00
   - id: SRC-centraldocs-ux-spec
     path: docs/scopian/sources/CENTRALDOCS_UX_SPEC.md
     status: active
-    content_hash: sha256:befc354df7997865ae633cc47c0da474068a72805fb747aa7f322c66bb74f57b
+    content_hash: sha256:ea34a4a816ca8649b98270688e8dae5cfc162170d5ae725861b5777e23f695d4
     registered_at: 2026-06-09T02:42:04+07:00
-    updated_at: 2026-06-09T02:42:04+07:00
+    updated_at: 2026-06-12T20:40:18+07:00

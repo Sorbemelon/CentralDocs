@@ -2,66 +2,106 @@
 
 ## Storage layers
 
-MongoDB Atlas:
+MongoDB Atlas stores metadata, session state, document chunks, embeddings, chat records, references, usage, quota windows, and AI routing attempts.
 
-- metadata.
-- folders.
-- demo sessions.
-- document chunks.
-- embeddings.
-- chat sessions/messages.
-- references.
-- AI routing attempts.
-- usage events.
+AWS S3 stores file objects:
 
-AWS S3:
+- seeded mock files.
+- uploaded originals.
+- generated Markdown documents.
 
-- mock files.
-- uploaded files.
-- generated `.md`/`.txt` files.
+Render local filesystem is temporary and must not be treated as durable storage.
 
-Render local disk is not trusted for persistent data.
+## S3 object key patterns
 
-## S3 object key convention
+Allowed CentralDocs object-key prefixes:
+
+```text
+mock/
+demo-sessions/<sessionId>/uploads/
+demo-sessions/<sessionId>/generated/
+```
+
+Examples:
 
 ```text
 mock/orchid-retail/original/<documentId>/<safeFilename>
-
-demo-sessions/<demoSessionId>/uploads/<documentId>/<safeFilename>
-demo-sessions/<demoSessionId>/generated/<documentId>/<safeFilename>
+demo-sessions/<sessionId>/uploads/<documentId>/<safeFilename>
+demo-sessions/<sessionId>/generated/<documentId>/<safeFilename>
 ```
 
-Use sanitized filenames and generated document IDs. Do not trust raw user filenames as object keys.
+Object keys are internal. Public DTOs and UI must not expose them.
+
+## Upload original storage
+
+Uploads save the original file to S3 before processing. If metadata creation fails after S3 save, backend cleanup should delete the orphan upload object when the key is under the safe upload prefix. Mock keys must never be deleted by upload cleanup.
+
+Failed uploaded-document processing can be retried by reading the original object from S3 and rerunning the processing/indexing path.
+
+## Generated document storage
+
+Generated documents are written as Markdown, uploaded to S3 under the generated prefix, stored as normal Document records, indexed, previewable, downloadable, searchable, and attachable.
+
+Filename defaults and uniqueness are handled before persistence. The default generated filename is `summary.md`, with numbered suffixes when needed.
 
 ## Download flow
 
-1. User clicks Download.
-2. Backend verifies document access through mock scope or demo session.
-3. Backend creates time-limited S3 presigned URL or streams the file.
-4. Browser downloads the file.
+1. User requests a download.
+2. Backend verifies access through mock scope or demo session ownership.
+3. Backend returns a time-limited presigned S3 URL from `POST /api/documents/:documentId/download-url`.
+4. Browser uses the URL to download the file.
 
-## Soft delete
+The download response can include safe filename and expiry metadata. It must not expose raw object keys or secrets.
 
-User-deleted files/folders are soft-deleted until clear session or expiry.
+## Soft delete and restore
+
+User-created documents and folders are soft-deleted first.
 
 Soft-deleted items:
 
-- hidden from normal workspace.
-- shown in Trash filter.
-- excluded from semantic search.
-- excluded from chat attachment selector.
-- excluded from RAG retrieval.
-- S3 object remains until hard cleanup.
+- are hidden from active source lists.
+- appear in Trash.
+- are excluded from semantic search.
+- are excluded from RAG retrieval.
+- keep S3 objects until hard cleanup.
 
-Hard delete only on:
+Restore returns eligible session-owned items to active state.
 
-- clear session.
-- session expiry cleanup.
+## Clear-session cleanup
+
+Clear Session and expiry cleanup remove session-created S3 objects under:
+
+```text
+demo-sessions/<sessionId>/
+```
+
+Cleanup must preserve:
+
+```text
+mock/
+```
+
+Cleanup should also remove session-created MongoDB records and chunks. In production, quota usage remains preserved according to the quota policy even though workspace data is removed.
 
 ## Mock files
 
-Mock files are global and read-only. They are stored in S3 and metadata/chunks are seeded into MongoDB. Mock data must never be removed by demo cleanup.
+Mock files are global read-only demo assets. They are stored in S3 under `mock/` and seeded into MongoDB with stable public identity. Mock media files are real downloadable files after seeding.
 
-## Generated files
+Mock assets must not be removed by user delete, clear session, retry cleanup, upload orphan cleanup, or expired session cleanup.
 
-Generated documents are written as `.md` or `.txt`, uploaded to S3, registered as Document records, indexed with Gemini Embedding 2, and can be previewed/downloaded/attached/cited.
+## Safety rules
+
+- Validate object keys before read/delete operations.
+- Allow S3 original-object read only for safe CentralDocs prefixes.
+- Reject path traversal and unsafe key shapes.
+- Return safe storage errors without object-key or provider-secret leakage.
+- Keep presigned URL generation behind access checks.
+- Keep bucket private; use presigned URLs for downloads.
+
+## Deployment checklist
+
+- Configure S3 bucket, region, and credentials in backend environment.
+- Keep bucket objects private.
+- Configure CORS only for intended frontend origins when direct browser download behavior requires it.
+- Ensure Render has backend environment variables for S3 and MongoDB.
+- Seed mock files before expecting mock download URLs to work.
